@@ -411,10 +411,71 @@ func TestLogsAndDelta(t *testing.T) {
 	if err != nil || text != "one\ntwo\n" {
 		t.Fatal(text, err)
 	}
-	for _, c := range []struct{ before, after, want string }{{"a\nb", "a\nb\nc", "\nc"}, {"a\nb\nc", "b\nc\nd", "d"}, {"a", "a", ""}, {"a", "z", "z"}} {
-		if got := logDelta(c.before, c.after); got != c.want {
-			t.Errorf("got %q want %q", got, c.want)
+	for _, c := range []struct {
+		before, after, want string
+		continued           bool
+	}{{"", "a\n", "a\n", true}, {"a\nb", "a\nb\nc", "\nc", true}, {"a\nb\nc", "b\nc\nd", "d", true}, {"a", "a", "", true}, {"a", "z", "z", false}, {"a\n", "", "", false}} {
+		if got, continued := logDelta(c.before, c.after); got != c.want || continued != c.continued {
+			t.Errorf("logDelta(%q, %q) = %q, %t; want %q, %t", c.before, c.after, got, continued, c.want, c.continued)
 		}
+	}
+}
+
+// --follow names the pod it reads, retries a failed read, waits while no pod
+// runs, follows the new pod after a rollout, and says when lines may be
+// missing. Edka's notes go to stderr, never into the log.
+func TestLogsFollowAcrossPods(t *testing.T) {
+	fastPolls(t)
+	interval := minLogInterval
+	minLogInterval = time.Millisecond
+	t.Cleanup(func() { minLogInterval = interval })
+	server, requests := sequenceAPI(t, map[string][]string{
+		"GET /api/deployments": {`{"data":[{"id":"d1","name":"api","cluster_name":"sinaia"}]}`},
+		"GET /api/deployments/d1/logs": {
+			`{"logs":"one\ntwo\n","podName":"api-a"}`,
+			`502 {"error":"Bad gateway"}`,
+			`{"logs":"one\ntwo\nthree\n","podName":"api-a"}`,
+			`404 {"error":"No pods found for deployment"}`,
+			`{"logs":"Container is still starting and has not produced logs yet.","podName":"api-b"}`,
+			`{"logs":"boot\n","podName":"api-b"}`,
+			`{"logs":"seven\neight\n","podName":"api-b"}`,
+			`{"logs":"three\nfour\n","podName":"api-a"}`,
+			`403 {"error":"Forbidden"}`,
+		},
+	})
+	out, errOut, err := execute(t, server.URL, "logs", "api", "--follow", "--interval", "1ms")
+	if err == nil || !strings.Contains(err.Error(), "Forbidden") {
+		t.Fatal(err)
+	}
+	if out != "one\ntwo\nthree\nboot\nseven\neight\nfour\n" {
+		t.Fatalf("%q", out)
+	}
+	inOrder(t, errOut,
+		"Following pod api-a",
+		"Could not read from Edka, trying again",
+		"No pod is running; waiting for one…",
+		"Following pod api-b",
+		"Container is still starting and has not produced logs yet.",
+		"Lines of pod api-b may be missing",
+		"Following pod api-a",
+	)
+	if strings.Count(errOut, "may be missing") != 1 {
+		t.Fatalf("one gap expected:\n%s", errOut)
+	}
+	if (*requests)[0] != "GET /api/deployments" {
+		t.Fatal(*requests)
+	}
+}
+
+// One read prints Edka's note on stderr, so the log on stdout stays a log.
+func TestLogsNoteGoesToStderr(t *testing.T) {
+	server, _ := sequenceAPI(t, map[string][]string{
+		"GET /api/deployments":         {`{"data":[{"id":"d1","name":"api","cluster_name":"sinaia"}]}`},
+		"GET /api/deployments/d1/logs": {`{"logs":"No previous container logs available. The pod has not been restarted.","podName":"api-a"}`},
+	})
+	out, errOut, err := execute(t, server.URL, "logs", "api", "--previous")
+	if err != nil || out != "" || !strings.Contains(errOut, "The pod has not been restarted.") {
+		t.Fatalf("out=%q err=%q %v", out, errOut, err)
 	}
 }
 func TestOutputFilePermissions(t *testing.T) {
