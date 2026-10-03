@@ -182,34 +182,31 @@ func Callback(state, issuer string, issRequired bool, result chan<- callbackResu
 		}
 		q := r.URL.Query()
 		if len(q["state"]) != 1 || subtle.ConstantTimeCompare([]byte(q.Get("state")), []byte(state)) != 1 {
-			http.Error(w, "Invalid login state. Return to your terminal.", 400)
+			writeCallbackPage(w, http.StatusBadRequest, callbackPage{Title: "Sign-in request not recognized", Detail: "This page does not match the sign-in waiting in your terminal. Return to your terminal and open the link it shows."})
 			return
 		}
 		if (issRequired || q.Get("iss") != "") && q.Get("iss") != issuer {
-			http.Error(w, "Invalid authorization server.", 400)
+			writeCallbackPage(w, http.StatusBadRequest, callbackPage{Title: "Sign-in rejected", Detail: "This authorization came from a different server than the one your terminal signs in to. To try again, run:", Retry: true})
 			return
 		}
 		value := callbackResult{Code: q.Get("code")}
 		if q.Get("error") != "" {
 			value.Err = fmt.Errorf("authorization declined: %s", q.Get("error"))
 		} else if value.Code == "" || len(q["code"]) != 1 {
-			http.Error(w, "Missing authorization code.", 400)
+			writeCallbackPage(w, http.StatusBadRequest, callbackPage{Title: "Sign-in incomplete", Detail: "The authorization response carried no code. To try again, run:", Retry: true})
 			return
 		}
 		select {
 		case result <- value:
 		default:
-			http.Error(w, "Login already completed.", http.StatusConflict)
+			writeCallbackPage(w, http.StatusConflict, callbackPage{Title: "Authorization already received", Detail: "This sign-in already finished in the browser. Return to your terminal."})
 			return
 		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		title := "Authorization received"
-		detail := "Return to your terminal to finish signing in. You can close this window."
 		if value.Err != nil {
-			title = "Connection cancelled"
-			detail = "No access was granted. Return to your terminal."
+			writeCallbackPage(w, http.StatusOK, callbackPage{Title: "Sign-in cancelled", Detail: "The CLI has no access to your account. Return to your terminal."})
+			return
 		}
-		fmt.Fprintf(w, `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Edka CLI</title><style>body{margin:0;background:#111313;color:#eee;font:16px system-ui;display:grid;place-items:center;min-height:100vh}main{max-width:460px;padding:48px}b{letter-spacing:.2em;color:#a4e5bd;font-size:14px}h1{font-weight:500;font-size:32px}p{color:#aeb8b2;line-height:1.7}</style><main><b>EDKA / CLI</b><h1>%s</h1><p>%s</p></main></html>`, title, detail)
+		writeCallbackPage(w, http.StatusOK, callbackPage{Received: true, Title: "Authorization received", Detail: "Return to your terminal to finish signing in. You can close this window."})
 	})
 }
 
