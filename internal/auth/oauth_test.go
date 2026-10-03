@@ -49,6 +49,48 @@ func TestPKCEAndStateValidation(t *testing.T) {
 	}
 }
 
+// The callback's CSP allows inline styles only, so every page has to work
+// without scripts or fetched resources.
+func TestCallbackPages(t *testing.T) {
+	for _, tc := range []struct {
+		query    string
+		taken    bool
+		status   int
+		title    string
+		received bool
+	}{
+		{query: "state=state&code=ok", status: 200, title: "Authorization received", received: true},
+		{query: "state=state&error=access_denied", status: 200, title: "Sign-in cancelled"},
+		{query: "state=state&code=ok", taken: true, status: 409, title: "Authorization already received"},
+		{query: "state=wrong&code=ok", status: 400, title: "Sign-in request not recognized"},
+		{query: "state=state&code=ok&iss=https://evil.example", status: 400, title: "Sign-in rejected"},
+		{query: "state=state", status: 400, title: "Sign-in incomplete"},
+	} {
+		results := make(chan callbackResult, 1)
+		if tc.taken {
+			results <- callbackResult{Code: "earlier"}
+		}
+		response := httptest.NewRecorder()
+		Callback("state", "https://api.edka.io/api/auth", false, results).ServeHTTP(response, httptest.NewRequest("GET", "http://127.0.0.1/callback?"+tc.query, nil))
+		body := response.Body.String()
+		if response.Code != tc.status || response.Header().Get("Content-Type") != "text/html; charset=utf-8" {
+			t.Errorf("%s: got %d %q", tc.query, response.Code, response.Header().Get("Content-Type"))
+		}
+		if !strings.Contains(body, `<span class="sr">`+tc.title+`</span>`) {
+			t.Errorf("%s: missing title %q", tc.query, tc.title)
+		}
+		if strings.Contains(body, `class="p `) != tc.received {
+			t.Errorf("%s: arrival animation rendered = %v", tc.query, !tc.received)
+		}
+		if strings.Contains(body, "<script") || strings.Contains(body, "src=") {
+			t.Errorf("%s: page needs more than the CSP allows", tc.query)
+		}
+		if strings.Contains(body, "ZgotmplZ") {
+			t.Errorf("%s: html/template rejected a value in the page", tc.query)
+		}
+	}
+}
+
 type loginOutput struct {
 	once sync.Once
 	urls chan string
