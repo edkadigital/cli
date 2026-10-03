@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"os/exec"
@@ -230,12 +231,12 @@ func (a *App) logsCommand(use, short string, locate func(context.Context, string
 	var tail int
 	var interval time.Duration
 	var pod, container string
-	cmd := &cobra.Command{Use: use, Short: short, Args: cobra.MaximumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+	cmd := &cobra.Command{Use: use, Short: short, Long: short + ".\n\n--follow reads the log again every --interval and prints the new lines until\nCtrl+C. Unless --pod names a pod, Edka picks one for each read, so after a\nrollout the command follows a new pod. It names the pod it follows on stderr,\nand says when lines may be missing because more than --tail lines arrived\nbetween two reads.", Args: cobra.MaximumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
 		// Edka returns at most 2000 lines and silently clamps larger requests.
 		if tail < 1 || tail > 2000 {
 			return fmt.Errorf("tail must be between 1 and 2000")
 		}
-		if interval < time.Second {
+		if interval < minLogInterval {
 			return fmt.Errorf("interval must be at least one second")
 		}
 		if follow && a.output == "json" {
@@ -262,8 +263,7 @@ func (a *App) logsCommand(use, short string, locate func(context.Context, string
 		if previous {
 			query.Set("previous", "true")
 		}
-		var last string
-		for {
+		if !follow {
 			response, err := a.request(cmd.Context(), "GET", path, query, nil)
 			if err != nil {
 				return err
@@ -271,23 +271,34 @@ func (a *App) logsCommand(use, short string, locate func(context.Context, string
 			if a.output == "json" {
 				return a.render(response)
 			}
-			text, err := logText(response.Body)
+			log, _, note, err := readLog(response.Body)
 			if err != nil {
 				return err
 			}
-			delta := text
-			if follow {
-				delta = logDelta(last, text)
+			if note != "" {
+				a.message("%s", ui.Clean(note))
 			}
-			if delta != "" {
-				fmt.Fprint(a.Out, delta)
-				if !strings.HasSuffix(delta, "\n") {
-					fmt.Fprintln(a.Out)
+			printLog(a.Out, log)
+			return nil
+		}
+		p := a.startProgress()
+		logs := logFollower{last: map[string]string{}}
+		for {
+			response, err := a.poll(cmd.Context(), p, path, query)
+			var apiError *api.Error
+			switch {
+			case errors.As(err, &apiError) && apiError.Status == 404 && strings.HasPrefix(apiError.Reason, "No pods"):
+				// A deployment with a volume that one node mounts stops its pod
+				// before the new one starts.
+				p.say("note", "No pod is running; waiting for one…")
+			case err != nil:
+				return err
+			default:
+				log, from, note, err := readLog(response.Body)
+				if err != nil {
+					return err
 				}
-			}
-			last = text
-			if !follow {
-				return nil
+				logs.read(a.Out, p, from, log, note)
 			}
 			if err := pause(cmd.Context(), interval); err != nil {
 				return err
@@ -302,6 +313,10 @@ func (a *App) logsCommand(use, short string, locate func(context.Context, string
 	cmd.Flags().BoolVar(&previous, "previous", false, "Read the previous container instance, for example after a crash")
 	return cmd
 }
+
+// minLogInterval is the shortest --interval between two reads of a log.
+var minLogInterval = time.Second
+
 func pause(ctx context.Context, d time.Duration) error {
 	timer := time.NewTimer(d)
 	defer timer.Stop()
@@ -346,19 +361,81 @@ func logText(body []byte) (string, error) {
 	}
 	return "", fmt.Errorf("unrecognized log response; rerun with --json to inspect it")
 }
-func logDelta(previous, current string) string {
+
+// readLog reads a log response: the log, the pod it came from, and the note
+// Edka sends in place of a log, such as "Container is still starting and has
+// not produced logs yet." A note is one line with no line break.
+func readLog(body []byte) (log, pod, note string, err error) {
+	log, err = logText(body)
+	if err != nil {
+		return "", "", "", err
+	}
+	data, _ := api.Data(body)
+	m, _ := data.(map[string]any)
+	pod = text(m, "podName")
+	if raw := text(m, "logs"); raw != "" && !strings.Contains(raw, "\n") {
+		return "", pod, log, nil
+	}
+	return log, pod, "", nil
+}
+
+// printLog prints a log and ends its last line.
+func printLog(w io.Writer, log string) {
+	if log == "" {
+		return
+	}
+	fmt.Fprint(w, log)
+	if !strings.HasSuffix(log, "\n") {
+		fmt.Fprintln(w)
+	}
+}
+
+// logFollower follows a log that Edka reads from one pod at a time. Edka picks
+// the pod again for each read, so after a rollout a read can come from another
+// pod. Each read is compared with the last one from the same pod.
+type logFollower struct {
+	pod  string
+	last map[string]string
+}
+
+// read prints on out what a read adds to its pod's log. The progress names the
+// pod it follows, Edka's notes, and lines that may be missing.
+func (f *logFollower) read(out io.Writer, p *progress, pod, log, note string) {
+	if pod != "" && pod != f.pod {
+		f.pod = pod
+		p.say("pod", "Following pod "+pod)
+	}
+	p.say("note", note)
+	if note != "" {
+		return
+	}
+	previous, seen := f.last[pod]
+	delta, continued := logDelta(previous, log)
+	f.last[pod] = log
+	if seen && !continued {
+		p.say("gap", fmt.Sprintf("Lines of pod %s may be missing: its log does not continue from the last read. Raise --tail or lower --interval to keep up, or read --previous if the container restarted.", pod))
+	} else {
+		p.say("gap", "")
+	}
+	printLog(out, delta)
+}
+
+// logDelta returns what current adds to previous, two reads of the end of a
+// log, and whether current continues previous. It doesn't when the log grew by
+// more than a read holds between the reads, or started again.
+func logDelta(previous, current string) (string, bool) {
 	if previous == "" {
-		return current
+		return current, true
 	}
 	if strings.HasPrefix(current, previous) {
-		return strings.TrimPrefix(current, previous)
+		return strings.TrimPrefix(current, previous), true
 	}
 	old := strings.Split(strings.TrimSuffix(previous, "\n"), "\n")
 	now := strings.Split(strings.TrimSuffix(current, "\n"), "\n")
 	for n := min(len(old), len(now)); n > 0; n-- {
 		if strings.Join(old[len(old)-n:], "\n") == strings.Join(now[:n], "\n") {
-			return strings.Join(now[n:], "\n")
+			return strings.Join(now[n:], "\n"), true
 		}
 	}
-	return current
+	return current, false
 }

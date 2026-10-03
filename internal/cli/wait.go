@@ -124,14 +124,9 @@ func (s *logStream) write(w io.Writer, log string, final bool) {
 	if log == "" {
 		return
 	}
-	delta := logDelta(s.printed, log)
+	delta, _ := logDelta(s.printed, log)
 	s.printed = log
-	if delta != "" {
-		fmt.Fprint(w, delta)
-		if !strings.HasSuffix(delta, "\n") {
-			fmt.Fprintln(w)
-		}
-	}
+	printLog(w, delta)
 }
 
 // buildSteps describes each state of a build that is still running.
