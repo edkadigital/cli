@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/url"
 	"os"
 	"os/exec"
@@ -227,11 +228,17 @@ func (a *App) deploymentLogs(ctx context.Context, target string) (string, error)
 // logsCommand reads pod logs from the path that locate resolves for its
 // argument. Deployment, app and cronjob log routes share these parameters.
 func (a *App) logsCommand(use, short string, locate func(context.Context, string) (string, error)) *cobra.Command {
-	var follow, previous bool
+	var follow, previous, timestamps bool
 	var tail int
-	var interval time.Duration
+	var interval, since time.Duration
 	var pod, container string
-	cmd := &cobra.Command{Use: use, Short: short, Long: short + ".\n\n--follow reads the log again every --interval and prints the new lines until\nCtrl+C. Unless --pod names a pod, Edka picks one for each read, so after a\nrollout the command follows a new pod. It names the pod it follows on stderr,\nand says when lines may be missing because more than --tail lines arrived\nbetween two reads.", Args: cobra.MaximumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+	cmd := &cobra.Command{Use: use, Short: short, Long: short + ".\n\n--since reads the lines of the last minutes or hours, up to 2000 lines unless\n--tail sets fewer. --timestamps starts each line with its time.\n\n--follow reads the log again every --interval and prints the new lines until\nCtrl+C. Unless --pod names a pod, Edka picks one for each read, so after a\nrollout the command follows a new pod. It names the pod it follows on stderr,\nand says when lines may be missing because more than --tail lines arrived\nbetween two reads.", Args: cobra.MaximumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+		if since < 0 || (since > 0 && since < time.Second) {
+			return fmt.Errorf("since must be at least one second, such as 30s, 15m or 2h")
+		}
+		if since > 0 && !cmd.Flags().Changed("tail") {
+			tail = 2000
+		}
 		// Edka returns at most 2000 lines and silently clamps larger requests.
 		if tail < 1 || tail > 2000 {
 			return fmt.Errorf("tail must be between 1 and 2000")
@@ -263,6 +270,14 @@ func (a *App) logsCommand(use, short string, locate func(context.Context, string
 		if previous {
 			query.Set("previous", "true")
 		}
+		if since > 0 {
+			query.Set("sinceSeconds", fmt.Sprint(int64(math.Ceil(since.Seconds()))))
+		}
+		// --follow compares reads by their timestamps, which tell apart lines
+		// that repeat exactly, and prints them only with --timestamps.
+		if timestamps || follow {
+			query.Set("timestamps", "true")
+		}
 		if !follow {
 			response, err := a.request(cmd.Context(), "GET", path, query, nil)
 			if err != nil {
@@ -271,18 +286,25 @@ func (a *App) logsCommand(use, short string, locate func(context.Context, string
 			if a.output == "json" {
 				return a.render(response)
 			}
-			log, _, note, err := readLog(response.Body)
+			read, err := readLog(response.Body)
 			if err != nil {
 				return err
 			}
-			if note != "" {
-				a.message("%s", ui.Clean(note))
+			if read.note != "" {
+				a.message("%s", ui.Clean(read.note))
+				return nil
 			}
-			printLog(a.Out, log)
+			if since > 0 && !read.since {
+				return errSinceUnsupported
+			}
+			if timestamps && !read.stamped {
+				a.message("%s", noTimestamps)
+			}
+			printLog(a.Out, read.log)
 			return nil
 		}
 		p := a.startProgress()
-		logs := logFollower{last: map[string]string{}}
+		logs := logFollower{last: map[string]string{}, timestamps: timestamps}
 		for {
 			response, err := a.poll(cmd.Context(), p, path, query)
 			var apiError *api.Error
@@ -294,11 +316,14 @@ func (a *App) logsCommand(use, short string, locate func(context.Context, string
 			case err != nil:
 				return err
 			default:
-				log, from, note, err := readLog(response.Body)
+				read, err := readLog(response.Body)
 				if err != nil {
 					return err
 				}
-				logs.read(a.Out, p, from, log, note)
+				if since > 0 && read.note == "" && !read.since {
+					return errSinceUnsupported
+				}
+				logs.read(a.Out, p, read)
 			}
 			if err := pause(cmd.Context(), interval); err != nil {
 				return err
@@ -311,8 +336,17 @@ func (a *App) logsCommand(use, short string, locate func(context.Context, string
 	cmd.Flags().StringVar(&pod, "pod", "", "Pod name (default: the failing pod with most restarts, else the newest)")
 	cmd.Flags().StringVar(&container, "container", "", "Container name")
 	cmd.Flags().BoolVar(&previous, "previous", false, "Read the previous container instance, for example after a crash")
+	cmd.Flags().DurationVar(&since, "since", 0, "Read the lines of the last duration, such as 15m or 2h")
+	cmd.Flags().BoolVar(&timestamps, "timestamps", false, "Start each line with its time")
 	return cmd
 }
+
+// errSinceUnsupported is the answer of an Edka API that reads a log without
+// --since, and so returned lines from before it.
+var errSinceUnsupported = errors.New("this Edka API doesn't support --since yet; use --tail instead")
+
+// noTimestamps says that an Edka API read a log without --timestamps.
+const noTimestamps = "This Edka API doesn't add timestamps yet, so the lines have none."
 
 // minLogInterval is the shortest --interval between two reads of a log.
 var minLogInterval = time.Second
@@ -362,21 +396,45 @@ func logText(body []byte) (string, error) {
 	return "", fmt.Errorf("unrecognized log response; rerun with --json to inspect it")
 }
 
-// readLog reads a log response: the log, the pod it came from, and the note
-// Edka sends in place of a log, such as "Container is still starting and has
-// not produced logs yet." A note is one line with no line break.
-func readLog(body []byte) (log, pod, note string, err error) {
-	log, err = logText(body)
+// logRead is one read of a log.
+type logRead struct {
+	log string
+	// pod is the pod Edka read. note is what Edka sends in place of a log, such
+	// as "Container is still starting and has not produced logs yet."
+	pod, note string
+	// since and stamped say that Edka read the log with --since and with
+	// timestamps. An Edka API from before them leaves them out.
+	since, stamped bool
+}
+
+// readLog reads a log response. A note is one line with no line break.
+func readLog(body []byte) (logRead, error) {
+	log, err := logText(body)
 	if err != nil {
-		return "", "", "", err
+		return logRead{}, err
 	}
 	data, _ := api.Data(body)
 	m, _ := data.(map[string]any)
-	pod = text(m, "podName")
+	parameters, _ := m["parameters"].(map[string]any)
+	read := logRead{log: log, pod: text(m, "podName"), since: parameters["sinceSeconds"] != nil, stamped: parameters["timestamps"] == true}
 	if raw := text(m, "logs"); raw != "" && !strings.Contains(raw, "\n") {
-		return "", pod, log, nil
+		read.log, read.note = "", log
 	}
-	return log, pod, "", nil
+	return read, nil
+}
+
+// withoutTimestamps removes the time Kubernetes puts before each line of a log
+// read with timestamps.
+func withoutTimestamps(log string) string {
+	lines := strings.SplitAfter(log, "\n")
+	for i, line := range lines {
+		if stamp, rest, ok := strings.Cut(line, " "); ok {
+			if _, err := time.Parse(time.RFC3339Nano, stamp); err == nil {
+				lines[i] = rest
+			}
+		}
+	}
+	return strings.Join(lines, "")
 }
 
 // printLog prints a log and ends its last line.
@@ -396,26 +454,35 @@ func printLog(w io.Writer, log string) {
 type logFollower struct {
 	pod  string
 	last map[string]string
+	// timestamps keeps the time before each line.
+	timestamps bool
 }
 
 // read prints on out what a read adds to its pod's log. The progress names the
 // pod it follows, Edka's notes, and lines that may be missing.
-func (f *logFollower) read(out io.Writer, p *progress, pod, log, note string) {
+func (f *logFollower) read(out io.Writer, p *progress, read logRead) {
+	pod := read.pod
 	if pod != "" && pod != f.pod {
 		f.pod = pod
 		p.say("pod", "Following pod "+pod)
 	}
-	p.say("note", note)
-	if note != "" {
+	p.say("note", read.note)
+	if read.note != "" {
 		return
 	}
+	if f.timestamps && !read.stamped {
+		p.say("timestamps", noTimestamps)
+	}
 	previous, seen := f.last[pod]
-	delta, continued := logDelta(previous, log)
-	f.last[pod] = log
+	delta, continued := logDelta(previous, read.log)
+	f.last[pod] = read.log
 	if seen && !continued {
 		p.say("gap", fmt.Sprintf("Lines of pod %s may be missing: its log does not continue from the last read. Raise --tail or lower --interval to keep up, or read --previous if the container restarted.", pod))
 	} else {
 		p.say("gap", "")
+	}
+	if read.stamped && !f.timestamps {
+		delta = withoutTimestamps(delta)
 	}
 	printLog(out, delta)
 }

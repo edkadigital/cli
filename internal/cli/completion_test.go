@@ -218,7 +218,7 @@ func TestGlobalFlagsLeftOutOfHelpStillWork(t *testing.T) {
 	if _, _, err := execute(t, "http://127.0.0.1:1", "version", "--timeout", "0s"); err == nil || !strings.Contains(err.Error(), "timeout must be positive") {
 		t.Fatal(err)
 	}
-	if got, _ := completions(t, "http://127.0.0.1:1", "logs", "--time"); strings.Join(got, ",") != "--timeout\tHTTP request timeout" {
+	if got, _ := completions(t, "http://127.0.0.1:1", "logs", "--timeo"); strings.Join(got, ",") != "--timeout\tHTTP request timeout" {
 		t.Fatalf("%q", got)
 	}
 }
