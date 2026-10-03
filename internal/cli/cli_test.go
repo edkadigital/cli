@@ -617,11 +617,12 @@ func TestLogsLineWithoutLineBreakIsLog(t *testing.T) {
 		}
 	}
 	for body, note := range map[string]bool{
-		`{"logs":"Container is still starting and has not produced logs yet."}`:                     true,
-		`{"logs":"Container is not producing logs because it is currently ContainerCreating."}`:     true,
-		`{"logs":"No previous container logs available.","parameters":{"noPreviousLogs":true}}`:     true,
-		`{"logs":"Container is still starting and has not produced logs yet.\nnext","podName":"a"}`: false,
-		`{"logs":"Error: listen EADDRINUSE :::8080","parameters":{"previous":false}}`:               false,
+		`{"logs":"Container is still starting and has not produced logs yet."}`:                               true,
+		`{"logs":"Container is not producing logs because it is currently ContainerCreating."}`:               true,
+		`{"logs":"No previous container logs available.","parameters":{"noPreviousLogs":true}}`:               true,
+		`{"logs":"ImagePullBackOff: Back-off pulling image ghcr.io/acme/api:1","parameters":{"noLogs":true}}`: true,
+		`{"logs":"Container is still starting and has not produced logs yet.\nnext","podName":"a"}`:           false,
+		`{"logs":"Error: listen EADDRINUSE :::8080","parameters":{"previous":false}}`:                         false,
 	} {
 		read, err := readLog([]byte(body))
 		if err != nil || (read.note != "") != note || (read.log != "") == note {
