@@ -1,5 +1,5 @@
 {
-  "source_sha": "9bce52ef16f8d8e93996ca2d2979bbc750e43d7b",
+  "source_sha": "84f77d8b92fd6b89bbbf3f424372aeeb1f433801",
   "confirm_words": [
     "cancel",
     "cleanup-orphaned-nodes",
@@ -1926,7 +1926,147 @@
         }
       ],
       "step_up": false,
-      "confirm": false
+      "confirm": false,
+      "body": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 63,
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+          },
+          "namespace": {
+            "default": "default",
+            "type": "string",
+            "maxLength": 63,
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+          },
+          "image_repository": {
+            "type": "string",
+            "minLength": 1
+          },
+          "image_tag": {
+            "type": "string"
+          },
+          "schedule": {
+            "type": "string",
+            "minLength": 1
+          },
+          "concurrency_policy": {
+            "default": "Forbid",
+            "type": "string",
+            "enum": [
+              "Allow",
+              "Forbid",
+              "Replace"
+            ]
+          },
+          "backoff_limit": {
+            "default": 6,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "active_deadline_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "suspend": {
+            "default": false,
+            "type": "boolean"
+          },
+          "successful_jobs_history_limit": {
+            "default": 3,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "failed_jobs_history_limit": {
+            "default": 1,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "config": {},
+          "run_command": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "auto_update_enabled": {
+            "default": false,
+            "type": "boolean"
+          },
+          "auto_update_pattern": {
+            "default": "minor",
+            "type": "string",
+            "enum": [
+              "all",
+              "major",
+              "minor",
+              "patch",
+              "force",
+              "custom"
+            ]
+          },
+          "auto_update_custom_pattern": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "auto_update_frequency": {
+            "default": "5m",
+            "type": "string",
+            "enum": [
+              "1m",
+              "5m",
+              "10m",
+              "30m",
+              "1h",
+              "6h",
+              "24h"
+            ]
+          },
+          "auto_update_approval": {
+            "default": false,
+            "type": "boolean"
+          },
+          "secret_values": {}
+        },
+        "required": [
+          "name",
+          "image_repository",
+          "schedule"
+        ],
+        "examples": [
+          {
+            "name": "nightly-report",
+            "image_repository": "ghcr.io/acme/reports",
+            "image_tag": "1.4.0",
+            "schedule": "0 3 * * *",
+            "run_command": "node report.js",
+            "config": {
+              "env_variables": [
+                {
+                  "name": "REPORT_DAYS",
+                  "value": "7"
+                }
+              ]
+            }
+          }
+        ]
+      }
     },
     {
       "command": "clusters cronjobs discover get",
@@ -2000,7 +2140,1614 @@
         }
       ],
       "step_up": false,
-      "confirm": false
+      "confirm": false,
+      "body": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "engine": {
+            "type": "string",
+            "enum": [
+              "postgresql",
+              "mysql",
+              "valkey",
+              "clickhouse"
+            ]
+          },
+          "database_name": {
+            "type": "string",
+            "maxLength": 63,
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+          },
+          "lifecycle": {
+            "default": "primary",
+            "type": "string",
+            "enum": [
+              "primary",
+              "restore"
+            ]
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+(\\.\\d+){0,2}(-[a-zA-Z0-9.-]+)?$"
+          },
+          "configuration": {
+            "type": "object",
+            "description": "Its fields depend on engine; see oneOf."
+          }
+        },
+        "required": [
+          "engine",
+          "database_name",
+          "version",
+          "configuration"
+        ],
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "engine": {
+                "type": "string",
+                "const": "postgresql"
+              },
+              "database_name": {
+                "type": "string",
+                "maxLength": 63,
+                "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+              },
+              "lifecycle": {
+                "default": "primary",
+                "type": "string",
+                "enum": [
+                  "primary",
+                  "restore"
+                ]
+              },
+              "version": {
+                "type": "string",
+                "pattern": "^\\d+\\.\\d+(\\.\\d+){0,2}(-[a-zA-Z0-9.-]+)?$"
+              },
+              "configuration": {
+                "type": "object",
+                "properties": {
+                  "cluster_name": {
+                    "type": "string",
+                    "maxLength": 63,
+                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                  },
+                  "namespace": {
+                    "default": "postgres",
+                    "type": "string",
+                    "maxLength": 63,
+                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                  },
+                  "instances_count": {
+                    "default": "1",
+                    "type": "string",
+                    "enum": [
+                      "1",
+                      "3",
+                      "5"
+                    ]
+                  },
+                  "storage_size": {
+                    "default": 10,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000
+                  },
+                  "storage_class": {
+                    "default": "hcloud-volumes",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "wal_storage_enabled": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "wal_storage_size": {
+                    "default": 10,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000
+                  },
+                  "wal_storage_class": {
+                    "default": "hcloud-volumes",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "cpu_request_millicores": {
+                    "default": 100,
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "cpu_limit_millicores": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "memory_request_mb": {
+                    "default": 256,
+                    "type": "integer",
+                    "minimum": 256,
+                    "maximum": 262144
+                  },
+                  "memory_limit_mb": {
+                    "type": "integer",
+                    "minimum": 256,
+                    "maximum": 262144
+                  },
+                  "init_database": {
+                    "default": "app",
+                    "type": "string",
+                    "maxLength": 63,
+                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                  },
+                  "init_username": {
+                    "default": "app",
+                    "type": "string",
+                    "maxLength": 63,
+                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                  },
+                  "init_password": {
+                    "type": "string",
+                    "minLength": 8
+                  },
+                  "superuser_username": {
+                    "default": "postgres",
+                    "type": "string",
+                    "maxLength": 63,
+                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                  },
+                  "superuser_password": {
+                    "type": "string",
+                    "minLength": 8
+                  },
+                  "node_pool_name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "tolerate_node_pool_taints": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "expose_enabled": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "expose_method": {
+                    "default": "loadbalancer",
+                    "type": "string",
+                    "enum": [
+                      "loadbalancer",
+                      "tailscale",
+                      "metallb"
+                    ]
+                  },
+                  "expose_port": {
+                    "type": "integer",
+                    "minimum": 1024,
+                    "maximum": 65535
+                  },
+                  "expose_require_tls": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "pooler_enabled": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "pooler_mode": {
+                    "default": "transaction",
+                    "type": "string",
+                    "enum": [
+                      "transaction",
+                      "session"
+                    ]
+                  },
+                  "pooler_max_client_conn": {
+                    "default": 1000,
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 100000
+                  },
+                  "pooler_default_pool_size": {
+                    "default": 10,
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 10000
+                  },
+                  "wal_level": {
+                    "default": "logical",
+                    "type": "string",
+                    "enum": [
+                      "logical",
+                      "replica"
+                    ]
+                  },
+                  "dynamic_shared_memory_type": {
+                    "default": "posix",
+                    "type": "string",
+                    "enum": [
+                      "posix",
+                      "sysv"
+                    ]
+                  },
+                  "shared_preload_libraries": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "parameters": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "pattern": "^[a-z0-9]([a-z0-9_.-]*[a-z0-9])?$"
+                        },
+                        "value": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "value"
+                      ]
+                    }
+                  },
+                  "pg_hba": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "pg_ident": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "backup_enabled": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "backup_provider": {
+                    "type": "string",
+                    "enum": [
+                      "aws-s3",
+                      "gcp-gcs"
+                    ]
+                  },
+                  "backup_configuration_mode": {
+                    "type": "string",
+                    "enum": [
+                      "manual",
+                      "integration"
+                    ]
+                  },
+                  "backup_retention_period": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 35
+                  },
+                  "backup_object_storage_integration_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "backup_object_storage_integration_name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "backup_object_storage_integration_provider": {
+                    "type": "string",
+                    "enum": [
+                      "aws-s3",
+                      "gcp-gcs",
+                      "s3-compatible"
+                    ]
+                  },
+                  "backup_path_prefix": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "s3_compatible_enabled": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "s3_endpoint_url": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "backup_s3_bucket": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "backup_s3_region": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "access_key_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "access_secret_key": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "backup_gcs_bucket": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "backup_gcs_credentials_json": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "managed_roles": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "maxLength": 63,
+                          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                        },
+                        "ensure": {
+                          "default": "present",
+                          "type": "string",
+                          "enum": [
+                            "present",
+                            "absent"
+                          ]
+                        },
+                        "password": {
+                          "type": "string",
+                          "minLength": 8
+                        },
+                        "login": {
+                          "default": true,
+                          "type": "boolean"
+                        },
+                        "superuser": {
+                          "default": false,
+                          "type": "boolean"
+                        },
+                        "createdb": {
+                          "default": false,
+                          "type": "boolean"
+                        },
+                        "in_roles": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 63,
+                            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                          }
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ]
+                    }
+                  },
+                  "managed_databases": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "maxLength": 63,
+                          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                        },
+                        "owner": {
+                          "type": "string",
+                          "maxLength": 63,
+                          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                        },
+                        "ensure": {
+                          "default": "present",
+                          "type": "string",
+                          "enum": [
+                            "present",
+                            "absent"
+                          ]
+                        },
+                        "database_reclaim_policy": {
+                          "default": "retain",
+                          "type": "string",
+                          "enum": [
+                            "retain",
+                            "delete"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "owner"
+                      ]
+                    }
+                  },
+                  "database_extensions": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "database_name": {
+                          "type": "string",
+                          "maxLength": 63,
+                          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                        },
+                        "name": {
+                          "type": "string",
+                          "pattern": "^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$"
+                        },
+                        "ensure": {
+                          "default": "present",
+                          "type": "string",
+                          "enum": [
+                            "present",
+                            "absent"
+                          ]
+                        },
+                        "version": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "schema": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "database_name",
+                        "name"
+                      ]
+                    }
+                  },
+                  "restore": {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "type": "string",
+                        "enum": [
+                          "pitr",
+                          "backup"
+                        ]
+                      },
+                      "source_database_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "source_database_name": {
+                        "type": "string",
+                        "maxLength": 63,
+                        "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                      },
+                      "source_cluster_name": {
+                        "type": "string",
+                        "maxLength": 63,
+                        "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                      },
+                      "source_namespace": {
+                        "default": "postgres",
+                        "type": "string",
+                        "maxLength": 63,
+                        "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                      },
+                      "source_database_version": {
+                        "type": "string",
+                        "pattern": "^\\d+\\.\\d+(\\.\\d+){0,2}(-[a-zA-Z0-9.-]+)?$"
+                      },
+                      "target_time_mode": {
+                        "type": "string",
+                        "enum": [
+                          "latest",
+                          "specific"
+                        ]
+                      },
+                      "target_time": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                      },
+                      "backup_name": {
+                        "type": "string",
+                        "maxLength": 63,
+                        "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                      }
+                    },
+                    "required": [
+                      "mode",
+                      "source_database_name",
+                      "source_cluster_name"
+                    ]
+                  },
+                  "import": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "default": "microservice",
+                        "type": "string",
+                        "enum": [
+                          "microservice",
+                          "monolith"
+                        ]
+                      },
+                      "source_host": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "source_port": {
+                        "default": 5432,
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 65535
+                      },
+                      "source_user": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "source_password": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "source_database": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "source_databases": {
+                        "default": [],
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "source_roles": {
+                        "default": [],
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "source_maintenance_database": {
+                        "default": "postgres",
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "source_ssl_mode": {
+                        "default": "prefer",
+                        "type": "string",
+                        "enum": [
+                          "disable",
+                          "allow",
+                          "prefer",
+                          "require",
+                          "verify-ca",
+                          "verify-full"
+                        ]
+                      },
+                      "pg_dump_extra_options": {
+                        "default": [],
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "pg_restore_extra_options": {
+                        "default": [],
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "pg_restore_predata_options": {
+                        "default": [],
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "pg_restore_data_options": {
+                        "default": [],
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "pg_restore_postdata_options": {
+                        "default": [],
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    },
+                    "required": [
+                      "source_host",
+                      "source_user",
+                      "source_password"
+                    ]
+                  },
+                  "bootstrap_from_cluster": {
+                    "type": "object",
+                    "properties": {
+                      "source_cluster_name": {
+                        "type": "string",
+                        "maxLength": 63,
+                        "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                      },
+                      "source_namespace": {
+                        "default": "postgres",
+                        "type": "string",
+                        "maxLength": 63,
+                        "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                      },
+                      "source_database_name": {
+                        "type": "string",
+                        "maxLength": 63,
+                        "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                      },
+                      "source_database_version": {
+                        "type": "string",
+                        "pattern": "^\\d+\\.\\d+(\\.\\d+){0,2}(-[a-zA-Z0-9.-]+)?$"
+                      }
+                    },
+                    "required": [
+                      "source_cluster_name"
+                    ]
+                  }
+                },
+                "required": [
+                  "init_password",
+                  "superuser_password"
+                ]
+              }
+            },
+            "required": [
+              "engine",
+              "database_name",
+              "version",
+              "configuration"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "engine": {
+                "type": "string",
+                "const": "mysql"
+              },
+              "database_name": {
+                "type": "string",
+                "maxLength": 63,
+                "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+              },
+              "lifecycle": {
+                "default": "primary",
+                "type": "string",
+                "enum": [
+                  "primary",
+                  "restore"
+                ]
+              },
+              "version": {
+                "type": "string",
+                "pattern": "^\\d+\\.\\d+(\\.\\d+){0,2}(-[a-zA-Z0-9.-]+)?$"
+              },
+              "configuration": {
+                "type": "object",
+                "properties": {
+                  "cluster_name": {
+                    "type": "string",
+                    "maxLength": 63,
+                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                  },
+                  "instances_count": {
+                    "default": "1",
+                    "type": "string",
+                    "enum": [
+                      "1",
+                      "3",
+                      "5"
+                    ]
+                  },
+                  "storage_size": {
+                    "default": 10,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000
+                  },
+                  "storage_class": {
+                    "default": "hcloud-volumes",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "init_database": {
+                    "default": "app",
+                    "type": "string",
+                    "maxLength": 63,
+                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                  },
+                  "init_username": {
+                    "default": "app",
+                    "type": "string",
+                    "maxLength": 63,
+                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                  },
+                  "expose_enabled": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "custom_passwords_enabled": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "backup_enabled": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "admin_password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024,
+                    "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                  },
+                  "writable_password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024,
+                    "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                  },
+                  "cpu_request_millicores": {
+                    "default": 250,
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "cpu_limit_millicores": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "memory_request_mb": {
+                    "default": 512,
+                    "type": "integer",
+                    "minimum": 256,
+                    "maximum": 262144
+                  },
+                  "memory_limit_mb": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 256,
+                        "maximum": 262144
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "node_pool_name": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 63,
+                        "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                      },
+                      {
+                        "type": "string",
+                        "const": ""
+                      }
+                    ]
+                  },
+                  "tolerate_node_pool_taints": {
+                    "type": "boolean"
+                  },
+                  "pod_anti_affinity": {
+                    "type": "string",
+                    "enum": [
+                      "preferred",
+                      "required"
+                    ]
+                  },
+                  "backup_object_storage_integration_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "backup_interval_hours": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 168
+                  },
+                  "backup_retention_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 365
+                  },
+                  "backup_work_storage_size": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2000
+                  },
+                  "restore_backup_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "restore_target_time": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  "managed_objects_enabled": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "init_password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024,
+                    "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                  },
+                  "adopt_existing_init_user": {
+                    "type": "boolean"
+                  },
+                  "managed_databases": {
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "maxLength": 63,
+                          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                        },
+                        "ensure": {
+                          "default": "present",
+                          "type": "string",
+                          "enum": [
+                            "present",
+                            "absent"
+                          ]
+                        },
+                        "reclaim_policy": {
+                          "default": "retain",
+                          "type": "string",
+                          "enum": [
+                            "retain",
+                            "delete"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ]
+                    }
+                  },
+                  "managed_users": {
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "maxLength": 32,
+                          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                        },
+                        "ensure": {
+                          "default": "present",
+                          "type": "string",
+                          "enum": [
+                            "present",
+                            "absent"
+                          ]
+                        },
+                        "password": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1024,
+                          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                        },
+                        "adopt_existing": {
+                          "type": "boolean"
+                        },
+                        "grants": {
+                          "default": [],
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "database": {
+                                "type": "string",
+                                "maxLength": 63,
+                                "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                              },
+                              "access": {
+                                "type": "string",
+                                "enum": [
+                                  "read",
+                                  "write",
+                                  "owner"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "database",
+                              "access"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ]
+                    }
+                  },
+                  "max_connections": {
+                    "default": 150,
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 10,
+                        "maximum": 10000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "max_allowed_packet_mb": {
+                    "default": 64,
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1024
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "innodb_buffer_pool_size_mb": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 16,
+                        "maximum": 196608
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "slow_query_log": {
+                    "type": "boolean"
+                  },
+                  "long_query_time_seconds": {
+                    "default": 2,
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 3600
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "wait_timeout_seconds": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 604800
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "expose_method": {
+                    "default": "loadbalancer",
+                    "type": "string",
+                    "enum": [
+                      "loadbalancer",
+                      "tailscale",
+                      "metallb"
+                    ]
+                  },
+                  "expose_port": {
+                    "default": 3306,
+                    "type": "integer",
+                    "minimum": 1024,
+                    "maximum": 65535
+                  },
+                  "upgrade_acknowledgement": {
+                    "type": "object",
+                    "properties": {
+                      "from": {
+                        "type": "string",
+                        "pattern": "^\\d+\\.\\d+(\\.\\d+){0,2}(-[a-zA-Z0-9.-]+)?$"
+                      },
+                      "to": {
+                        "type": "string",
+                        "pattern": "^\\d+\\.\\d+(\\.\\d+){0,2}(-[a-zA-Z0-9.-]+)?$"
+                      }
+                    },
+                    "required": [
+                      "from",
+                      "to"
+                    ]
+                  },
+                  "restart_token": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "maintenance_request": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "switchover",
+                          "restart"
+                        ]
+                      },
+                      "requested_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                      },
+                      "previous_primary": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 4
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "kind",
+                      "requested_at"
+                    ]
+                  }
+                }
+              }
+            },
+            "required": [
+              "engine",
+              "database_name",
+              "version",
+              "configuration"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "engine": {
+                "type": "string",
+                "const": "valkey"
+              },
+              "database_name": {
+                "type": "string",
+                "maxLength": 63,
+                "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+              },
+              "lifecycle": {
+                "default": "primary",
+                "type": "string",
+                "enum": [
+                  "primary",
+                  "restore"
+                ]
+              },
+              "version": {
+                "type": "string",
+                "pattern": "^\\d+\\.\\d+(\\.\\d+){0,2}(-[a-zA-Z0-9.-]+)?$"
+              },
+              "configuration": {
+                "type": "object",
+                "properties": {
+                  "cluster_name": {
+                    "type": "string",
+                    "maxLength": 63,
+                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                  },
+                  "namespace": {
+                    "default": "valkey",
+                    "type": "string",
+                    "maxLength": 63,
+                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                  },
+                  "mode": {
+                    "default": "standalone",
+                    "type": "string",
+                    "enum": [
+                      "standalone",
+                      "replication"
+                    ]
+                  },
+                  "instances_count": {
+                    "default": "1",
+                    "type": "string",
+                    "enum": [
+                      "1",
+                      "2",
+                      "3",
+                      "4"
+                    ]
+                  },
+                  "replica_count": {
+                    "default": 0,
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 3
+                  },
+                  "failover_enabled": {
+                    "type": "boolean"
+                  },
+                  "usage_profile": {
+                    "default": "durable",
+                    "type": "string",
+                    "enum": [
+                      "cache",
+                      "durable"
+                    ]
+                  },
+                  "persistence_mode": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "rdb",
+                      "rdb-aof"
+                    ]
+                  },
+                  "storage_size": {
+                    "default": 10,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000
+                  },
+                  "storage_class": {
+                    "default": "hcloud-volumes",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "cpu_request_millicores": {
+                    "default": 10,
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "cpu_limit_millicores": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "memory_request_mb": {
+                    "default": 64,
+                    "type": "integer",
+                    "minimum": 64,
+                    "maximum": 65536
+                  },
+                  "memory_limit_mb": {
+                    "default": 1024,
+                    "type": "integer",
+                    "minimum": 64,
+                    "maximum": 65536
+                  },
+                  "maxmemory_percent": {
+                    "type": "integer",
+                    "minimum": 10,
+                    "maximum": 80
+                  },
+                  "backup_enabled": {
+                    "type": "boolean"
+                  },
+                  "backup_object_storage_integration_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "backup_interval_hours": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 168
+                  },
+                  "backup_retention_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 365
+                  },
+                  "backup_work_storage_size": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000
+                  },
+                  "restore_backup_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "node_pool_name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "tolerate_node_pool_taints": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "expose_enabled": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "expose_method": {
+                    "default": "loadbalancer",
+                    "type": "string",
+                    "enum": [
+                      "loadbalancer",
+                      "tailscale",
+                      "metallb"
+                    ]
+                  },
+                  "expose_port": {
+                    "default": 6379,
+                    "type": "integer",
+                    "minimum": 1024,
+                    "maximum": 65535
+                  },
+                  "read_service_enabled": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "diskless_sync": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "min_replicas_to_write": {
+                    "default": 0,
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 3
+                  },
+                  "min_replicas_max_lag": {
+                    "default": 10,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 3600
+                  },
+                  "pod_disruption_budget_enabled": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "pod_disruption_budget_max_unavailable": {
+                    "default": 1,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 3
+                  },
+                  "auth_enabled": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "default_user_password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^[^\\u0000-\\u001f\\u007f]*$"
+                  },
+                  "metrics_enabled": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "valkey_log_level": {
+                    "default": "notice",
+                    "type": "string",
+                    "enum": [
+                      "debug",
+                      "verbose",
+                      "notice",
+                      "warning"
+                    ]
+                  }
+                }
+              }
+            },
+            "required": [
+              "engine",
+              "database_name",
+              "version",
+              "configuration"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "engine": {
+                "type": "string",
+                "const": "clickhouse"
+              },
+              "database_name": {
+                "type": "string",
+                "maxLength": 63,
+                "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+              },
+              "lifecycle": {
+                "default": "primary",
+                "type": "string",
+                "enum": [
+                  "primary",
+                  "restore"
+                ]
+              },
+              "version": {
+                "type": "string",
+                "pattern": "^\\d+\\.\\d+(\\.\\d+){0,2}(-[a-zA-Z0-9.-]+)?$"
+              },
+              "configuration": {
+                "type": "object",
+                "properties": {
+                  "cluster_name": {
+                    "type": "string",
+                    "maxLength": 63,
+                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                  },
+                  "namespace": {
+                    "default": "clickhouse",
+                    "type": "string",
+                    "maxLength": 63,
+                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                  },
+                  "instances_count": {
+                    "default": "1",
+                    "type": "string",
+                    "enum": [
+                      "1",
+                      "2",
+                      "3",
+                      "4",
+                      "5"
+                    ]
+                  },
+                  "shards_count": {
+                    "default": 1,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 16
+                  },
+                  "keeper_replicas": {
+                    "default": "1",
+                    "type": "string",
+                    "enum": [
+                      "1",
+                      "3",
+                      "5"
+                    ]
+                  },
+                  "resource_profile": {
+                    "default": "small",
+                    "type": "string",
+                    "enum": [
+                      "default",
+                      "small",
+                      "production"
+                    ]
+                  },
+                  "keeper_version": {
+                    "type": "string",
+                    "pattern": "^\\d+\\.\\d+(\\.\\d+){0,2}(-[a-zA-Z0-9.-]+)?$"
+                  },
+                  "backup_enabled": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "backup_object_storage_integration_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "backup_interval_hours": {
+                    "default": 24,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 168
+                  },
+                  "backup_retention_days": {
+                    "default": 7,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 365
+                  },
+                  "restore_backup_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "storage_size": {
+                    "default": 20,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5000
+                  },
+                  "storage_class": {
+                    "default": "hcloud-volumes",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "keeper_storage_size": {
+                    "default": 10,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000
+                  },
+                  "keeper_storage_class": {
+                    "default": "hcloud-volumes",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "cpu_request_millicores": {
+                    "default": 250,
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "cpu_limit_millicores": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "memory_request_mb": {
+                    "default": 512,
+                    "type": "integer",
+                    "minimum": 256,
+                    "maximum": 262144
+                  },
+                  "memory_limit_mb": {
+                    "default": 2048,
+                    "type": "integer",
+                    "minimum": 256,
+                    "maximum": 262144
+                  },
+                  "keeper_cpu_request_millicores": {
+                    "default": 100,
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "keeper_cpu_limit_millicores": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "keeper_memory_request_mb": {
+                    "default": 256,
+                    "type": "integer",
+                    "minimum": 128,
+                    "maximum": 65536
+                  },
+                  "keeper_memory_limit_mb": {
+                    "default": 512,
+                    "type": "integer",
+                    "minimum": 128,
+                    "maximum": 65536
+                  },
+                  "node_pool_name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "tolerate_node_pool_taints": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "expose_enabled": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "expose_method": {
+                    "default": "loadbalancer",
+                    "type": "string",
+                    "enum": [
+                      "loadbalancer",
+                      "tailscale",
+                      "metallb"
+                    ]
+                  },
+                  "load_balancer_source_ranges": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "expose_port": {
+                    "default": 8123,
+                    "type": "integer",
+                    "minimum": 1024,
+                    "maximum": 65535
+                  },
+                  "native_port": {
+                    "default": 9000,
+                    "type": "integer",
+                    "minimum": 1024,
+                    "maximum": 65535
+                  },
+                  "default_user_password": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "tls_enabled": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "tls_required": {
+                    "default": false,
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "default_user_password"
+                ]
+              }
+            },
+            "required": [
+              "engine",
+              "database_name",
+              "version",
+              "configuration"
+            ]
+          }
+        ],
+        "examples": [
+          {
+            "engine": "mysql",
+            "database_name": "orders",
+            "version": "8.4.8.1",
+            "configuration": {
+              "storage_size": 10
+            }
+          }
+        ]
+      }
     },
     {
       "command": "clusters databases delete",
@@ -6119,7 +7866,26 @@
         }
       ],
       "step_up": false,
-      "confirm": false
+      "confirm": false,
+      "body": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "replicas": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "replicas"
+        ],
+        "examples": [
+          {
+            "replicas": 3
+          }
+        ]
+      }
     },
     {
       "command": "deployments settings update",

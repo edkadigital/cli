@@ -105,13 +105,14 @@ func TestGeneratedConfirmFlags(t *testing.T) {
 }
 
 // A body schema describes the fields of its route, and its example sends only
-// those. The routes that create and change a deployment have one.
+// those. The routes that create, change and scale a deployment have one, and
+// so do the routes the CLI suggests for a database or a cronjob.
 func TestBodySchemasDescribeTheirExample(t *testing.T) {
 	c, err := Load()
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, route := range [][2]string{{"POST", "/api/clusters/:id/deployments"}, {"POST", "/api/clusters/:clusterId/deployments/git"}, {"PATCH", "/api/deployments/:id/settings"}} {
+	for _, route := range [][2]string{{"POST", "/api/clusters/:id/deployments"}, {"POST", "/api/clusters/:clusterId/deployments/git"}, {"PATCH", "/api/deployments/:id/settings"}, {"PATCH", "/api/deployments/:id/scale"}, {"POST", "/api/clusters/:clusterId/databases"}, {"POST", "/api/clusters/:id/cronjobs"}} {
 		if op := c.Find(route[0], route[1]); op == nil || len(op.Body) == 0 {
 			t.Errorf("%s %s has no body schema", route[0], route[1])
 		}
