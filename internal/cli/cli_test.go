@@ -682,11 +682,49 @@ func TestLogsFollowByTimestamps(t *testing.T) {
 func TestLogsNoteGoesToStderr(t *testing.T) {
 	server, _ := sequenceAPI(t, map[string][]string{
 		"GET /api/deployments":         {`{"data":[{"id":"d1","name":"api","cluster_name":"sinaia"}]}`},
-		"GET /api/deployments/d1/logs": {`{"logs":"No previous container logs available. The pod has not been restarted.","podName":"api-a"}`},
+		"GET /api/deployments/d1/logs": {`{"logs":"No previous container logs available. The pod has not been restarted.","podName":"api-a","parameters":{"previous":true,"noPreviousLogs":true}}`},
 	})
 	out, errOut, err := execute(t, server.URL, "logs", "api", "--previous")
 	if err != nil || out != "" || !strings.Contains(errOut, "The pod has not been restarted.") {
 		t.Fatalf("out=%q err=%q %v", out, errOut, err)
+	}
+}
+
+// A container's last line can lack a line break, and a log can be that one
+// line. It stays on stdout: only what Edka marks or words as a note is one.
+func TestLogsLineWithoutLineBreakIsLog(t *testing.T) {
+	fastPolls(t)
+	interval := minLogInterval
+	minLogInterval = time.Millisecond
+	t.Cleanup(func() { minLogInterval = interval })
+	for _, args := range [][]string{{"logs", "api"}, {"logs", "api", "--follow", "--interval", "1ms"}} {
+		server, _ := sequenceAPI(t, map[string][]string{
+			"GET /api/deployments": {`{"data":[{"id":"d1","name":"api","cluster_name":"sinaia"}]}`},
+			"GET /api/deployments/d1/logs": {
+				`{"logs":"fatal: configuration missing","podName":"api-a"}`,
+				`403 {"error":"Forbidden"}`,
+			},
+		})
+		out, errOut, err := execute(t, server.URL, args...)
+		if len(args) == 2 && err != nil || len(args) > 2 && (err == nil || !strings.Contains(err.Error(), "Forbidden")) {
+			t.Fatal(args, err)
+		}
+		if out != "fatal: configuration missing\n" || strings.Contains(errOut, "fatal") {
+			t.Fatalf("%v: out=%q err=%q", args, out, errOut)
+		}
+	}
+	for body, note := range map[string]bool{
+		`{"logs":"Container is still starting and has not produced logs yet."}`:                               true,
+		`{"logs":"Container is not producing logs because it is currently ContainerCreating."}`:               true,
+		`{"logs":"No previous container logs available.","parameters":{"noPreviousLogs":true}}`:               true,
+		`{"logs":"ImagePullBackOff: Back-off pulling image ghcr.io/acme/api:1","parameters":{"noLogs":true}}`: true,
+		`{"logs":"Container is still starting and has not produced logs yet.\nnext","podName":"a"}`:           false,
+		`{"logs":"Error: listen EADDRINUSE :::8080","parameters":{"previous":false}}`:                         false,
+	} {
+		read, err := readLog([]byte(body))
+		if err != nil || (read.note != "") != note || (read.log != "") == note {
+			t.Errorf("%s: %+v %v", body, read, err)
+		}
 	}
 }
 func TestOutputFilePermissions(t *testing.T) {

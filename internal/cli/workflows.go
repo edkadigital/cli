@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"syscall"
@@ -407,7 +408,16 @@ type logRead struct {
 	since, stamped bool
 }
 
-// readLog reads a log response. A note is one line with no line break.
+// unstartedLog is the note Edka sends in place of the log of a container that
+// isn't running yet.
+var unstartedLog = regexp.MustCompile(`^Container is (?:still starting and has not produced logs yet|not producing logs because it is currently [A-Za-z]+)\.$`)
+
+// readLog reads a log response. A container can write any text, even one line
+// with no line break, so a note is only what Edka marks or words as one: Edka
+// marks its notes with noPreviousLogs or noLogs. An Edka API from before noLogs
+// leaves it out. Its notes for a container that isn't running yet are known by
+// their words, but its note for a container that can't start, "Reason:
+// message", reads like a log line, so it prints as one.
 func readLog(body []byte) (logRead, error) {
 	log, err := logText(body)
 	if err != nil {
@@ -417,7 +427,7 @@ func readLog(body []byte) (logRead, error) {
 	m, _ := data.(map[string]any)
 	parameters, _ := m["parameters"].(map[string]any)
 	read := logRead{log: log, pod: text(m, "podName"), since: parameters["sinceSeconds"] != nil, stamped: parameters["timestamps"] == true}
-	if raw := text(m, "logs"); raw != "" && !strings.Contains(raw, "\n") {
+	if parameters["noPreviousLogs"] == true || parameters["noLogs"] == true || unstartedLog.MatchString(text(m, "logs")) {
 		read.log, read.note = "", log
 	}
 	return read, nil
