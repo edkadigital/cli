@@ -65,6 +65,31 @@ func (s Store) Load(profile string) (*Session, error) {
 	return &session, nil
 }
 
+// SignedIn reports whether the profile has saved credentials. Unlike Load, it
+// counts a keyring it can't read as an error rather than as no credentials,
+// unless a credential file answers first.
+func (s Store) SignedIn(profile string) (bool, error) {
+	if !config.ValidName(profile) {
+		return false, fmt.Errorf("invalid profile name")
+	}
+	if _, err := os.Stat(s.path(profile)); err == nil {
+		return true, nil
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return false, err
+	}
+	if s.Mode == "file" {
+		return false, nil
+	}
+	_, err := keyring.Get("edka-cli", s.Dir+":"+profile)
+	if err == nil {
+		return true, nil
+	}
+	if errors.Is(err, keyring.ErrNotFound) {
+		return false, nil
+	}
+	return false, fmt.Errorf("read system keyring: %w", err)
+}
+
 // Save returns the chosen storage so the caller can explain file fallback.
 func (s Store) Save(profile string, session *Session) (string, error) {
 	if !config.ValidName(profile) {

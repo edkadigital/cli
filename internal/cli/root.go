@@ -419,6 +419,11 @@ func (a *App) resolveContext(cmd *cobra.Command) error {
 	}
 	a.deployment = first(a.deploymentFlag, os.Getenv("EDKA_DEPLOYMENT"), linkDeployment)
 	a.organization = first(a.organizationFlag, os.Getenv("EDKA_ORGANIZATION"), linkOrganization, current.Organization)
+	return a.resolveStoreMode(cmd)
+}
+
+// resolveStoreMode applies EDKA_CREDENTIAL_STORE unless --credential-store is set.
+func (a *App) resolveStoreMode(cmd *cobra.Command) error {
 	if !cmd.Flags().Changed("credential-store") {
 		a.storeMode = first(os.Getenv("EDKA_CREDENTIAL_STORE"), "auto")
 	}

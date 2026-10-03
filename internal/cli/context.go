@@ -161,6 +161,41 @@ func (a *App) addContext(root *cobra.Command) {
 			return ui.Render(a.Out, jsonBody(row(args[0])), a.output, false)
 		}
 		return nil
+	}}, &cobra.Command{Use: "remove <name>", Short: "Remove a signed-out profile", Long: "Remove a profile's saved API address, organization and cluster. Sign out of\nthe profile first, so its credentials don't outlive it.\n\nThe default profile always exists. Removing it resets it to\n" + config.DefaultAPI + ". When you remove the active profile, default becomes active.", Args: cobra.ExactArgs(1), ValidArgsFunction: firstArgument(a.profileNames), Example: "  edka logout --profile staging\n  edka profile remove staging", RunE: func(cmd *cobra.Command, args []string) error {
+		name := args[0]
+		if _, exists := a.cfg.Profiles[name]; !exists {
+			return fmt.Errorf("profile %q does not exist; run `edka profile list`", name)
+		}
+		if err := a.resolveStoreMode(cmd); err != nil {
+			return err
+		}
+		signedIn, err := a.store().SignedIn(name)
+		if err != nil {
+			return fmt.Errorf("can't confirm profile %q is signed out: %w", name, err)
+		}
+		if signedIn {
+			return fmt.Errorf("profile %q is signed in; run `edka logout --profile %s` first", name, name)
+		}
+		delete(a.cfg.Profiles, name)
+		wasActive := a.cfg.Active == name
+		if wasActive {
+			a.cfg.Active = "default"
+		}
+		if err := config.Save(a.dir, a.cfg); err != nil {
+			return err
+		}
+		switch {
+		case name == "default":
+			a.message("✓ Reset profile default to %s", config.DefaultAPI)
+		case wasActive:
+			a.message("✓ Removed profile %s; default is now active", name)
+		default:
+			a.message("✓ Removed profile %s", name)
+		}
+		if a.output != "table" {
+			return ui.Render(a.Out, jsonBody(map[string]any{"name": name, "removed": true, "active": a.cfg.Active}), a.output, false)
+		}
+		return nil
 	}})
 	markConfigOnly(profiles.Commands()...)
 	markLocal(contextCmd)
