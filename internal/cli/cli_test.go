@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -17,6 +18,7 @@ import (
 	"github.com/edkadigital/cli/internal/catalog"
 	"github.com/edkadigital/cli/internal/config"
 	"github.com/edkadigital/cli/internal/credential"
+	"github.com/zalando/go-keyring"
 )
 
 func execute(t *testing.T, base string, args ...string) (string, string, error) {
@@ -457,6 +459,30 @@ func TestProfileRemove(t *testing.T) {
 
 	if _, errOut, err = run("spare"); err != nil || !strings.Contains(errOut, "✓ Removed profile spare\n") {
 		t.Fatal(errOut, err)
+	}
+}
+
+// A keyring that can't be read can't show that a profile is signed out, so the
+// profile stays, and so does `edka logout --profile` for it.
+func TestProfileRemoveKeepsAProfileTheKeyringCantClear(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("EDKA_CONFIG_DIR", dir)
+	t.Setenv("EDKA_CREDENTIAL_STORE", "auto")
+	t.Setenv("EDKA_PROFILE", "")
+	keyring.MockInitWithError(errors.New("keyring is locked"))
+	t.Cleanup(keyring.MockInit)
+	c, _ := config.Load(dir)
+	c.Profiles["work"] = config.Profile{APIURL: "https://work.example"}
+	if err := config.Save(dir, c); err != nil {
+		t.Fatal(err)
+	}
+	root := New("test", strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
+	root.SetArgs([]string{"profile", "remove", "work"})
+	if err := root.Execute(); err == nil || !strings.Contains(err.Error(), `can't confirm profile "work" is signed out`) || !strings.Contains(err.Error(), "keyring is locked") {
+		t.Fatal(err)
+	}
+	if c, err := config.Load(dir); err != nil || c.Profiles["work"].APIURL != "https://work.example" {
+		t.Fatal(c, err)
 	}
 }
 func TestOperationsSearch(t *testing.T) {

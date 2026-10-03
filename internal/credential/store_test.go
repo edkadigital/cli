@@ -117,6 +117,44 @@ func TestAutoStoreFallsBackToAPrivateFile(t *testing.T) {
 	}
 }
 
+// SignedIn finds credentials in a file or the keyring. A keyring it can't read
+// is an error, not an absence, unless a file answers first or file mode leaves
+// the keyring out.
+func TestSignedIn(t *testing.T) {
+	workingKeyring(t)
+	for _, mode := range []string{"keyring", "auto"} {
+		store := Store{Dir: t.TempDir(), Mode: mode}
+		if in, err := store.SignedIn("default"); err != nil || in {
+			t.Fatal(mode, in, err)
+		}
+		if _, err := store.Save("default", &Session{AccessToken: "access"}); err != nil {
+			t.Fatal(mode, err)
+		}
+		if in, err := store.SignedIn("default"); err != nil || !in {
+			t.Fatal(mode, in, err)
+		}
+	}
+	brokenKeyring(t)
+	for _, mode := range []string{"keyring", "auto"} {
+		store := Store{Dir: t.TempDir(), Mode: mode}
+		if _, err := store.SignedIn("default"); err == nil || !strings.Contains(err.Error(), "read system keyring") {
+			t.Fatal(mode, err)
+		}
+		if _, err := (Store{Dir: store.Dir, Mode: "file"}).Save("default", &Session{AccessToken: "access"}); err != nil {
+			t.Fatal(mode, err)
+		}
+		if in, err := store.SignedIn("default"); err != nil || !in {
+			t.Fatal(mode, in, err)
+		}
+	}
+	if in, err := (Store{Dir: t.TempDir(), Mode: "file"}).SignedIn("default"); err != nil || in {
+		t.Fatal(in, err)
+	}
+	if _, err := (Store{Dir: t.TempDir(), Mode: "file"}).SignedIn("../escape"); err == nil || !strings.Contains(err.Error(), "invalid profile name") {
+		t.Fatal(err)
+	}
+}
+
 func TestKeyringStoreNeverFallsBackToAFile(t *testing.T) {
 	brokenKeyring(t)
 	store := Store{Dir: t.TempDir(), Mode: "keyring"}

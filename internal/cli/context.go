@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"maps"
 	"os"
@@ -10,7 +9,6 @@ import (
 	"slices"
 
 	"github.com/edkadigital/cli/internal/config"
-	"github.com/edkadigital/cli/internal/credential"
 	"github.com/edkadigital/cli/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -171,12 +169,12 @@ func (a *App) addContext(root *cobra.Command) {
 		if err := a.resolveStoreMode(cmd); err != nil {
 			return err
 		}
-		_, err := a.store().Load(name)
-		if err == nil {
-			return fmt.Errorf("profile %q is signed in; run `edka logout --profile %s` first", name, name)
+		signedIn, err := a.store().SignedIn(name)
+		if err != nil {
+			return fmt.Errorf("can't confirm profile %q is signed out: %w", name, err)
 		}
-		if !errors.Is(err, credential.ErrNotFound) {
-			return err
+		if signedIn {
+			return fmt.Errorf("profile %q is signed in; run `edka logout --profile %s` first", name, name)
 		}
 		delete(a.cfg.Profiles, name)
 		wasActive := a.cfg.Active == name
