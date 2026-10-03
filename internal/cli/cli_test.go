@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -464,6 +465,119 @@ func TestLogsFollowAcrossPods(t *testing.T) {
 	}
 	if (*requests)[0] != "GET /api/deployments" {
 		t.Fatal(*requests)
+	}
+}
+
+// --since asks for the lines of the last duration, up to 2000 unless --tail
+// says otherwise, and refuses a log from an Edka API that doesn't apply it.
+func TestLogsSince(t *testing.T) {
+	deployments := `{"data":[{"id":"d1","name":"api","cluster_name":"sinaia"}]}`
+	server, requests := fakeAPI(t, map[string]string{
+		"GET /api/deployments":         deployments,
+		"GET /api/deployments/d1/logs": `{"logs":"ready\n","podName":"api-a","parameters":{"tailLines":2000,"sinceSeconds":600,"timestamps":false}}`,
+	})
+	out, _, err := execute(t, server.URL, "logs", "api", "--since", "10m")
+	if err != nil || out != "ready\n" {
+		t.Fatalf("out=%q %v", out, err)
+	}
+	if last := (*requests)[len(*requests)-1]; last != "GET /api/deployments/d1/logs?sinceSeconds=600&tailLines=2000" {
+		t.Fatal(last)
+	}
+	if _, _, err := execute(t, server.URL, "logs", "api", "--since", "90s", "--tail", "50"); err != nil {
+		t.Fatal(err)
+	}
+	if last := (*requests)[len(*requests)-1]; last != "GET /api/deployments/d1/logs?sinceSeconds=90&tailLines=50" {
+		t.Fatal(last)
+	}
+	if _, _, err := execute(t, server.URL, "logs", "api", "--since", "500ms"); err == nil || !strings.Contains(err.Error(), "at least one second") {
+		t.Fatal(err)
+	}
+
+	old, _ := fakeAPI(t, map[string]string{
+		"GET /api/deployments":         deployments,
+		"GET /api/deployments/d1/logs": `{"logs":"from yesterday\n","podName":"api-a","parameters":{"tailLines":2000}}`,
+	})
+	out, _, err = execute(t, old.URL, "logs", "api", "--since", "10m")
+	if !errors.Is(err, errSinceUnsupported) || out != "" {
+		t.Fatalf("out=%q %v", out, err)
+	}
+}
+
+// --timestamps prints each line's time, or says that Edka sent none.
+func TestLogsTimestamps(t *testing.T) {
+	deployments := `{"data":[{"id":"d1","name":"api","cluster_name":"sinaia"}]}`
+	server, requests := fakeAPI(t, map[string]string{
+		"GET /api/deployments":         deployments,
+		"GET /api/deployments/d1/logs": `{"logs":"2026-10-03T12:00:00.5Z ready\n","podName":"api-a","parameters":{"timestamps":true}}`,
+	})
+	out, errOut, err := execute(t, server.URL, "logs", "api", "--timestamps")
+	if err != nil || out != "2026-10-03T12:00:00.5Z ready\n" || errOut != "" {
+		t.Fatalf("out=%q err=%q %v", out, errOut, err)
+	}
+	if last := (*requests)[len(*requests)-1]; last != "GET /api/deployments/d1/logs?tailLines=100&timestamps=true" {
+		t.Fatal(last)
+	}
+	old, _ := fakeAPI(t, map[string]string{
+		"GET /api/deployments":         deployments,
+		"GET /api/deployments/d1/logs": `{"logs":"ready\n","podName":"api-a","parameters":{"tailLines":100}}`,
+	})
+	out, errOut, err = execute(t, old.URL, "logs", "api", "--timestamps")
+	if err != nil || out != "ready\n" || !strings.Contains(errOut, "doesn't add timestamps") {
+		t.Fatalf("out=%q err=%q %v", out, errOut, err)
+	}
+}
+
+// --follow reads with timestamps, so a line that repeats exactly prints each
+// time it is logged, and the times stay off the output unless asked for.
+func TestLogsFollowByTimestamps(t *testing.T) {
+	fastPolls(t)
+	interval := minLogInterval
+	minLogInterval = time.Millisecond
+	t.Cleanup(func() { minLogInterval = interval })
+	reads := []string{
+		"2026-10-03T12:00:01Z health ok\n2026-10-03T12:00:02Z health ok\n",
+		"2026-10-03T12:00:02Z health ok\n2026-10-03T12:00:03Z health ok\n",
+		"2026-10-03T12:00:03Z health ok\n2026-10-03T12:00:04Z served /\n",
+	}
+	for _, c := range []struct {
+		flags []string
+		want  string
+	}{
+		{nil, "health ok\nhealth ok\nhealth ok\nserved /\n"},
+		{[]string{"--timestamps"}, "2026-10-03T12:00:01Z health ok\n2026-10-03T12:00:02Z health ok\n2026-10-03T12:00:03Z health ok\n2026-10-03T12:00:04Z served /\n"},
+	} {
+		var queries []string
+		calls := 0
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/api/deployments":
+				fmt.Fprint(w, `{"data":[{"id":"d1","name":"api","cluster_name":"sinaia"}]}`)
+			case "/api/deployments/d1/logs":
+				queries = append(queries, r.URL.RawQuery)
+				if calls == len(reads) {
+					w.WriteHeader(http.StatusForbidden)
+					fmt.Fprint(w, `{"error":"Forbidden"}`)
+					return
+				}
+				body, _ := json.Marshal(map[string]any{"logs": reads[calls], "podName": "api-a", "parameters": map[string]any{"timestamps": true}})
+				calls++
+				w.Write(body)
+			}
+		}))
+		out, _, err := execute(t, server.URL, append([]string{"logs", "api", "--follow", "--interval", "1ms"}, c.flags...)...)
+		server.Close()
+		if err == nil || !strings.Contains(err.Error(), "Forbidden") {
+			t.Fatal(err)
+		}
+		if out != c.want {
+			t.Errorf("%v: got %q want %q", c.flags, out, c.want)
+		}
+		if queries[0] != "tailLines=100&timestamps=true" {
+			t.Fatal(queries)
+		}
+	}
+	if got := withoutTimestamps("2026-10-03T12:00:01.123456789Z a b\nnot a time\n"); got != "a b\nnot a time\n" {
+		t.Fatalf("%q", got)
 	}
 }
 
