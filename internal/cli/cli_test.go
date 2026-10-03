@@ -16,6 +16,7 @@ import (
 
 	"github.com/edkadigital/cli/internal/catalog"
 	"github.com/edkadigital/cli/internal/config"
+	"github.com/edkadigital/cli/internal/credential"
 )
 
 func execute(t *testing.T, base string, args ...string) (string, string, error) {
@@ -385,6 +386,77 @@ func TestLocalChangesPrintJSONRecords(t *testing.T) {
 		if _, out, _ := run(args...); out != "" {
 			t.Fatal(args, out)
 		}
+	}
+}
+
+// A profile goes only once it is signed out, so no credentials outlive it.
+// Removing default resets it, and removing the active profile makes default
+// active.
+func TestProfileRemove(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("EDKA_CONFIG_DIR", dir)
+	t.Setenv("EDKA_CREDENTIAL_STORE", "file")
+	t.Setenv("EDKA_PROFILE", "")
+	c, _ := config.Load(dir)
+	c.Active = "work"
+	c.Profiles["default"] = config.Profile{APIURL: "http://localhost:8080", Organization: "o1"}
+	c.Profiles["work"] = config.Profile{APIURL: "https://work.example", Organization: "o2"}
+	c.Profiles["spare"] = config.Profile{APIURL: "https://spare.example"}
+	if err := config.Save(dir, c); err != nil {
+		t.Fatal(err)
+	}
+	store := credential.Store{Dir: dir, Mode: "file"}
+	if _, err := store.Save("work", &credential.Session{AccessToken: "access"}); err != nil {
+		t.Fatal(err)
+	}
+	run := func(args ...string) (string, string, error) {
+		var out, errOut bytes.Buffer
+		root := New("test", strings.NewReader(""), &out, &errOut)
+		root.SetArgs(append([]string{"profile", "remove"}, args...))
+		err := root.Execute()
+		return out.String(), errOut.String(), err
+	}
+	saved := func() *config.Config {
+		t.Helper()
+		c, err := config.Load(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return c
+	}
+
+	if _, _, err := run("work"); err == nil || !strings.Contains(err.Error(), "run `edka logout --profile work` first") {
+		t.Fatal(err)
+	}
+	if _, kept := saved().Profiles["work"]; !kept {
+		t.Fatal("a signed-in profile was removed")
+	}
+	if _, _, err := run("typo"); err == nil || !strings.Contains(err.Error(), `profile "typo" does not exist`) {
+		t.Fatal(err)
+	}
+
+	if err := store.Delete("work"); err != nil {
+		t.Fatal(err)
+	}
+	out, errOut, err := run("work", "--json")
+	var record map[string]any
+	if err != nil || json.Unmarshal([]byte(out), &record) != nil || record["name"] != "work" || record["removed"] != true || record["active"] != "default" || !strings.Contains(errOut, "✓ Removed profile work; default is now active") {
+		t.Fatal(out, errOut, err)
+	}
+	if c := saved(); c.Active != "default" || c.Profiles["work"] != (config.Profile{}) || c.Profiles["spare"].APIURL != "https://spare.example" {
+		t.Fatal(c)
+	}
+
+	out, errOut, err = run("default")
+	if err != nil || out != "" || !strings.Contains(errOut, "✓ Reset profile default to "+config.DefaultAPI) {
+		t.Fatal(out, errOut, err)
+	}
+	if c := saved(); c.Profiles["default"] != (config.Profile{APIURL: config.DefaultAPI}) {
+		t.Fatal(c.Profiles["default"])
+	}
+
+	if _, errOut, err = run("spare"); err != nil || !strings.Contains(errOut, "✓ Removed profile spare\n") {
+		t.Fatal(errOut, err)
 	}
 }
 func TestOperationsSearch(t *testing.T) {

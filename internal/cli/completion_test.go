@@ -152,7 +152,7 @@ func TestCompletionOffersProfilesWithoutTheOneInContext(t *testing.T) {
 	if err := config.Save(dir, c); err != nil {
 		t.Fatal(err)
 	}
-	for _, line := range [][]string{{"profile", "use", ""}, {"logs", "--profile", ""}} {
+	for _, line := range [][]string{{"profile", "use", ""}, {"profile", "remove", ""}, {"logs", "--profile", ""}} {
 		var out bytes.Buffer
 		root := New("test", strings.NewReader(""), &out, &bytes.Buffer{})
 		root.SetArgs(append([]string{"__complete"}, line...))
