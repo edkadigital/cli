@@ -1,0 +1,76 @@
+name: CI
+on:
+  # A pull request runs once: for the pull request, not also for the push to
+  # its branch.
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # A vulnerability can be published while the code stays the same.
+    - cron: '23 6 * * 1'
+permissions:
+  contents: read
+jobs:
+  test:
+    if: github.event_name != 'schedule'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The latest Go release has the security fixes of the standard library.
+      # go.mod names the oldest Go that builds the CLI.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+          cache: true
+      - name: Test with race detection
+        run: go test -race ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Build
+        run: go build ./...
+      - name: Check Go formatting
+        shell: bash
+        run: test -z "$(gofmt -l cmd internal)"
+  lint:
+    if: github.event_name != 'schedule'
+    strategy:
+      fail-fast: false
+      matrix:
+        # Each system builds files the others leave out.
+        goos: [linux, darwin, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+          cache: true
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        env:
+          GOOS: ${{ matrix.goos }}
+        with:
+          # The Makefile names the same version.
+          version: v2.13.2
+  scripts:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # ShellCheck comes with the runner. The scripts print `$PATH` and
+      # backticks on purpose, which ShellCheck notes below a warning.
+      - name: Check the shell scripts
+        run: shellcheck --severity=warning install.sh scripts/homebrew-formula.sh
+  vulnerabilities:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+          cache: true
+      - name: Check for known vulnerabilities
+        run: make vuln

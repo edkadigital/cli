@@ -1,0 +1,121 @@
+name: Release
+on:
+  push:
+    tags: ['v[0-9]*']
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+      - run: go test -race ./...
+      - run: go vet ./...
+      # A tag with a known vulnerability publishes nothing.
+      - run: make vuln
+  # The latest Go release has the security fixes of the standard library.
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [darwin, linux, windows]
+        goarch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+      - name: Build portable archive
+        shell: bash
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '0'
+        run: |
+          mkdir -p dist/package
+          binary=edka
+          if [ "$GOOS" = windows ]; then binary=edka.exe; fi
+          go build -trimpath -ldflags "-s -w -X main.version=$GITHUB_REF_NAME" -o "dist/package/$binary" ./cmd/edka
+          cp README.md LICENSE dist/package/
+          archive="edka_${GITHUB_REF_NAME}_${GOOS}_${GOARCH}"
+          if [ "$GOOS" = windows ]; then
+            (cd dist/package && zip "../$archive.zip" "$binary" README.md LICENSE)
+          else
+            tar -czf "dist/$archive.tar.gz" -C dist/package "$binary" README.md LICENSE
+          fi
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # Checked out before the download, which a checkout would clean away.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums and release
+        working-directory: dist
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          sha256sum *.tar.gz *.zip > checksums.txt
+          # edka.io/install.sh and edka.io/install.ps1 redirect to the scripts
+          # of the latest release.
+          cp ../install.sh ../install.ps1 .
+          # `edka upgrade` installs the latest release, and GitHub leaves
+          # pre-releases out of it.
+          prerelease=()
+          case "$GITHUB_REF_NAME" in *-*) prerelease=(--prerelease) ;; esac
+          gh release create "$GITHUB_REF_NAME" ./* --verify-tag --generate-notes "${prerelease[@]}"
+  # `brew install edkadigital/tap/edka` reads the formula in
+  # edkadigital/homebrew-tap. HOMEBREW_TAP_TOKEN may write to that repository's
+  # contents and to nothing else.
+  homebrew:
+    needs: publish
+    # Homebrew installs releases; a pre-release stays out of the formula.
+    if: ${{ !contains(github.ref_name, '-') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the tap token
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -z "$HOMEBREW_TAP_TOKEN" ]; then
+            echo "::error::Set the HOMEBREW_TAP_TOKEN secret to a token that may write to edkadigital/homebrew-tap, then re-run this job."
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: edkadigital/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+      - name: Update the formula
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release download "$GITHUB_REF_NAME" --pattern checksums.txt --dir dist
+          mkdir -p tap/Formula
+          scripts/homebrew-formula.sh "$GITHUB_REF_NAME" dist/checksums.txt > tap/Formula/edka.rb
+          cd tap
+          git add Formula/edka.rb
+          if git diff --cached --quiet; then
+            echo "The formula already installs $GITHUB_REF_NAME."
+            exit 0
+          fi
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m "edka $GITHUB_REF_NAME"
+          git push

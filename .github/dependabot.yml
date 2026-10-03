@@ -1,0 +1,29 @@
+version: 2
+updates:
+  # The workflows pin each action to a commit. Dependabot moves the commit and
+  # the version in the comment beside it.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # A release is proposed a week after it is published, so one that is
+    # withdrawn or found compromised in its first days never arrives.
+    cooldown:
+      default-days: 7
+    groups:
+      # One pull request holds the minor and patch updates of every action. A
+      # major update comes in a pull request of its own.
+      actions:
+        patterns: ['*']
+        update-types: [minor, patch]
+  # The modules go.mod requires directly. Their own dependencies move with them.
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      go-modules:
+        patterns: ['*']
+        update-types: [minor, patch]

@@ -1,0 +1,7543 @@
+{
+  "source_sha": "9bce52ef16f8d8e93996ca2d2979bbc750e43d7b",
+  "confirm_words": [
+    "cancel",
+    "cleanup-orphaned-nodes",
+    "delete",
+    "destroy",
+    "disconnect",
+    "drain-node",
+    "purge",
+    "reset",
+    "restore",
+    "revoke",
+    "rollback",
+    "rotate",
+    "scale-down",
+    "truncate",
+    "unprotect"
+  ],
+  "operations": [
+    {
+      "command": "addons catalog get",
+      "method": "GET",
+      "path": "/api/addons/catalog",
+      "summary": "Get all available addons from the catalog",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "addons categories list",
+      "method": "GET",
+      "path": "/api/addons/categories",
+      "summary": "Get all addon categories",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "apps catalog get",
+      "method": "GET",
+      "path": "/api/apps/catalog",
+      "summary": "Get all apps in the catalog",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "apps catalog icon get",
+      "method": "GET",
+      "path": "/api/apps/catalog/:catalogAppId/icon",
+      "summary": "Get the icon file of a packaged catalog app",
+      "params": [
+        {
+          "name": "catalogAppId",
+          "flag": "catalog-app-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "apps categories list",
+      "method": "GET",
+      "path": "/api/apps/categories",
+      "summary": "Get all app categories",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "apps get",
+      "method": "GET",
+      "path": "/api/apps/:appName",
+      "summary": "Get a specific app by name",
+      "params": [
+        {
+          "name": "appName",
+          "flag": "app-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "apps instance get",
+      "method": "GET",
+      "path": "/api/apps/instance/:appId",
+      "summary": "Get app by ID",
+      "params": [
+        {
+          "name": "appId",
+          "flag": "app-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "apps instances list",
+      "method": "GET",
+      "path": "/api/apps/instances",
+      "summary": "Get all installed apps across clusters visible to the current user",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "cluster-backup-sessions abort",
+      "method": "POST",
+      "path": "/api/cluster-backup-sessions/abort",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "cluster-backup-sessions complete",
+      "method": "POST",
+      "path": "/api/cluster-backup-sessions/complete",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "cluster-backup-sessions create",
+      "method": "POST",
+      "path": "/api/cluster-backup-sessions",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "cluster-backup-sets list",
+      "method": "GET",
+      "path": "/api/cluster-backup-sets",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters actions cache entries clear",
+      "method": "DELETE",
+      "path": "/api/clusters/:clusterId/actions/cache/entries",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters actions cache entries delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:clusterId/actions/cache/entries/:entryId",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "entryId",
+          "flag": "entry-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters actions cache entries list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/actions/cache/entries",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters actions cache stats get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/actions/cache/stats",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters actions cache update",
+      "method": "PUT",
+      "path": "/api/clusters/:clusterId/actions/cache",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters actions logs get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/actions/logs",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters actions runners create",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/actions/runners",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters actions runners delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:clusterId/actions/runners/:runnerId",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "runnerId",
+          "flag": "runner-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters actions runners get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/actions/runners/:runnerId",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "runnerId",
+          "flag": "runner-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters actions runners list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/actions/runners",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters actions runners metrics history get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/actions/runners/:runnerId/metrics/history",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "runnerId",
+          "flag": "runner-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters actions runners metrics jobs list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/actions/runners/:runnerId/metrics/jobs",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "runnerId",
+          "flag": "runner-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters actions runners update",
+      "method": "PATCH",
+      "path": "/api/clusters/:clusterId/actions/runners/:runnerId",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "runnerId",
+          "flag": "runner-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters actions status get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/actions/status",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters addons create",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/addons",
+      "summary": "Install an addon to a cluster",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters addons delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:clusterId/addons",
+      "summary": "Uninstall an addon from a cluster",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters addons list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/addons",
+      "summary": "Get all addons installed in a cluster",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters addons update",
+      "method": "PUT",
+      "path": "/api/clusters/:clusterId/addons",
+      "summary": "Upgrade an installed addon",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters agent-heartbeats list",
+      "method": "GET",
+      "path": "/api/clusters/agent-heartbeats",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents backup-runs list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/agents/:agentId/backup-runs",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents backups create",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/agents/:agentId/backups",
+      "summary": "Create a one-off Job from the agent's state-backup CronJob",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents backups list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/agents/:agentId/backups",
+      "summary": "List state backups, newest first",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents codex-deploy-login create",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/agents/codex-deploy-login",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents codex-deploy-login delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:clusterId/agents/codex-deploy-login/:loginId",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "loginId",
+          "flag": "login-id"
+        }
+      ],
+      "step_up": true,
+      "confirm": true
+    },
+    {
+      "command": "clusters agents codex-deploy-login get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/agents/codex-deploy-login/:loginId",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "loginId",
+          "flag": "login-id"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents codex-login confirm",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/agents/:agentId/codex-login/confirm",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents codex-login create",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/agents/:agentId/codex-login",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents codex-login delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:clusterId/agents/:agentId/codex-login",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        }
+      ],
+      "step_up": true,
+      "confirm": true
+    },
+    {
+      "command": "clusters agents codex-login get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/agents/:agentId/codex-login",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents environments connection get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/agents/:agentId/environments/:environmentId/connection",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        },
+        {
+          "name": "environmentId",
+          "flag": "environment-id"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents environments create",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/agents/:agentId/environments",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents environments delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:clusterId/agents/:agentId/environments/:environmentId",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        },
+        {
+          "name": "environmentId",
+          "flag": "environment-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters agents environments get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/agents/:agentId/environments/:environmentId",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        },
+        {
+          "name": "environmentId",
+          "flag": "environment-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents environments list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/agents/:agentId/environments",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents environments resize",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/agents/:agentId/environments/:environmentId/resize",
+      "summary": "Resize in place",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        },
+        {
+          "name": "environmentId",
+          "flag": "environment-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents environments restart",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/agents/:agentId/environments/:environmentId/restart",
+      "summary": "Roll the pod without changing the desired spec",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        },
+        {
+          "name": "environmentId",
+          "flag": "environment-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents environments update",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/agents/:agentId/environments/:environmentId/update",
+      "summary": "Adopt the agent's current Codex version and model in place",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        },
+        {
+          "name": "environmentId",
+          "flag": "environment-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/agents/:agentId",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/agents",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents operations device-approval create",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/agents/:agentId/operations/device-approval",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents operations diagnostics-export get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/agents/:agentId/operations/diagnostics-export",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents operations pairing-approval create",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/agents/:agentId/operations/pairing-approval",
+      "summary": "List the pending requests for a channel or approve one sender by pairing code",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents operations usage-cost get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/agents/:agentId/operations/usage-cost",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents profiles create",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/agents/:agentId/profiles",
+      "summary": "Create a profile inside the agent runtime",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents profiles delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:clusterId/agents/:agentId/profiles/:profileName",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        },
+        {
+          "name": "profileName",
+          "flag": "profile-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters agents profiles list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/agents/:agentId/profiles",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents profiles restart",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/agents/:agentId/profiles/:profileName/restart",
+      "summary": "Drive one profile's gateway through the runtime driver",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        },
+        {
+          "name": "profileName",
+          "flag": "profile-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents profiles start",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/agents/:agentId/profiles/:profileName/start",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        },
+        {
+          "name": "profileName",
+          "flag": "profile-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents profiles stop",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/agents/:agentId/profiles/:profileName/stop",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        },
+        {
+          "name": "profileName",
+          "flag": "profile-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents profiles update",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/agents/:agentId/profiles/:profileName/update",
+      "summary": "Pull and apply the configured distribution for one named profile",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        },
+        {
+          "name": "profileName",
+          "flag": "profile-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents profiles webhook-secret get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/agents/:agentId/profiles/:profileName/webhook-secret",
+      "summary": "Reveal the HMAC secret that signs everything under the profile's webhook prefix",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        },
+        {
+          "name": "profileName",
+          "flag": "profile-name"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "clusters agents profiles webhook-test create",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/agents/:agentId/profiles/:profileName/webhook-test",
+      "summary": "Verify the public webhook chain end to end",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "agentId",
+          "flag": "agent-id"
+        },
+        {
+          "name": "profileName",
+          "flag": "profile-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters alert-rule-packs install",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/alert-rule-packs/:packId/install",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "packId",
+          "flag": "pack-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters alert-rule-packs list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/alert-rule-packs",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters alert-rules create",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/alert-rules",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters alert-rules delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:clusterId/alert-rules/:ruleId",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "ruleId",
+          "flag": "rule-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters alert-rules get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/alert-rules/:ruleId",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "ruleId",
+          "flag": "rule-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters alert-rules list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/alert-rules",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters alert-rules test",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/alert-rules/test",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters alert-rules update",
+      "method": "PATCH",
+      "path": "/api/clusters/:clusterId/alert-rules/:ruleId",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "ruleId",
+          "flag": "rule-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps catalog get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/apps/catalog",
+      "summary": "Get catalog apps available to this cluster/account",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps catalog package get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/apps/catalog/:catalogAppId/package",
+      "summary": "Get what a packaged catalog app is and runs, before it is installed on a cluster",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "catalogAppId",
+          "flag": "catalog-app-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps configure",
+      "method": "PUT",
+      "path": "/api/clusters/:clusterId/apps",
+      "summary": "Update app configuration",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps create",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/apps",
+      "summary": "Install an app to a cluster",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps data-sources get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/apps/data-sources/:dataSource",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "dataSource",
+          "flag": "data-source"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:clusterId/apps/:appId",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "appId",
+          "flag": "app-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters apps endpoints list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/apps/:appId/endpoints",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "appId",
+          "flag": "app-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/apps/:appId",
+      "summary": "Get app details by ID",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "appId",
+          "flag": "app-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps instances create",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/apps/:catalogAppId/instances",
+      "summary": "Install a catalog app as a new instance",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "catalogAppId",
+          "flag": "catalog-app-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps instances list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/apps/:appName/instances",
+      "summary": "Get all instances of a specific app type in a cluster",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "appName",
+          "flag": "app-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps instances list-all",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/apps/instances",
+      "summary": "Get installed app instances for the redesigned Apps UI",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/apps",
+      "summary": "Get all installed apps for a cluster",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps logs get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/apps/:appId/logs",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "appId",
+          "flag": "app-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps metrics get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/apps/:appId/metrics",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "appId",
+          "flag": "app-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps metrics history get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/apps/:appId/metrics/history",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "appId",
+          "flag": "app-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps pods list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/apps/:appId/pods",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "appId",
+          "flag": "app-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps postgres backup-timeline get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/apps/postgres/:clusterName/backup-timeline",
+      "summary": "Get backup timeline for a PostgreSQL cluster",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "clusterName",
+          "flag": "cluster-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps postgres check-restore-name",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/apps/postgres/check-restore-name",
+      "summary": "Check if a restore cluster name is available",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps postgres clusters list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/apps/postgres/clusters",
+      "summary": "Get PostgreSQL clusters with backup info for a specific Kubernetes cluster",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps postgres logs get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/apps/postgres/:clusterName/logs",
+      "summary": "Get PostgreSQL cluster logs",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "clusterName",
+          "flag": "cluster-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps postgres prepare-restore",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/apps/postgres/prepare-restore",
+      "summary": "Prepare PostgreSQL restore configuration",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps postgres validate-restore",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/apps/postgres/validate-restore",
+      "summary": "Validate PostgreSQL restore configuration",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps preview-environments get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/apps/preview-environments/:environmentId",
+      "summary": "Get runtime details for one adopted Helm-backed preview/review environment",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "environmentId",
+          "flag": "environment-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps preview-environments github-feedback create",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/apps/preview-environments/:environmentId/github-feedback",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "environmentId",
+          "flag": "environment-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps preview-environments list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/apps/preview-environments",
+      "summary": "Get Helm-backed preview/review environments adopted into the Apps surface",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps progress get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/apps/:appName/progress",
+      "summary": "Get installation progress for a specific app",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "appName",
+          "flag": "app-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps secrets list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/apps/:appId/secrets",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "appId",
+          "flag": "app-id"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps status get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/apps/:appId/status",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "appId",
+          "flag": "app-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps storage get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/apps/:appId/storage",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "appId",
+          "flag": "app-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps uninstall",
+      "method": "DELETE",
+      "path": "/api/clusters/:clusterId/apps",
+      "summary": "Uninstall an app from a cluster",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters apps update",
+      "method": "PATCH",
+      "path": "/api/clusters/:clusterId/apps/:appId",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "appId",
+          "flag": "app-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters apps versions get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/apps/:appId/versions/:version",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "appId",
+          "flag": "app-id"
+        },
+        {
+          "name": "version",
+          "flag": "version"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters archive",
+      "method": "PATCH",
+      "path": "/api/clusters/:id/archive",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters backup-encryption rotate",
+      "method": "POST",
+      "path": "/api/clusters/:id/backup-encryption/rotate",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters byo create",
+      "method": "POST",
+      "path": "/api/clusters/byo",
+      "summary": "Create a satellite cluster record and mint its first connect command",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters byo enrollment get",
+      "method": "GET",
+      "path": "/api/clusters/:id/byo/enrollment",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters byo enrollment-token create",
+      "method": "POST",
+      "path": "/api/clusters/:id/byo/enrollment-token",
+      "summary": "Supersede any live enrollment token and mint a fresh connect command",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters byo finalize",
+      "method": "POST",
+      "path": "/api/clusters/:id/byo/finalize",
+      "summary": "Re-run finalize for a byo cluster stuck in error",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters cleanup-orphaned-nodes",
+      "method": "POST",
+      "path": "/api/clusters/:id/cleanup-orphaned-nodes",
+      "summary": "Force removal of orphaned nodes from a deleted nodepool",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters connectivity get",
+      "method": "GET",
+      "path": "/api/clusters/:id/connectivity",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters connectivity probe",
+      "method": "POST",
+      "path": "/api/clusters/:id/connectivity/probe",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters costs summary get",
+      "method": "GET",
+      "path": "/api/clusters/:id/costs/summary",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters create",
+      "method": "POST",
+      "path": "/api/clusters",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters credential-status get",
+      "method": "GET",
+      "path": "/api/clusters/:id/credential-status",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters cronjobs adopt",
+      "method": "POST",
+      "path": "/api/clusters/:id/cronjobs/adopt",
+      "summary": "Adopt an existing Kubernetes CronJob into Edka management without recreating it",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters cronjobs check-name get",
+      "method": "GET",
+      "path": "/api/clusters/:id/cronjobs/check-name",
+      "summary": "Check if a cronjob name is available in a namespace",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters cronjobs create",
+      "method": "POST",
+      "path": "/api/clusters/:id/cronjobs",
+      "summary": "Create a new cronjob for a cluster",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters cronjobs discover get",
+      "method": "GET",
+      "path": "/api/clusters/:id/cronjobs/discover",
+      "summary": "Discover Kubernetes CronJobs in the cluster that are not tracked by Edka",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters cronjobs list",
+      "method": "GET",
+      "path": "/api/clusters/:id/cronjobs",
+      "summary": "Get all cronjobs for a cluster",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters databases backups create",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/databases/:databaseId/backups",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "databaseId",
+          "flag": "database-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters databases clickhouse backups list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/databases/clickhouse/backups",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters databases create",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/databases",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters databases delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:clusterId/databases/:databaseId",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "databaseId",
+          "flag": "database-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters databases get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/databases/:databaseId",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "databaseId",
+          "flag": "database-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters databases list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/databases",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters databases logs get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/databases/:databaseId/logs",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "databaseId",
+          "flag": "database-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters databases metrics get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/databases/:databaseId/metrics",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "databaseId",
+          "flag": "database-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters databases metrics list-all",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/databases/metrics",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters databases mysql backups list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/databases/mysql/backups",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters databases mysql maintenance create",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/databases/:databaseId/mysql/maintenance",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "databaseId",
+          "flag": "database-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters databases postgres insights list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/databases/:databaseId/postgres/insights",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "databaseId",
+          "flag": "database-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters databases postgresql restore-sources list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/databases/postgresql/restore-sources",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters databases secrets list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/databases/:databaseId/secrets",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "databaseId",
+          "flag": "database-id"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "clusters databases status get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/databases/:databaseId/status",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "databaseId",
+          "flag": "database-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters databases update",
+      "method": "PATCH",
+      "path": "/api/clusters/:clusterId/databases/:databaseId",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "databaseId",
+          "flag": "database-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters databases valkey backups list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/databases/valkey/backups",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:id",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": true,
+      "confirm": true
+    },
+    {
+      "command": "clusters delete-many",
+      "method": "DELETE",
+      "path": "/api/clusters",
+      "summary": "",
+      "params": [],
+      "step_up": true,
+      "confirm": true
+    },
+    {
+      "command": "clusters deployments check-name get",
+      "method": "GET",
+      "path": "/api/clusters/:id/deployments/check-name",
+      "summary": "Check if a deployment name is available in a namespace",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters deployments create",
+      "method": "POST",
+      "path": "/api/clusters/:id/deployments",
+      "summary": "Create a new deployment for a cluster",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false,
+      "body": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 63,
+            "pattern": "^[a-z]([-a-z0-9]*[a-z0-9])?$"
+          },
+          "environment": {
+            "default": "production",
+            "type": "string",
+            "enum": [
+              "production",
+              "staging",
+              "development",
+              "testing"
+            ]
+          },
+          "namespace": {
+            "type": "string",
+            "maxLength": 63,
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+          },
+          "image_repository": {
+            "type": "string"
+          },
+          "image_tag": {
+            "type": "string"
+          },
+          "replicas": {
+            "default": 1,
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "port": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "expose_via_ingress": {
+            "default": false,
+            "type": "boolean"
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "hostnames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tls_enabled": {
+            "default": false,
+            "type": "boolean"
+          },
+          "ingress_class": {
+            "default": "nginx",
+            "type": "string"
+          },
+          "https_only": {
+            "type": "boolean"
+          },
+          "config": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "namespace": {
+                "type": "string"
+              },
+              "image_repository": {
+                "type": "string"
+              },
+              "image_tag": {
+                "type": "string"
+              },
+              "image_digest": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^sha256:[a-f0-9]{64}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "command": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "port": {
+                "type": "number"
+              },
+              "service_port": {
+                "type": "number"
+              },
+              "replicas": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "cpu_request": {
+                "type": "string"
+              },
+              "memory_request": {
+                "type": "string"
+              },
+              "cpu_limit": {
+                "type": "string"
+              },
+              "memory_limit": {
+                "type": "string"
+              },
+              "env_variables": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "value"
+                  ]
+                }
+              },
+              "secrets": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "value"
+                  ]
+                }
+              },
+              "volumes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "pvc",
+                        "configMap",
+                        "secret",
+                        "emptyDir"
+                      ]
+                    },
+                    "mountPath": {
+                      "type": "string"
+                    },
+                    "readOnly": {
+                      "type": "boolean"
+                    },
+                    "size": {
+                      "type": "string"
+                    },
+                    "storageClass": {
+                      "type": "string"
+                    },
+                    "accessModes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "existingClaim": {
+                      "type": "boolean"
+                    },
+                    "claimName": {
+                      "type": "string"
+                    },
+                    "configMapName": {
+                      "type": "string"
+                    },
+                    "secretName": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "mountPath"
+                  ]
+                }
+              },
+              "expose_via_ingress": {
+                "type": "boolean"
+              },
+              "expose_via_private_loadbalancer": {
+                "type": "boolean"
+              },
+              "hostname": {
+                "type": "string"
+              },
+              "hostnames": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "ingress_class": {
+                "type": "string"
+              },
+              "tls": {
+                "type": "boolean"
+              },
+              "https_only": {
+                "type": "boolean"
+              },
+              "private_loadbalancer_ips": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "node_pool_name": {
+                "type": "string"
+              },
+              "tolerate_node_pool_taints": {
+                "type": "boolean"
+              },
+              "health_checks": {
+                "type": "object",
+                "properties": {
+                  "readinessProbe": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "tcpSocket",
+                          "httpGet",
+                          "none"
+                        ]
+                      },
+                      "path": {
+                        "type": "string",
+                        "maxLength": 2048,
+                        "pattern": "^\\/\\S*$"
+                      },
+                      "port": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 65535
+                      },
+                      "initialDelaySeconds": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 3600
+                      },
+                      "periodSeconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 3600
+                      },
+                      "timeoutSeconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 3600
+                      },
+                      "failureThreshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ]
+                  },
+                  "livenessProbe": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "tcpSocket",
+                          "httpGet",
+                          "none"
+                        ]
+                      },
+                      "path": {
+                        "type": "string",
+                        "maxLength": 2048,
+                        "pattern": "^\\/\\S*$"
+                      },
+                      "port": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 65535
+                      },
+                      "initialDelaySeconds": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 3600
+                      },
+                      "periodSeconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 3600
+                      },
+                      "timeoutSeconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 3600
+                      },
+                      "failureThreshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ]
+                  }
+                },
+                "required": [
+                  "readinessProbe"
+                ]
+              }
+            },
+            "additionalProperties": {}
+          },
+          "auto_update_enabled": {
+            "default": false,
+            "type": "boolean"
+          },
+          "auto_update_pattern": {
+            "default": "minor",
+            "type": "string",
+            "enum": [
+              "all",
+              "major",
+              "minor",
+              "patch",
+              "none",
+              "force",
+              "custom"
+            ]
+          },
+          "auto_update_custom_pattern": {
+            "default": "",
+            "type": "string"
+          },
+          "auto_update_frequency": {
+            "default": "5m",
+            "type": "string"
+          },
+          "auto_update_approval": {
+            "default": false,
+            "type": "boolean"
+          },
+          "autoscale_enabled": {
+            "default": false,
+            "type": "boolean"
+          },
+          "min_replicas": {
+            "default": 1,
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "max_replicas": {
+            "default": 10,
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "target_cpu_percentage": {
+            "default": 80,
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "target_memory_percentage": {
+            "default": 80,
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "scale_down_stabilization": {
+            "default": 300,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "scale_up_stabilization": {
+            "default": 0,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "auto_rollback_enabled": {
+            "type": "boolean"
+          },
+          "secret_values": {},
+          "branch": {
+            "type": "string"
+          },
+          "commit_sha": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "namespace"
+        ],
+        "anyOf": [
+          {
+            "required": [
+              "image_repository"
+            ]
+          },
+          {
+            "required": [
+              "config"
+            ],
+            "properties": {
+              "config": {
+                "required": [
+                  "image_repository"
+                ]
+              }
+            }
+          }
+        ],
+        "examples": [
+          {
+            "name": "web",
+            "namespace": "default",
+            "image_repository": "nginx",
+            "image_tag": "1.29",
+            "port": 80,
+            "replicas": 1,
+            "config": {
+              "cpu_request": "100m",
+              "memory_request": "128Mi",
+              "cpu_limit": "500m",
+              "memory_limit": "512Mi",
+              "env_variables": [
+                {
+                  "name": "NGINX_ENTRYPOINT_QUIET_LOGS",
+                  "value": "1"
+                }
+              ],
+              "health_checks": {
+                "readinessProbe": {
+                  "type": "httpGet",
+                  "path": "/"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "command": "clusters deployments delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:id/deployments/:deploymentId",
+      "summary": "Delete a deployment by ID",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "deploymentId",
+          "flag": "deployment-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters deployments git create",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/deployments/git",
+      "summary": "Create a new git deployment",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false,
+      "body": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "github_repository_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 63,
+            "pattern": "^[a-z]([-a-z0-9]*[a-z0-9])?$"
+          },
+          "namespace": {
+            "default": "default",
+            "type": "string",
+            "maxLength": 63,
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+          },
+          "environment": {
+            "default": "production",
+            "type": "string",
+            "enum": [
+              "production",
+              "staging",
+              "development",
+              "testing"
+            ]
+          },
+          "github_ref": {
+            "default": "main",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "dockerfile_path": {
+            "default": "Dockerfile",
+            "type": "string"
+          },
+          "build_context": {
+            "default": ".",
+            "type": "string"
+          },
+          "build_args": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "railpack_build_cmd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "railpack_install_cmd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "railpack_start_cmd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "registry_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "image_repository_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*(?:\\/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)*$"
+          },
+          "image_tag_strategy": {
+            "default": "commit_sha",
+            "type": "string",
+            "enum": [
+              "commit_sha",
+              "branch",
+              "timestamp",
+              "custom"
+            ]
+          },
+          "custom_tag_pattern": {
+            "type": "string"
+          },
+          "auto_build_enabled": {
+            "default": true,
+            "type": "boolean"
+          },
+          "auto_deploy_enabled": {
+            "default": true,
+            "type": "boolean"
+          },
+          "is_primary": {
+            "type": "boolean"
+          },
+          "preview_enabled": {
+            "default": false,
+            "type": "boolean"
+          },
+          "preview_domain_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "preview_hostname_pattern": {
+            "type": "string"
+          },
+          "preview_resource_preset": {
+            "default": "preview",
+            "type": "string",
+            "enum": [
+              "preview",
+              "small",
+              "medium",
+              "large",
+              "xlarge"
+            ]
+          },
+          "preview_auto_delete_hours": {
+            "default": 168,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 720
+          },
+          "expose_via_ingress": {
+            "default": false,
+            "type": "boolean"
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "hostnames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tls_enabled": {
+            "default": true,
+            "type": "boolean"
+          },
+          "ingress_class": {
+            "default": "nginx",
+            "type": "string"
+          },
+          "https_only": {
+            "type": "boolean"
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "service_port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "replicas": {
+            "default": 1,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cpu_request": {
+            "default": "100m",
+            "type": "string"
+          },
+          "memory_request": {
+            "default": "128Mi",
+            "type": "string"
+          },
+          "cpu_limit": {
+            "default": "500m",
+            "type": "string"
+          },
+          "memory_limit": {
+            "default": "512Mi",
+            "type": "string"
+          },
+          "env_variables": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "value"
+              ]
+            }
+          },
+          "secrets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ]
+            }
+          },
+          "secret_values": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "volumes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "pvc",
+                    "configMap",
+                    "secret",
+                    "emptyDir"
+                  ]
+                },
+                "mountPath": {
+                  "type": "string"
+                },
+                "readOnly": {
+                  "type": "boolean"
+                },
+                "size": {
+                  "type": "string"
+                },
+                "storageClass": {
+                  "type": "string"
+                },
+                "accessModes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "existingClaim": {
+                  "type": "boolean"
+                },
+                "claimName": {
+                  "type": "string"
+                },
+                "configMapName": {
+                  "type": "string"
+                },
+                "secretName": {
+                  "type": "string"
+                },
+                "items": {
+                  "type": "array",
+                  "items": {}
+                }
+              },
+              "required": [
+                "type",
+                "mountPath"
+              ]
+            }
+          },
+          "run_command": {
+            "type": "string",
+            "minLength": 1
+          },
+          "node_pool_name": {
+            "type": "string"
+          },
+          "tolerate_node_pool_taints": {
+            "type": "boolean"
+          },
+          "autoscale_enabled": {
+            "default": false,
+            "type": "boolean"
+          },
+          "min_replicas": {
+            "default": 1,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "max_replicas": {
+            "default": 10,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "target_cpu_percentage": {
+            "default": 80,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "target_memory_percentage": {
+            "default": 80,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "scale_down_stabilization": {
+            "default": 300,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "scale_up_stabilization": {
+            "default": 0,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "github_repository_id",
+          "name",
+          "image_repository_name"
+        ],
+        "examples": [
+          {
+            "name": "api",
+            "namespace": "default",
+            "github_repository_id": "123456789",
+            "github_ref": "main",
+            "image_repository_name": "acme/api",
+            "port": 3000,
+            "env_variables": [
+              {
+                "name": "LOG_LEVEL",
+                "value": "info"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "command": "clusters deployments list",
+      "method": "GET",
+      "path": "/api/clusters/:id/deployments",
+      "summary": "Get all deployments for a specific cluster",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters deployments metrics get",
+      "method": "GET",
+      "path": "/api/clusters/:id/deployments/metrics",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters deployments status get",
+      "method": "GET",
+      "path": "/api/clusters/:id/deployments/status",
+      "summary": "Get all deployments status for a cluster",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters domains create",
+      "method": "POST",
+      "path": "/api/clusters/:id/domains",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters domains delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:id/domains/:domainId",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "domainId",
+          "flag": "domain-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters domains domain-connect create",
+      "method": "POST",
+      "path": "/api/clusters/:id/domains/:domainId/domain-connect",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "domainId",
+          "flag": "domain-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters domains domain-connect get",
+      "method": "GET",
+      "path": "/api/clusters/:id/domains/:domainId/domain-connect",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "domainId",
+          "flag": "domain-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters domains list",
+      "method": "GET",
+      "path": "/api/clusters/:id/domains",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters domains statuses list",
+      "method": "GET",
+      "path": "/api/clusters/:id/domains/statuses",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters domains update",
+      "method": "PATCH",
+      "path": "/api/clusters/:id/domains/:domainId",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "domainId",
+          "flag": "domain-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters domains wildcard-tls create",
+      "method": "POST",
+      "path": "/api/clusters/:id/domains/:domainId/wildcard-tls",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "domainId",
+          "flag": "domain-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters domains wildcard-tls delegation create",
+      "method": "POST",
+      "path": "/api/clusters/:id/domains/:domainId/wildcard-tls/delegation",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "domainId",
+          "flag": "domain-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters domains wildcard-tls list",
+      "method": "GET",
+      "path": "/api/clusters/:id/domains/:domainId/wildcard-tls",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "domainId",
+          "flag": "domain-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters drift get",
+      "method": "GET",
+      "path": "/api/clusters/:id/drift",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters drift recheck",
+      "method": "POST",
+      "path": "/api/clusters/:id/drift/recheck",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters drift repair",
+      "method": "POST",
+      "path": "/api/clusters/:id/drift/repair",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters drift repair-plan get",
+      "method": "GET",
+      "path": "/api/clusters/:id/drift/repair-plan",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters events list",
+      "method": "GET",
+      "path": "/api/clusters/:id/events",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters explorer actions cordon-node",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/explorer/actions/cordon-node",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "clusters explorer actions delete-pod",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/explorer/actions/delete-pod",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": true,
+      "confirm": true
+    },
+    {
+      "command": "clusters explorer actions drain-node",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/explorer/actions/drain-node",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": true,
+      "confirm": true
+    },
+    {
+      "command": "clusters explorer actions restart-workload",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/explorer/actions/restart-workload",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "clusters explorer actions scale-workload",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/explorer/actions/scale-workload",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "clusters explorer actions start-debug-container",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/explorer/actions/start-debug-container",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "clusters explorer actions uncordon-node",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/explorer/actions/uncordon-node",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "clusters explorer node-pools usage get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/explorer/node-pools/usage",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters explorer nodes drain-preview get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/explorer/nodes/:name/drain-preview",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "name",
+          "flag": "name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters explorer nodes headroom get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/explorer/nodes/headroom",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters explorer nodes usage get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/explorer/nodes/:name/usage",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "name",
+          "flag": "name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters explorer pods logs get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/explorer/pods/:namespace/:name/logs",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "namespace",
+          "flag": "namespace"
+        },
+        {
+          "name": "name",
+          "flag": "name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters explorer pods resource-advice get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/explorer/pods/:namespace/:name/resource-advice",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "namespace",
+          "flag": "namespace"
+        },
+        {
+          "name": "name",
+          "flag": "name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters explorer pods resource-advice history get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/explorer/pods/:namespace/:name/resource-advice/history",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "namespace",
+          "flag": "namespace"
+        },
+        {
+          "name": "name",
+          "flag": "name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters explorer resource-advice get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/explorer/resource-advice",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters explorer resources delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:clusterId/explorer/resources/:kind/:name",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "kind",
+          "flag": "kind"
+        },
+        {
+          "name": "name",
+          "flag": "name"
+        }
+      ],
+      "step_up": true,
+      "confirm": true
+    },
+    {
+      "command": "clusters explorer resources events list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/explorer/resources/:kind/:name/events",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "kind",
+          "flag": "kind"
+        },
+        {
+          "name": "name",
+          "flag": "name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters explorer resources get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/explorer/resources/:kind/:name",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "kind",
+          "flag": "kind"
+        },
+        {
+          "name": "name",
+          "flag": "name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters explorer resources list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/explorer/resources",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters explorer resources update",
+      "method": "PUT",
+      "path": "/api/clusters/:clusterId/explorer/resources/:kind/:name",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "kind",
+          "flag": "kind"
+        },
+        {
+          "name": "name",
+          "flag": "name"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "clusters explorer resources values list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/explorer/resources/:kind/:name/values",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "kind",
+          "flag": "kind"
+        },
+        {
+          "name": "name",
+          "flag": "name"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "clusters explorer topology get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/explorer/topology",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters gateway-classes create",
+      "method": "POST",
+      "path": "/api/clusters/:id/gateway-classes",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters gateway-classes delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:id/gateway-classes/:gatewayClass",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "gatewayClass",
+          "flag": "gateway-class"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters gateway-classes update",
+      "method": "PATCH",
+      "path": "/api/clusters/:id/gateway-classes/:gatewayClass",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "gatewayClass",
+          "flag": "gateway-class"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters gateway-metrics get",
+      "method": "GET",
+      "path": "/api/clusters/:id/gateway-metrics",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters gateway-metrics history get",
+      "method": "GET",
+      "path": "/api/clusters/:id/gateway-metrics/history",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters gateway-metrics route-history get",
+      "method": "GET",
+      "path": "/api/clusters/:id/gateway-metrics/route-history",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters get",
+      "method": "GET",
+      "path": "/api/clusters/:id",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters gitops create",
+      "method": "POST",
+      "path": "/api/clusters/:id/gitops",
+      "summary": "Enable or disable GitOps for a cluster using FluxInstance",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters gitops get",
+      "method": "GET",
+      "path": "/api/clusters/:id/gitops",
+      "summary": "Get GitOps configuration for a cluster",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters gitops status get",
+      "method": "GET",
+      "path": "/api/clusters/:id/gitops/status",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters hetzner-token create",
+      "method": "POST",
+      "path": "/api/clusters/:id/hetzner-token",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters hetzner-token delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:id/hetzner-token",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters hetzner-token status get",
+      "method": "GET",
+      "path": "/api/clusters/:id/hetzner-token/status",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters ingress-classes list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/ingress-classes",
+      "summary": "Get available ingress classes for a cluster",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters ingress-controllers list",
+      "method": "GET",
+      "path": "/api/clusters/:id/ingress-controllers",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters k3s-metrics get",
+      "method": "GET",
+      "path": "/api/clusters/:id/k3s-metrics",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters k3s-versions list",
+      "method": "GET",
+      "path": "/api/clusters/k3s-versions",
+      "summary": "List the k3s versions Edka installs and the default for new clusters",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters kubeconfig get",
+      "method": "GET",
+      "path": "/api/clusters/:id/kubeconfig",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "clusters kubeconfig wrapped get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterName/kubeconfig/wrapped",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterName",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "clusters kubernetes-events list",
+      "method": "GET",
+      "path": "/api/clusters/:id/kubernetes-events",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters list",
+      "method": "GET",
+      "path": "/api/clusters",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters locations list",
+      "method": "GET",
+      "path": "/api/clusters/locations",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters messaging accounts create",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/messaging/accounts",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters messaging accounts delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:clusterId/messaging/accounts/:accountId",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "accountId",
+          "flag": "account-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters messaging accounts get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/messaging/accounts/:accountId",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "accountId",
+          "flag": "account-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters messaging accounts list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/messaging/accounts",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters messaging accounts update",
+      "method": "PATCH",
+      "path": "/api/clusters/:clusterId/messaging/accounts/:accountId",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "accountId",
+          "flag": "account-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters messaging consumers create",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/messaging/consumers",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters messaging consumers delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:clusterId/messaging/consumers/:consumerId",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "consumerId",
+          "flag": "consumer-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters messaging consumers get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/messaging/consumers/:consumerId",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "consumerId",
+          "flag": "consumer-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters messaging consumers list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/messaging/consumers",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters messaging consumers update",
+      "method": "PATCH",
+      "path": "/api/clusters/:clusterId/messaging/consumers/:consumerId",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "consumerId",
+          "flag": "consumer-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters messaging nats-cluster connection get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/messaging/nats-cluster/connection",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters messaging nats-cluster create",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/messaging/nats-cluster",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters messaging nats-cluster delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:clusterId/messaging/nats-cluster",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters messaging nats-cluster get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/messaging/nats-cluster",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters messaging nats-cluster logs get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/messaging/nats-cluster/logs",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters messaging nats-cluster metrics get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/messaging/nats-cluster/metrics",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters messaging nats-cluster update",
+      "method": "PATCH",
+      "path": "/api/clusters/:clusterId/messaging/nats-cluster",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters messaging streams consumers list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/messaging/streams/:streamId/consumers",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "streamId",
+          "flag": "stream-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters messaging streams create",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/messaging/streams",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters messaging streams delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:clusterId/messaging/streams/:streamId",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "streamId",
+          "flag": "stream-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters messaging streams get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/messaging/streams/:streamId",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "streamId",
+          "flag": "stream-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters messaging streams list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/messaging/streams",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters messaging streams update",
+      "method": "PATCH",
+      "path": "/api/clusters/:clusterId/messaging/streams/:streamId",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "streamId",
+          "flag": "stream-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters namespaces list",
+      "method": "GET",
+      "path": "/api/clusters/:id/namespaces",
+      "summary": "Get available namespaces in the specified cluster",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters nat-gateway actions create",
+      "method": "POST",
+      "path": "/api/clusters/:id/nat-gateway/actions/:action",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "action",
+          "flag": "action"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters nat-gateway enable",
+      "method": "POST",
+      "path": "/api/clusters/:id/nat-gateway/enable",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters nat-gateway metrics history get",
+      "method": "GET",
+      "path": "/api/clusters/:id/nat-gateway/metrics/history",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters nat-gateway status get",
+      "method": "GET",
+      "path": "/api/clusters/:id/nat-gateway/status",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters nodepools activity get",
+      "method": "GET",
+      "path": "/api/clusters/:id/nodepools/:poolName/activity",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "poolName",
+          "flag": "pool-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters nodepools last-scale-events list",
+      "method": "GET",
+      "path": "/api/clusters/:id/nodepools/last-scale-events",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters nodepools list",
+      "method": "GET",
+      "path": "/api/clusters/:id/nodepools",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters nodepools restore-failed-deletion",
+      "method": "POST",
+      "path": "/api/clusters/:id/nodepools/restore-failed-deletion",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters nodepools scheduling-references list",
+      "method": "GET",
+      "path": "/api/clusters/:id/nodepools/scheduling-references",
+      "summary": "List the Edka resources pinned to each active worker pool",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters nodepools update",
+      "method": "PUT",
+      "path": "/api/clusters/:id/nodepools",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters observability components create",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/observability/components/:componentName",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "componentName",
+          "flag": "component-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters observability components delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:clusterId/observability/components/:componentName",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "componentName",
+          "flag": "component-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters observability components list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/observability/components",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters observability components update",
+      "method": "PUT",
+      "path": "/api/clusters/:clusterId/observability/components/:componentName",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "componentName",
+          "flag": "component-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters observability victoria-logs overview get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/observability/victoria-logs/overview",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters observability victoria-logs query get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/observability/victoria-logs/query",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters observability victoria-metrics metric-names list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/observability/victoria-metrics/metric-names",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters observability victoria-metrics overview get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/observability/victoria-metrics/overview",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters observability victoria-metrics query get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/observability/victoria-metrics/query",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters permissions developers delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:id/permissions/developers/:userId",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "userId",
+          "flag": "user-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters permissions developers list",
+      "method": "GET",
+      "path": "/api/clusters/:id/permissions/developers",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters permissions developers update",
+      "method": "PUT",
+      "path": "/api/clusters/:id/permissions/developers/:userId",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "userId",
+          "flag": "user-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters permissions me get",
+      "method": "GET",
+      "path": "/api/clusters/:id/permissions/me",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters pods problematic get",
+      "method": "GET",
+      "path": "/api/clusters/:id/pods/problematic",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters pricing-preview create",
+      "method": "POST",
+      "path": "/api/clusters/pricing-preview",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters protect",
+      "method": "POST",
+      "path": "/api/clusters/:id/protect",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters protection-status get",
+      "method": "GET",
+      "path": "/api/clusters/:id/protection-status",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters registries default create",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/registries/default",
+      "summary": "Set a registry as default for a cluster",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters registries default get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/registries/default",
+      "summary": "Get default registry for a cluster",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters registries in-cluster overview get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/registries/in-cluster/overview",
+      "summary": "Get in-cluster registry overview",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters registries in-cluster storage update",
+      "method": "PATCH",
+      "path": "/api/clusters/:clusterId/registries/in-cluster/storage",
+      "summary": "Expand storage for an installed in-cluster registry PVC",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters registries in-cluster tags delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:clusterId/registries/in-cluster/tags",
+      "summary": "Delete one or more tags from a repository in the in-cluster registry",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters registries in-cluster tags list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/registries/in-cluster/tags",
+      "summary": "List all tags for a repository in the in-cluster registry",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters registries list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/registries",
+      "summary": "Get default registry for a cluster",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters registries sync",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/registries/sync",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters replace",
+      "method": "PUT",
+      "path": "/api/clusters/:id",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters rollback",
+      "method": "POST",
+      "path": "/api/clusters/:id/rollback",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters run-update",
+      "method": "POST",
+      "path": "/api/clusters/:id/update",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters scale-down",
+      "method": "POST",
+      "path": "/api/clusters/:id/scale-down",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters secrets create",
+      "method": "POST",
+      "path": "/api/clusters/:id/secrets",
+      "summary": "Create a generic Kubernetes secret in the specified cluster and namespace",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters secrets delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:id/secrets/:secretName",
+      "summary": "Delete an edka-managed secret",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "secretName",
+          "flag": "secret-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters secrets get",
+      "method": "GET",
+      "path": "/api/clusters/:id/secrets/:secretName",
+      "summary": "Get metadata for a single Edka-managed cluster secret",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "secretName",
+          "flag": "secret-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters secrets list",
+      "method": "GET",
+      "path": "/api/clusters/:id/secrets",
+      "summary": "List Edka-managed cluster secrets",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters secrets update",
+      "method": "PUT",
+      "path": "/api/clusters/:id/secrets/:secretName",
+      "summary": "Update an edka-managed secret",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "secretName",
+          "flag": "secret-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters snapshot get",
+      "method": "GET",
+      "path": "/api/clusters/:id/snapshot",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters ssh wrapped get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterName/ssh/wrapped",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterName",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "clusters ssh-private-key download get",
+      "method": "GET",
+      "path": "/api/clusters/:id/ssh-private-key/download",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "clusters storage get",
+      "method": "GET",
+      "path": "/api/clusters/:id/storage",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters storage-classes list",
+      "method": "GET",
+      "path": "/api/clusters/:id/storage-classes",
+      "summary": "Get available storage classes in the specified cluster",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters unarchive",
+      "method": "PATCH",
+      "path": "/api/clusters/:id/unarchive",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters unprotect",
+      "method": "POST",
+      "path": "/api/clusters/:id/unprotect",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters update",
+      "method": "PATCH",
+      "path": "/api/clusters/:id",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters user-credentials delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:id/user-credentials/:userId",
+      "summary": "Revoke user's credentials",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "userId",
+          "flag": "user-id"
+        }
+      ],
+      "step_up": true,
+      "confirm": true
+    },
+    {
+      "command": "clusters user-credentials list",
+      "method": "GET",
+      "path": "/api/clusters/:id/user-credentials",
+      "summary": "List all credentials for cluster",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters user-credentials rotate",
+      "method": "POST",
+      "path": "/api/clusters/:id/user-credentials/:userId/rotate",
+      "summary": "Rotate any user's credentials",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "userId",
+          "flag": "user-id"
+        }
+      ],
+      "step_up": true,
+      "confirm": true
+    },
+    {
+      "command": "clusters user-credentials rotate-own",
+      "method": "POST",
+      "path": "/api/clusters/:id/user-credentials/rotate",
+      "summary": "Rotate own credentials",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": true,
+      "confirm": true
+    },
+    {
+      "command": "clusters user-credentials status get",
+      "method": "GET",
+      "path": "/api/clusters/:id/user-credentials/status",
+      "summary": "Get own credential status",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters user-kubeconfig download get",
+      "method": "GET",
+      "path": "/api/clusters/:id/user-kubeconfig/download",
+      "summary": "Download own kubeconfig",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "clusters user-kubeconfig temporary create",
+      "method": "POST",
+      "path": "/api/clusters/:id/user-kubeconfig/temporary",
+      "summary": "Create a temporary kubeconfig that expires after an hour",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "cronjobs auto-update apply",
+      "method": "POST",
+      "path": "/api/cronjobs/:id/auto-update/apply",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "cronjobs auto-update check",
+      "method": "POST",
+      "path": "/api/cronjobs/:id/auto-update/check",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "cronjobs auto-update get",
+      "method": "GET",
+      "path": "/api/cronjobs/:id/auto-update",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "cronjobs auto-update skip",
+      "method": "POST",
+      "path": "/api/cronjobs/:id/auto-update/skip",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "cronjobs delete",
+      "method": "DELETE",
+      "path": "/api/cronjobs/:id",
+      "summary": "Delete a cronjob",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "cronjobs get",
+      "method": "GET",
+      "path": "/api/cronjobs/:id",
+      "summary": "Get a specific cronjob by ID",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "cronjobs jobs list",
+      "method": "GET",
+      "path": "/api/cronjobs/:id/jobs",
+      "summary": "Get recent Job history for a CronJob from Kubernetes",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "cronjobs logs get",
+      "method": "GET",
+      "path": "/api/cronjobs/:id/logs",
+      "summary": "Get logs from a CronJob's child Jobs/Pods",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "cronjobs restore-version",
+      "method": "POST",
+      "path": "/api/cronjobs/:id/restore-version",
+      "summary": "Restore a cronjob to a specific image version",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "cronjobs status get",
+      "method": "GET",
+      "path": "/api/cronjobs/:id/status",
+      "summary": "Get the K8s status of a cronjob",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "cronjobs suspend",
+      "method": "PATCH",
+      "path": "/api/cronjobs/:id/suspend",
+      "summary": "Suspend or resume a cronjob",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "cronjobs trigger",
+      "method": "POST",
+      "path": "/api/cronjobs/:id/trigger",
+      "summary": "Trigger a manual run of a cronjob",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "cronjobs update",
+      "method": "PUT",
+      "path": "/api/cronjobs/:id",
+      "summary": "Update a cronjob",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "cronjobs versions list",
+      "method": "GET",
+      "path": "/api/cronjobs/:id/versions",
+      "summary": "Get version history for a cronjob",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "custom-apps create",
+      "method": "POST",
+      "path": "/api/custom-apps",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "custom-apps delete",
+      "method": "DELETE",
+      "path": "/api/custom-apps/:slug",
+      "summary": "Remove a custom app from the organization's catalog",
+      "params": [
+        {
+          "name": "slug",
+          "flag": "slug"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "custom-apps get",
+      "method": "GET",
+      "path": "/api/custom-apps/:slug",
+      "summary": "Get a custom app and its versions",
+      "params": [
+        {
+          "name": "slug",
+          "flag": "slug"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "custom-apps list",
+      "method": "GET",
+      "path": "/api/custom-apps",
+      "summary": "Get the organization's custom apps",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "custom-apps scaffold create",
+      "method": "POST",
+      "path": "/api/custom-apps/scaffold",
+      "summary": "Get the starting files of a new package",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "custom-apps validate",
+      "method": "POST",
+      "path": "/api/custom-apps/validate",
+      "summary": "Check a package without storing it",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "custom-apps versions archive get",
+      "method": "GET",
+      "path": "/api/custom-apps/:slug/versions/:version/archive",
+      "summary": "Download the files of one version",
+      "params": [
+        {
+          "name": "slug",
+          "flag": "slug"
+        },
+        {
+          "name": "version",
+          "flag": "version"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "custom-apps versions community get",
+      "method": "GET",
+      "path": "/api/custom-apps/:slug/versions/:version/community",
+      "summary": "",
+      "params": [
+        {
+          "name": "slug",
+          "flag": "slug"
+        },
+        {
+          "name": "version",
+          "flag": "version"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "custom-apps versions get",
+      "method": "GET",
+      "path": "/api/custom-apps/:slug/versions/:version",
+      "summary": "Get one version with its manifest and README",
+      "params": [
+        {
+          "name": "slug",
+          "flag": "slug"
+        },
+        {
+          "name": "version",
+          "flag": "version"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "custom-apps versions share create",
+      "method": "POST",
+      "path": "/api/custom-apps/:slug/versions/:version/share",
+      "summary": "",
+      "params": [
+        {
+          "name": "slug",
+          "flag": "slug"
+        },
+        {
+          "name": "version",
+          "flag": "version"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "databases catalog get",
+      "method": "GET",
+      "path": "/api/databases/catalog",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "deployments auto-update apply",
+      "method": "POST",
+      "path": "/api/deployments/:id/auto-update/apply",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "deployments auto-update check",
+      "method": "POST",
+      "path": "/api/deployments/:id/auto-update/check",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "deployments auto-update get",
+      "method": "GET",
+      "path": "/api/deployments/:id/auto-update",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "deployments auto-update skip",
+      "method": "POST",
+      "path": "/api/deployments/:id/auto-update/skip",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "deployments builds create",
+      "method": "POST",
+      "path": "/api/deployments/:id/builds",
+      "summary": "Trigger a manual build",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "deployments builds delete",
+      "method": "DELETE",
+      "path": "/api/deployments/:id/builds/:buildId",
+      "summary": "Cancel a build",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        },
+        {
+          "name": "buildId",
+          "flag": "build-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "deployments builds get",
+      "method": "GET",
+      "path": "/api/deployments/:id/builds/:buildId",
+      "summary": "Get build details",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        },
+        {
+          "name": "buildId",
+          "flag": "build-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "deployments builds list",
+      "method": "GET",
+      "path": "/api/deployments/:id/builds",
+      "summary": "Get build history for a deployment",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "deployments builds logs get",
+      "method": "GET",
+      "path": "/api/deployments/:id/builds/:buildId/logs",
+      "summary": "Get build logs",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        },
+        {
+          "name": "buildId",
+          "flag": "build-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "deployments delete",
+      "method": "DELETE",
+      "path": "/api/deployments/:id",
+      "summary": "Delete a deployment by ID",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "deployments deploy",
+      "method": "POST",
+      "path": "/api/deployments/:id/deploy",
+      "summary": "Deploy a successful production build",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "deployments get",
+      "method": "GET",
+      "path": "/api/deployments/:id",
+      "summary": "Get a specific deployment by ID",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "deployments github get",
+      "method": "GET",
+      "path": "/api/deployments/:id/github",
+      "summary": "Get GitHub configuration for a deployment",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "deployments github update",
+      "method": "PUT",
+      "path": "/api/deployments/:id/github",
+      "summary": "Update GitHub configuration",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "deployments list",
+      "method": "GET",
+      "path": "/api/deployments",
+      "summary": "Get all deployments for an account",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "deployments logs get",
+      "method": "GET",
+      "path": "/api/deployments/:id/logs",
+      "summary": "Get deployment logs",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "deployments metrics get",
+      "method": "GET",
+      "path": "/api/deployments/:id/metrics",
+      "summary": "Get deployment metrics",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "deployments metrics history get",
+      "method": "GET",
+      "path": "/api/deployments/:id/metrics/history",
+      "summary": "Get deployment CPU, memory and disk IO history from VictoriaMetrics",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "deployments previews delete",
+      "method": "DELETE",
+      "path": "/api/deployments/:id/previews/:prNumber",
+      "summary": "Delete a preview deployment",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        },
+        {
+          "name": "prNumber",
+          "flag": "pr-number"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "deployments previews list",
+      "method": "GET",
+      "path": "/api/deployments/:id/previews",
+      "summary": "List preview deployments",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "deployments previews logs get",
+      "method": "GET",
+      "path": "/api/deployments/:id/previews/:prNumber/logs",
+      "summary": "Get preview runtime logs",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        },
+        {
+          "name": "prNumber",
+          "flag": "pr-number"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "deployments previews metrics get",
+      "method": "GET",
+      "path": "/api/deployments/:id/previews/:prNumber/metrics",
+      "summary": "Get preview runtime metrics",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        },
+        {
+          "name": "prNumber",
+          "flag": "pr-number"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "deployments previews status get",
+      "method": "GET",
+      "path": "/api/deployments/:id/previews/:prNumber/status",
+      "summary": "Get preview runtime status from Kubernetes",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        },
+        {
+          "name": "prNumber",
+          "flag": "pr-number"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "deployments restart",
+      "method": "POST",
+      "path": "/api/deployments/:id/restart",
+      "summary": "Restart a deployment",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "deployments revisions get",
+      "method": "GET",
+      "path": "/api/deployments/:id/revisions/:generation",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        },
+        {
+          "name": "generation",
+          "flag": "generation"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "deployments revisions list",
+      "method": "GET",
+      "path": "/api/deployments/:id/revisions",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "deployments rollback",
+      "method": "POST",
+      "path": "/api/deployments/:id/rollback",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "deployments scale",
+      "method": "PATCH",
+      "path": "/api/deployments/:id/scale",
+      "summary": "Scale a deployment",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "deployments settings update",
+      "method": "PATCH",
+      "path": "/api/deployments/:id/settings",
+      "summary": "Edit deployment configuration",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false,
+      "body": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "hostname": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hostnames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "https_only": {
+            "type": "boolean"
+          },
+          "auto_update_enabled": {
+            "type": "boolean"
+          },
+          "auto_update_pattern": {
+            "type": "string",
+            "enum": [
+              "all",
+              "major",
+              "minor",
+              "patch",
+              "none",
+              "force",
+              "custom"
+            ]
+          },
+          "auto_update_custom_pattern": {
+            "type": "string"
+          },
+          "auto_update_frequency": {
+            "type": "string"
+          },
+          "auto_update_approval": {
+            "type": "boolean"
+          },
+          "autoscale_enabled": {
+            "type": "boolean"
+          },
+          "min_replicas": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "max_replicas": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "target_cpu_percentage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "target_memory_percentage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "scale_down_stabilization": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "scale_up_stabilization": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "auto_rollback_enabled": {
+            "type": "boolean"
+          },
+          "config": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "namespace": {
+                "type": "string"
+              },
+              "image_repository": {
+                "type": "string"
+              },
+              "image_tag": {
+                "type": "string"
+              },
+              "image_digest": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^sha256:[a-f0-9]{64}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "command": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "port": {
+                "type": "number"
+              },
+              "service_port": {
+                "type": "number"
+              },
+              "replicas": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "cpu_request": {
+                "type": "string"
+              },
+              "memory_request": {
+                "type": "string"
+              },
+              "cpu_limit": {
+                "type": "string"
+              },
+              "memory_limit": {
+                "type": "string"
+              },
+              "env_variables": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "value"
+                  ]
+                }
+              },
+              "secrets": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "value"
+                  ]
+                }
+              },
+              "volumes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "pvc",
+                        "configMap",
+                        "secret",
+                        "emptyDir"
+                      ]
+                    },
+                    "mountPath": {
+                      "type": "string"
+                    },
+                    "readOnly": {
+                      "type": "boolean"
+                    },
+                    "size": {
+                      "type": "string"
+                    },
+                    "storageClass": {
+                      "type": "string"
+                    },
+                    "accessModes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "existingClaim": {
+                      "type": "boolean"
+                    },
+                    "claimName": {
+                      "type": "string"
+                    },
+                    "configMapName": {
+                      "type": "string"
+                    },
+                    "secretName": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "mountPath"
+                  ]
+                }
+              },
+              "expose_via_ingress": {
+                "type": "boolean"
+              },
+              "expose_via_private_loadbalancer": {
+                "type": "boolean"
+              },
+              "hostname": {
+                "type": "string"
+              },
+              "hostnames": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "ingress_class": {
+                "type": "string"
+              },
+              "tls": {
+                "type": "boolean"
+              },
+              "https_only": {
+                "type": "boolean"
+              },
+              "private_loadbalancer_ips": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "node_pool_name": {
+                "type": "string"
+              },
+              "tolerate_node_pool_taints": {
+                "type": "boolean"
+              },
+              "health_checks": {
+                "type": "object",
+                "properties": {
+                  "readinessProbe": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "tcpSocket",
+                          "httpGet",
+                          "none"
+                        ]
+                      },
+                      "path": {
+                        "type": "string",
+                        "maxLength": 2048,
+                        "pattern": "^\\/\\S*$"
+                      },
+                      "port": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 65535
+                      },
+                      "initialDelaySeconds": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 3600
+                      },
+                      "periodSeconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 3600
+                      },
+                      "timeoutSeconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 3600
+                      },
+                      "failureThreshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ]
+                  },
+                  "livenessProbe": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "tcpSocket",
+                          "httpGet",
+                          "none"
+                        ]
+                      },
+                      "path": {
+                        "type": "string",
+                        "maxLength": 2048,
+                        "pattern": "^\\/\\S*$"
+                      },
+                      "port": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 65535
+                      },
+                      "initialDelaySeconds": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 3600
+                      },
+                      "periodSeconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 3600
+                      },
+                      "timeoutSeconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 3600
+                      },
+                      "failureThreshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ]
+                  }
+                },
+                "required": [
+                  "readinessProbe"
+                ]
+              }
+            },
+            "additionalProperties": {}
+          },
+          "secret_values": {},
+          "expected_generation": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "namespace": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "examples": [
+          {
+            "config": {
+              "image_tag": "1.30",
+              "replicas": 2
+            }
+          }
+        ]
+      }
+    },
+    {
+      "command": "deployments status get",
+      "method": "GET",
+      "path": "/api/deployments/:id/status",
+      "summary": "Get deployment status from Kubernetes",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "deployments summary get",
+      "method": "GET",
+      "path": "/api/deployments/summary",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "deployments usage get",
+      "method": "GET",
+      "path": "/api/deployments/usage",
+      "summary": "Get deployment usage for account",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "event create",
+      "method": "POST",
+      "path": "/api/event",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "git-deployments related get",
+      "method": "GET",
+      "path": "/api/git-deployments/related",
+      "summary": "Get related GitHub deployments for a repository/branch",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "git-deployments usage get",
+      "method": "GET",
+      "path": "/api/git-deployments/usage",
+      "summary": "Get deployment usage for account",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "github auth get",
+      "method": "GET",
+      "path": "/api/github/auth",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "github diagnostic permissions list",
+      "method": "GET",
+      "path": "/api/github/diagnostic/permissions",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "github exists get",
+      "method": "GET",
+      "path": "/api/github/exists",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "github integrations delete",
+      "method": "DELETE",
+      "path": "/api/github/integrations/:username",
+      "summary": "",
+      "params": [
+        {
+          "name": "username",
+          "flag": "username"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "github integrations list",
+      "method": "GET",
+      "path": "/api/github/integrations",
+      "summary": "Get all GitHub integrations for the account",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "github repos branches list",
+      "method": "GET",
+      "path": "/api/github/repos/:repo/branches",
+      "summary": "Get branches for a repository",
+      "params": [
+        {
+          "name": "repo",
+          "flag": "repo"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "github repos list",
+      "method": "GET",
+      "path": "/api/github/repos",
+      "summary": "Get all repositories accessible to the user",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "github repositories create",
+      "method": "POST",
+      "path": "/api/github/repositories",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "github repositories delete",
+      "method": "DELETE",
+      "path": "/api/github/repositories/:id",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "github repositories external-preview-discovery update",
+      "method": "PATCH",
+      "path": "/api/github/repositories/external-preview-discovery",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "github repositories get",
+      "method": "GET",
+      "path": "/api/github/repositories/:username",
+      "summary": "Get GitHub repositories for a user",
+      "params": [
+        {
+          "name": "username",
+          "flag": "username"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "github repositories resolve",
+      "method": "POST",
+      "path": "/api/github/repositories/resolve",
+      "summary": "Persist a repository selected from the installation-backed picker",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "github reviewer-app get",
+      "method": "GET",
+      "path": "/api/github/reviewer-app",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "github user repositories list",
+      "method": "GET",
+      "path": "/api/github/user/repositories",
+      "summary": "Get GitHub repositories for the currently authenticated user",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "global-secrets create",
+      "method": "POST",
+      "path": "/api/global-secrets",
+      "summary": "",
+      "params": [],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "global-secrets delete",
+      "method": "DELETE",
+      "path": "/api/global-secrets/:secretName",
+      "summary": "",
+      "params": [
+        {
+          "name": "secretName",
+          "flag": "secret-name"
+        }
+      ],
+      "step_up": true,
+      "confirm": true
+    },
+    {
+      "command": "global-secrets exists get",
+      "method": "GET",
+      "path": "/api/global-secrets/:secretName/exists",
+      "summary": "",
+      "params": [
+        {
+          "name": "secretName",
+          "flag": "secret-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "global-secrets get",
+      "method": "GET",
+      "path": "/api/global-secrets/:secretName",
+      "summary": "",
+      "params": [
+        {
+          "name": "secretName",
+          "flag": "secret-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "global-secrets list",
+      "method": "GET",
+      "path": "/api/global-secrets",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "global-secrets wrapped get",
+      "method": "GET",
+      "path": "/api/global-secrets/:secretName/wrapped",
+      "summary": "",
+      "params": [
+        {
+          "name": "secretName",
+          "flag": "secret-name"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "hetzner-robot-integrations create",
+      "method": "POST",
+      "path": "/api/hetzner-robot-integrations",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "hetzner-robot-integrations delete",
+      "method": "DELETE",
+      "path": "/api/hetzner-robot-integrations/:id",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "hetzner-robot-integrations get",
+      "method": "GET",
+      "path": "/api/hetzner-robot-integrations/:id",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "hetzner-robot-integrations list",
+      "method": "GET",
+      "path": "/api/hetzner-robot-integrations",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "hetzner-robot-integrations servers list",
+      "method": "GET",
+      "path": "/api/hetzner-robot-integrations/:id/servers",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "hetzner-robot-integrations update",
+      "method": "PATCH",
+      "path": "/api/hetzner-robot-integrations/:id",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "instance-types get",
+      "method": "GET",
+      "path": "/api/instance-types/:location",
+      "summary": "",
+      "params": [
+        {
+          "name": "location",
+          "flag": "location"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "instance-types list",
+      "method": "GET",
+      "path": "/api/instance-types",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "instance-types-grouped get",
+      "method": "GET",
+      "path": "/api/instance-types-grouped/:location",
+      "summary": "",
+      "params": [
+        {
+          "name": "location",
+          "flag": "location"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "integrations create",
+      "method": "POST",
+      "path": "/api/integrations",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "integrations delete",
+      "method": "DELETE",
+      "path": "/api/integrations/:id",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "integrations get",
+      "method": "GET",
+      "path": "/api/integrations/:id",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "integrations github get",
+      "method": "GET",
+      "path": "/api/integrations/github",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "integrations list",
+      "method": "GET",
+      "path": "/api/integrations",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "integrations update",
+      "method": "PATCH",
+      "path": "/api/integrations/:id",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "inventory clusters list",
+      "method": "GET",
+      "path": "/api/inventory/clusters",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "inventory cost-breakdown get",
+      "method": "GET",
+      "path": "/api/inventory/cost-breakdown",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "inventory cost-time-series list",
+      "method": "GET",
+      "path": "/api/inventory/cost-time-series",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "inventory resources list",
+      "method": "GET",
+      "path": "/api/inventory/resources",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "job create",
+      "method": "POST",
+      "path": "/api/job",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "job delete",
+      "method": "DELETE",
+      "path": "/api/job/:id",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "job get",
+      "method": "GET",
+      "path": "/api/job/:id",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "job update",
+      "method": "PATCH",
+      "path": "/api/job/:id",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "notification list",
+      "method": "GET",
+      "path": "/api/notification",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "notification update",
+      "method": "PATCH",
+      "path": "/api/notification",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "notifications channels create",
+      "method": "POST",
+      "path": "/api/notifications/channels",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "notifications channels delete",
+      "method": "DELETE",
+      "path": "/api/notifications/channels/:channelId",
+      "summary": "",
+      "params": [
+        {
+          "name": "channelId",
+          "flag": "channel-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "notifications channels list",
+      "method": "GET",
+      "path": "/api/notifications/channels",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "notifications channels test",
+      "method": "POST",
+      "path": "/api/notifications/channels/:channelId/test",
+      "summary": "",
+      "params": [
+        {
+          "name": "channelId",
+          "flag": "channel-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "notifications channels update",
+      "method": "PATCH",
+      "path": "/api/notifications/channels/:channelId",
+      "summary": "",
+      "params": [
+        {
+          "name": "channelId",
+          "flag": "channel-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "notifications global get",
+      "method": "GET",
+      "path": "/api/notifications/global",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "notifications global read update",
+      "method": "PATCH",
+      "path": "/api/notifications/global/read",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "notifications history get",
+      "method": "GET",
+      "path": "/api/notifications/history",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "notifications silences create",
+      "method": "POST",
+      "path": "/api/notifications/silences",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "notifications silences delete",
+      "method": "DELETE",
+      "path": "/api/notifications/silences/:silenceId",
+      "summary": "",
+      "params": [
+        {
+          "name": "silenceId",
+          "flag": "silence-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "notifications silences list",
+      "method": "GET",
+      "path": "/api/notifications/silences",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "notifications silences update",
+      "method": "PATCH",
+      "path": "/api/notifications/silences/:silenceId",
+      "summary": "",
+      "params": [
+        {
+          "name": "silenceId",
+          "flag": "silence-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "object-storage create",
+      "method": "POST",
+      "path": "/api/object-storage",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "object-storage delete",
+      "method": "DELETE",
+      "path": "/api/object-storage/:id",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "object-storage get",
+      "method": "GET",
+      "path": "/api/object-storage/:id",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "object-storage list",
+      "method": "GET",
+      "path": "/api/object-storage",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "object-storage update",
+      "method": "PATCH",
+      "path": "/api/object-storage/:id",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "organization billing-details get",
+      "method": "GET",
+      "path": "/api/organization/billing-details",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "organization billing-history get",
+      "method": "GET",
+      "path": "/api/organization/billing-history",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "organization card get",
+      "method": "GET",
+      "path": "/api/organization/card",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "organization current-usage get",
+      "method": "GET",
+      "path": "/api/organization/current-usage",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "organization extra-byo-clusters list",
+      "method": "GET",
+      "path": "/api/organization/extra-byo-clusters",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "organization extra-clusters list",
+      "method": "GET",
+      "path": "/api/organization/extra-clusters",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "organization get",
+      "method": "GET",
+      "path": "/api/organization",
+      "summary": "Get account details",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "organization invoice get",
+      "method": "GET",
+      "path": "/api/organization/invoice",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "organization invoice pdf get",
+      "method": "GET",
+      "path": "/api/organization/invoice/:transactionId/pdf",
+      "summary": "",
+      "params": [
+        {
+          "name": "transactionId",
+          "flag": "transaction-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "organization plan get",
+      "method": "GET",
+      "path": "/api/organization/plan",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "organization plans list",
+      "method": "GET",
+      "path": "/api/organization/plans",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "organization resources list",
+      "method": "GET",
+      "path": "/api/organization/resources",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "organization subscription get",
+      "method": "GET",
+      "path": "/api/organization/subscription",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "organization subscription-schedule get",
+      "method": "GET",
+      "path": "/api/organization/subscription-schedule",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "organization usage get",
+      "method": "GET",
+      "path": "/api/organization/usage",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "organization users list",
+      "method": "GET",
+      "path": "/api/organization/users",
+      "summary": "",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "registry apply create",
+      "method": "POST",
+      "path": "/api/registry/:name/apply/:clusterId",
+      "summary": "Apply registry to a cluster",
+      "params": [
+        {
+          "name": "name",
+          "flag": "name"
+        },
+        {
+          "name": "clusterId",
+          "flag": "cluster-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "registry apply delete",
+      "method": "DELETE",
+      "path": "/api/registry/:name/apply/:clusterId",
+      "summary": "Remove registry from a cluster",
+      "params": [
+        {
+          "name": "name",
+          "flag": "name"
+        },
+        {
+          "name": "clusterId",
+          "flag": "cluster-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "registry create",
+      "method": "POST",
+      "path": "/api/registry",
+      "summary": "Create or update registry",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "registry delete",
+      "method": "DELETE",
+      "path": "/api/registry/:name",
+      "summary": "Delete registry",
+      "params": [
+        {
+          "name": "name",
+          "flag": "name"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "registry exists get",
+      "method": "GET",
+      "path": "/api/registry/:name/exists",
+      "summary": "Check if registry exists",
+      "params": [
+        {
+          "name": "name",
+          "flag": "name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "registry get",
+      "method": "GET",
+      "path": "/api/registry/:name",
+      "summary": "Get single registry by name",
+      "params": [
+        {
+          "name": "name",
+          "flag": "name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "registry list",
+      "method": "GET",
+      "path": "/api/registry",
+      "summary": "Get all registries for an account",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "wrapped-secrets unwrap",
+      "method": "POST",
+      "path": "/api/wrapped-secrets/unwrap",
+      "summary": "",
+      "params": [],
+      "step_up": true,
+      "confirm": false
+    }
+  ]
+}

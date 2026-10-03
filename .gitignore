@@ -1,0 +1,7 @@
+/bin/
+/dist/
+*.test
+coverage.out
+.edka.json
+.env
+.DS_Store
