@@ -1,5 +1,5 @@
 {
-  "source_sha": "84f77d8b92fd6b89bbbf3f424372aeeb1f433801",
+  "source_sha": "47fa724b91d9efcb1a2ffc579ff4fa6853ef5093",
   "confirm_words": [
     "cancel",
     "cleanup-orphaned-nodes",
@@ -7387,46 +7387,10 @@
       "confirm": false
     },
     {
-      "command": "custom-apps versions community get",
-      "method": "GET",
-      "path": "/api/custom-apps/:slug/versions/:version/community",
-      "summary": "",
-      "params": [
-        {
-          "name": "slug",
-          "flag": "slug"
-        },
-        {
-          "name": "version",
-          "flag": "version"
-        }
-      ],
-      "step_up": false,
-      "confirm": false
-    },
-    {
       "command": "custom-apps versions get",
       "method": "GET",
       "path": "/api/custom-apps/:slug/versions/:version",
       "summary": "Get one version with its manifest and README",
-      "params": [
-        {
-          "name": "slug",
-          "flag": "slug"
-        },
-        {
-          "name": "version",
-          "flag": "version"
-        }
-      ],
-      "step_up": false,
-      "confirm": false
-    },
-    {
-      "command": "custom-apps versions share create",
-      "method": "POST",
-      "path": "/api/custom-apps/:slug/versions/:version/share",
-      "summary": "",
       "params": [
         {
           "name": "slug",

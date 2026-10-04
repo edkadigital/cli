@@ -110,8 +110,7 @@ func decode(t *testing.T, body string) map[string]any {
 func TestAppsShareOpensAPullRequestFromTheUsersAccount(t *testing.T) {
 	dir := writePackage(t, map[string]string{"template.yaml": sharedTemplate, "icon.png": "\x89PNG\r\n\x1a\n\xff\xfe"})
 	server, api := newStepAPI(t, map[string][]string{
-		"POST /api/custom-apps/validate":                   {communityValid},
-		"POST /api/custom-apps/memos/versions/1.2.0/share": {`{"success":true,"data":{}}`},
+		"POST /api/custom-apps/validate": {communityValid},
 	})
 	calls := fakeGitHub(t, firstShare())
 
@@ -182,12 +181,6 @@ func TestAppsShareOpensAPullRequestFromTheUsersAccount(t *testing.T) {
 		if !strings.Contains(body, expected) {
 			t.Errorf("the pull request does not say %q:\n%s", expected, body)
 		}
-	}
-
-	// Edka records the pull request on the published version.
-	recorded := decode(t, api.bodies["POST /api/custom-apps/memos/versions/1.2.0/share"])
-	if recorded["pull_request_url"] != "https://github.com/edkadigital/apps/pull/7" {
-		t.Fatalf("recorded %v", recorded)
 	}
 }
 
@@ -267,8 +260,7 @@ func TestAppsShareAsksBeforeItOpensAnything(t *testing.T) {
 func TestAppsShareCommitsAsTheGitIdentityOfThePackageDirectory(t *testing.T) {
 	dir := writePackage(t, map[string]string{"template.yaml": sharedTemplate})
 	server, _ := newStepAPI(t, map[string][]string{
-		"POST /api/custom-apps/validate":                   {communityValid},
-		"POST /api/custom-apps/memos/versions/1.2.0/share": {`{"success":true,"data":{}}`},
+		"POST /api/custom-apps/validate": {communityValid},
 	})
 	calls := fakeGitHub(t, firstShare())
 
@@ -298,8 +290,7 @@ func TestAppsShareCommitsAsTheGitIdentityOfThePackageDirectory(t *testing.T) {
 func TestAppsShareLetsGitHubPickTheEmailWithoutAGitIdentity(t *testing.T) {
 	dir := writePackage(t, map[string]string{"template.yaml": sharedTemplate})
 	server, _ := newStepAPI(t, map[string][]string{
-		"POST /api/custom-apps/validate":                   {communityValid},
-		"POST /api/custom-apps/memos/versions/1.2.0/share": {`{"success":true,"data":{}}`},
+		"POST /api/custom-apps/validate": {communityValid},
 	})
 	// A name alone is not an identity GitHub takes.
 	calls := fakeGitHub(t, append([][2]string{{"config --get user.email", "!exit status 1"}}, firstShare()...))
@@ -371,8 +362,7 @@ func TestAppsShareUpdatesAPackageAndAPullRequestThatExist(t *testing.T) {
 		t.Fatal(err)
 	}
 	data := decode(t, out)["data"].(map[string]any)
-	// The share is not recorded: this organization did not publish the package.
-	if data["pull_request_url"] != "https://github.com/edkadigital/apps/pull/7" || data["branch"] != "memos-1.2.0" || data["recorded"] != false {
+	if data["pull_request_url"] != "https://github.com/edkadigital/apps/pull/7" || data["branch"] != "memos-1.2.0" {
 		t.Fatalf("data %v", data)
 	}
 	if commit := decode(t, callsTo(*calls, "POST repos/octocat/apps/git/commits")[0].stdin); commit["message"] != "Update Memos to 1.2.0" {
@@ -396,8 +386,7 @@ func indexOfCall(calls []ghCall, text string) int {
 func TestAppsShareWaitsForANewForkBeforeItWritesToIt(t *testing.T) {
 	dir := writePackage(t, map[string]string{"template.yaml": sharedTemplate})
 	server, _ := newStepAPI(t, map[string][]string{
-		"POST /api/custom-apps/validate":                   {communityValid},
-		"POST /api/custom-apps/memos/versions/1.2.0/share": {`{"success":true,"data":{}}`},
+		"POST /api/custom-apps/validate": {communityValid},
 	})
 	// GitHub answers the fork request before the fork is there: first it is
 	// not found, then it is a repository without commits.
@@ -435,7 +424,7 @@ func TestAppsShareStopsWhenGitHubDoesNotFinishTheFork(t *testing.T) {
 	forkReadyWait = 30 * time.Millisecond
 	t.Cleanup(func() { forkReadyWait = previous })
 	dir := writePackage(t, map[string]string{"template.yaml": sharedTemplate})
-	server, api := newStepAPI(t, map[string][]string{"POST /api/custom-apps/validate": {communityValid}})
+	server, _ := newStepAPI(t, map[string][]string{"POST /api/custom-apps/validate": {communityValid}})
 	rules := [][2]string{{"GET repos/octocat/apps/git/ref/heads/main", "!gh: Not Found (HTTP 404)"}}
 	calls := fakeGitHub(t, append(rules, firstShare()...))
 
@@ -445,9 +434,6 @@ func TestAppsShareStopsWhenGitHubDoesNotFinishTheFork(t *testing.T) {
 	}
 	if writes := callsTo(*calls, "POST repos/octocat/apps/"); len(writes) != 0 {
 		t.Fatalf("wrote to a fork that is not there: %v", writes)
-	}
-	if api.count("POST /api/custom-apps/memos/versions/1.2.0/share") != 0 {
-		t.Fatal("recorded a share that did not happen")
 	}
 }
 
@@ -470,8 +456,7 @@ func TestAppsShareStopsWhenTheForkCannotBeRead(t *testing.T) {
 func TestAppsShareReadsTheDefaultBranchOfAForkThatRenamedIt(t *testing.T) {
 	dir := writePackage(t, map[string]string{"template.yaml": sharedTemplate})
 	server, _ := newStepAPI(t, map[string][]string{
-		"POST /api/custom-apps/validate":                   {communityValid},
-		"POST /api/custom-apps/memos/versions/1.2.0/share": {`{"success":true,"data":{}}`},
+		"POST /api/custom-apps/validate": {communityValid},
 	})
 	rules := [][2]string{
 		{"POST repos/edkadigital/apps/forks", `{"full_name":"octocat/apps","default_branch":"trunk","owner":{"login":"octocat"}}`},
@@ -521,7 +506,6 @@ func TestAppsShareTakesThePublishedVersionOfAPackage(t *testing.T) {
 		"GET /api/custom-apps/memos":                        {`{"data":{"app":{"slug":"memos"},"versions":[{"version":"1.2.0","current":true},{"version":"1.1.0","current":false}]}}`},
 		"GET /api/custom-apps/memos/versions/1.2.0/archive": {archive},
 		"POST /api/custom-apps/validate":                    {communityValid},
-		"POST /api/custom-apps/memos/versions/1.2.0/share":  {`{"success":true,"data":{}}`},
 	})
 	calls := fakeGitHub(t, firstShare())
 
@@ -529,7 +513,7 @@ func TestAppsShareTakesThePublishedVersionOfAPackage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if data := decode(t, out)["data"].(map[string]any); data["recorded"] != true || data["version"] != "1.2.0" {
+	if data := decode(t, out)["data"].(map[string]any); data["version"] != "1.2.0" {
 		t.Fatalf("data %v", data)
 	}
 	files := sentFiles(t, api.bodies["POST /api/custom-apps/validate"])
