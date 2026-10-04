@@ -82,7 +82,8 @@ func TestAppsValidateRefusesADirectoryOverOneMegabyteBeforeItSendsIt(t *testing.
 }
 
 const validPackage = `{"data":{"valid":true,"profile":"organization","diagnostics":[],"capabilities":null}}`
-const invalidPackage = `{"data":{"valid":false,"profile":"organization","diagnostics":[{"code":"chart.version","severity":"error","file":"chart/Chart.yaml","line":3,"message":"The chart is version \"1.1.0\". It must carry the package version, \"1.2.0\".","fix":"Set version: 1.2.0 in Chart.yaml."}],"capabilities":null}}`
+const invalidValidation = `{"valid":false,"profile":"organization","diagnostics":[{"code":"chart.api-version","severity":"error","file":"chart/Chart.yaml","line":1,"message":"Chart.yaml must set apiVersion: v2.","fix":"Set apiVersion: v2 in Chart.yaml."}],"capabilities":null}`
+const invalidPackage = `{"data":` + invalidValidation + `}`
 
 func sentFiles(t *testing.T, body string) map[string]any {
 	t.Helper()
@@ -134,7 +135,7 @@ func TestAppsValidatePrintsEachFindingAndFails(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "memos 1.2.0 has 1 error to fix") {
 		t.Fatalf("err %v", err)
 	}
-	for _, want := range []string{"✗ chart/Chart.yaml:3  chart.version", "It must carry the package version", "Fix: Set version: 1.2.0 in Chart.yaml."} {
+	for _, want := range []string{"✗ chart/Chart.yaml:1  chart.api-version", "Chart.yaml must set apiVersion: v2.", "Fix: Set apiVersion: v2 in Chart.yaml."} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("missing %q in %q", want, out)
 		}
@@ -176,32 +177,40 @@ func TestAppsValidateRefusesADirectoryThatIsNotAPackage(t *testing.T) {
 	}
 }
 
-func TestAppsPublishStoresOnlyAValidPackage(t *testing.T) {
+func TestAppsPublishPrintsTheFindingsOfARefusedPackage(t *testing.T) {
 	dir := writePackage(t, nil)
-	server, api := newStepAPI(t, map[string][]string{"POST /api/custom-apps/validate": {invalidPackage}})
+	server, api := newStepAPI(t, map[string][]string{
+		"POST /api/custom-apps": {`422 {"error":"Unprocessable Entity","message":"The package is not valid. Fix the errors and publish again.","data":{"validation":` + invalidValidation + `}}`},
+	})
 
 	out, _, err := execute(t, server.URL, "apps", "publish", dir)
-	if err == nil || !strings.Contains(err.Error(), "nothing was published") {
+	if err == nil || !strings.Contains(err.Error(), "memos 1.2.0 has 1 error to fix; nothing was published") {
 		t.Fatalf("err %v", err)
 	}
-	if !strings.Contains(out, "chart.version") || api.count("POST /api/custom-apps") != 0 {
-		t.Fatalf("out %q, requests %v", out, api.requests)
+	if !strings.Contains(out, "✗ chart/Chart.yaml:1  chart.api-version") {
+		t.Fatalf("out %q", out)
+	}
+	// The publish answers with the findings, so nothing validates first.
+	if api.count("POST /api/custom-apps/validate") != 0 || api.count("POST /api/custom-apps") != 1 {
+		t.Fatalf("requests %v", api.requests)
 	}
 }
 
 func TestAppsPublishReportsTheVersionItStored(t *testing.T) {
 	dir := writePackage(t, nil)
 	server, api := newStepAPI(t, map[string][]string{
-		"POST /api/custom-apps/validate": {validPackage},
-		"POST /api/custom-apps":          {`{"success":true,"data":{"app":{"id":"p1","name":"Memos","slug":"memos"},"version":{"id":"v1","version":"1.2.0"},"created":true,"unchanged":false}}`},
+		"POST /api/custom-apps": {`{"success":true,"data":{"app":{"id":"p1","name":"Memos","slug":"memos"},"version":{"id":"v1","version":"1.2.0"},"created":true,"unchanged":false,"validation":{"valid":true,"profile":"organization","diagnostics":[{"code":"package.unexpected-file","severity":"warning","file":"LICENSE","line":null,"message":"This file is not part of a package.","fix":null}],"capabilities":null}}}`},
 	})
 
-	_, errOut, err := execute(t, server.URL, "apps", "publish", dir)
+	out, errOut, err := execute(t, server.URL, "apps", "publish", dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(errOut, "✓ Published memos 1.2.0") {
 		t.Fatalf("err %q", errOut)
+	}
+	if !strings.Contains(out, "! LICENSE  package.unexpected-file") {
+		t.Fatalf("out %q", out)
 	}
 	body := api.bodies["POST /api/custom-apps"]
 	if !strings.Contains(body, `"via":"cli"`) || len(sentFiles(t, body)) != 4 {
@@ -212,8 +221,7 @@ func TestAppsPublishReportsTheVersionItStored(t *testing.T) {
 func TestAppsPublishSaysWhenTheFilesAreAlreadyPublished(t *testing.T) {
 	dir := writePackage(t, nil)
 	server, _ := newStepAPI(t, map[string][]string{
-		"POST /api/custom-apps/validate": {validPackage},
-		"POST /api/custom-apps":          {`{"success":true,"data":{"app":{"id":"p1","name":"Memos","slug":"memos"},"version":{"id":"v1","version":"1.2.0"},"created":false,"unchanged":true}}`},
+		"POST /api/custom-apps": {`{"success":true,"data":{"app":{"id":"p1","name":"Memos","slug":"memos"},"version":{"id":"v1","version":"1.2.0"},"created":false,"unchanged":true}}`},
 	})
 
 	_, errOut, err := execute(t, server.URL, "apps", "publish", dir)
