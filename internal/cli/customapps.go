@@ -405,7 +405,7 @@ func (a *App) customAppCommands() []*cobra.Command {
 	}}
 	validate.Flags().BoolVar(&community, "community", false, "Also apply the rules for the public catalog")
 
-	publish := &cobra.Command{Use: "publish [directory]", Short: "Publish a custom app to your organization's catalog", Long: "Publish a custom app, or a new version of one, to the catalog of your\norganization. The files are checked first and stored only when they are valid.\nA new version carries a higher version in template.yaml and chart/Chart.yaml.\n\nPublishing changes no installed app. Each one stays on its version until\n`edka apps update <app>` moves it. Needs the admin role.", Args: cobra.MaximumNArgs(1), Example: "  edka apps publish ./memos\n  edka apps publish ./memos --json", RunE: func(cmd *cobra.Command, args []string) error {
+	publish := &cobra.Command{Use: "publish [directory]", Short: "Publish a custom app to your organization's catalog", Long: "Publish a custom app, or a new version of one, to the catalog of your\norganization. The files are checked first and stored only when they are valid.\nA new version carries a higher version in template.yaml.\n\nPublishing changes no installed app. Each one stays on its version until\n`edka apps update <app>` moves it. Needs the admin role.", Args: cobra.MaximumNArgs(1), Example: "  edka apps publish ./memos\n  edka apps publish ./memos --json", RunE: func(cmd *cobra.Command, args []string) error {
 		dir := packageDir(args)
 		files, err := readPackageDir(dir)
 		if err != nil {
