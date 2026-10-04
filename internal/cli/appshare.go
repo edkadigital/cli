@@ -548,16 +548,8 @@ func (a *App) shareCommand() *cobra.Command {
 			return err
 		}
 
-		// The custom app page of the organization links the pull request. A
-		// package that was shared from a directory may not be published there.
-		recorded := false
-		if strings.HasPrefix(pullRequestURL, "https://github.com/"+communityRepository+"/pull/") {
-			_, recordErr := a.request(ctx, "POST", "/api/custom-apps/"+url.PathEscape(pkg.Slug)+"/versions/"+url.PathEscape(pkg.Version)+"/share", nil, jsonBody(map[string]any{"pull_request_url": pullRequestURL}))
-			recorded = recordErr == nil
-		}
-
 		if a.output != "table" {
-			return ui.Render(a.Out, jsonBody(map[string]any{"data": map[string]any{"pull_request_url": pullRequestURL, "repository": communityRepository, "branch": branch, "slug": pkg.Slug, "version": pkg.Version, "recorded": recorded}}), a.output, false)
+			return ui.Render(a.Out, jsonBody(map[string]any{"data": map[string]any{"pull_request_url": pullRequestURL, "repository": communityRepository, "branch": branch, "slug": pkg.Slug, "version": pkg.Version}}), a.output, false)
 		}
 		a.message("✓ Opened %s", ui.Clean(pullRequestURL))
 		a.message("Edka maintainers review it. Its checks run on the pull request.")
