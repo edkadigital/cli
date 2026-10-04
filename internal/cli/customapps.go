@@ -3,10 +3,12 @@ package cli
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -159,6 +161,22 @@ func packageFindings(result map[string]any) (findings []map[string]any, errorCou
 		}
 	}
 	return findings, errorCount
+}
+
+// refusedValidation is the validation result of a package a publish refused
+// as invalid, or nil for any other answer.
+func refusedValidation(err error) map[string]any {
+	var apiErr *api.Error
+	if !errors.As(err, &apiErr) || apiErr.Status != http.StatusUnprocessableEntity {
+		return nil
+	}
+	var data struct {
+		Validation map[string]any `json:"validation"`
+	}
+	if json.Unmarshal(apiErr.Data, &data) != nil {
+		return nil
+	}
+	return data.Validation
 }
 
 // checkPackage sends a package to the validator and returns its result.
@@ -411,17 +429,16 @@ func (a *App) customAppCommands() []*cobra.Command {
 		if err != nil {
 			return err
 		}
-		result, _, err := a.checkPackage(cmd.Context(), files, "organization")
-		if err != nil {
-			return err
-		}
-		if findings, errorCount := packageFindings(result); errorCount > 0 {
+		// Edka validates the files and stores them only when they are valid, and
+		// answers with the findings either way.
+		response, err := a.request(cmd.Context(), "POST", "/api/custom-apps", nil, jsonBody(map[string]any{"files": files, "via": "cli"}))
+		if refused := refusedValidation(err); refused != nil {
+			findings, errorCount := packageFindings(refused)
 			if a.output == "table" {
 				a.printFindings(findings)
 			}
 			return fmt.Errorf("%s has %d %s to fix; nothing was published", packageIdentity(files), errorCount, plural(errorCount, "error", "errors"))
 		}
-		response, err := a.request(cmd.Context(), "POST", "/api/custom-apps", nil, jsonBody(map[string]any{"files": files, "via": "cli"}))
 		if err != nil {
 			return err
 		}
@@ -432,6 +449,9 @@ func (a *App) customAppCommands() []*cobra.Command {
 		if err != nil {
 			return err
 		}
+		validation, _ := published["validation"].(map[string]any)
+		findings, _ := packageFindings(validation)
+		a.printFindings(findings)
 		pkg, _ := published["app"].(map[string]any)
 		version, _ := published["version"].(map[string]any)
 		slug, number := text(pkg, "slug"), text(version, "version")

@@ -31,9 +31,12 @@ type Error struct {
 	Reason string
 	Code   string
 	// Details is the body's "details" when it is text, and Fields its "fields".
-	// Nothing else of the body is kept, and both are cut to a bounded size.
-	Details   string
-	Fields    []FieldError
+	// Both are cut to a bounded size.
+	Details string
+	Fields  []FieldError
+	// Data is the body's "data", for a command that reads what a refused request
+	// answered, such as the findings of a package. Error does not print it.
+	Data      json.RawMessage
 	RequestID string
 }
 
@@ -205,8 +208,15 @@ func (c *Client) Do(ctx context.Context, method, path string, query url.Values, 
 		message := http.StatusText(resp.StatusCode)
 		var reason, code, details string
 		var fields []FieldError
+		var payload json.RawMessage
 		var v map[string]any
 		if json.Unmarshal(data, &v) == nil {
+			var body struct {
+				Data json.RawMessage `json:"data"`
+			}
+			if json.Unmarshal(data, &body) == nil {
+				payload = body.Data
+			}
 			reason, _ = v["error"].(string)
 			code, _ = v["code"].(string)
 			details, _ = v["details"].(string)
@@ -231,7 +241,7 @@ func (c *Client) Do(ctx context.Context, method, path string, query url.Values, 
 				}
 			}
 		}
-		return nil, &Error{Status: resp.StatusCode, Message: message, Reason: reason, Code: code, Details: clip(details, maxErrorDetails), Fields: fields, RequestID: resp.Header.Get("X-Request-ID")}
+		return nil, &Error{Status: resp.StatusCode, Message: message, Reason: reason, Code: code, Details: clip(details, maxErrorDetails), Fields: fields, Data: payload, RequestID: resp.Header.Get("X-Request-ID")}
 	}
 	return &Response{Body: data, Status: resp.StatusCode, Header: resp.Header}, nil
 }
