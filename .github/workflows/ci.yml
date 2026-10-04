@@ -1,9 +1,7 @@
 name: CI
 on:
-  # A pull request runs once: for the pull request, not also for the push to
-  # its branch.
-  push:
-    branches: [main]
+  # Code reaches main through a pull request, which runs these checks, so a
+  # merge does not run them again. release.yml tests a tag before it publishes.
   pull_request:
   schedule:
     # A vulnerability can be published while the code stays the same.
