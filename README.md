@@ -1,27 +1,30 @@
 # Edka CLI
 
-The Edka CLI lets you interact with your Edka clusters from the command line. Read the [CLI documentation](https://edka.io/docs/cli).
-
-Sign in through the browser, link a project directory to a cluster or a deployment,
-then deploy, follow logs, diagnose failures, and manage clusters, apps and databases.
-`edka api` calls any Edka API endpoint that a CLI token can reach.
+`edka` is the command line for [Edka](https://edka.io). It deploys, follows logs,
+diagnoses failures, and manages clusters, apps and databases from a terminal, a
+script or a coding agent. `edka api` calls any Edka API endpoint that a CLI token
+can reach. The [CLI documentation](https://edka.io/docs/cli) covers every command.
 
 ```console
 $ edka login
-  Authorize Edka CLI in your browser
-  ✓ Signed in to Acme as you@example.com
+Authorize Edka CLI in your browser
+…
+✓ Signed in to Acme as you@example.com
+  Next: edka link
 
 $ edka link --cluster production --deployment api
-  ✓ Linked this directory
+✓ Linked this directory
+  Cluster: production
+  Deployment: api
+  Context: /home/you/api/.edka.json
+  Next: edka status
 
 $ edka up --wait
-  Deployment submitted. Waiting for generation 3…
-  Applying generation 3…
-  Rolling out: 1/2 updated, 2/2 ready
-  Rolling out: 2/2 updated, 2/2 ready
-  ✓ api is running generation 3
-
-$ edka logs --follow
+Deployment submitted. Waiting for generation 3…
+Applying generation 3…
+Rolling out: 1/2 updated, 2/2 ready
+Rolling out: 2/2 updated, 2/2 ready
+✓ api is running generation 3
 ```
 
 ## Install
@@ -54,19 +57,154 @@ The install scripts check each download against the SHA-256 in the release's
 `checksums.txt`. [Install options](https://edka.io/docs/cli/overview/#install-options)
 covers pinning a version, choosing the directory, and the release archives.
 
-## Get started
+## Examples
 
-```sh
-edka login                      # Sign in through your browser
-edka link                       # Pick a cluster, then a deployment, for this directory
-edka status                     # The linked deployment, its replicas and pods
-edka up --wait                  # Redeploy and follow the rollout
-edka logs --follow
-edka diagnose                   # What is wrong, and the commands to run next
-edka --help                     # Every command
+The examples use a deployment named `api` on a cluster named `production`. In a
+linked directory, commands default to the linked deployment, so the name is
+optional. `edka <command> --help` lists the flags and more examples of a command.
+
+### Deploy a change
+
+`--diff` compares a change with the deployment and sends nothing:
+
+```console
+$ edka up api --field config.image_tag=v3 --field config.replicas:=3 --diff
+api at generation 5: 2 changes. Nothing was sent.
+
+  config.image_tag   v2 → v3
+  config.replicas    2 → 3
+
+To apply this only while api is at generation 5, run the command without --diff and with --expected-generation 5.
 ```
 
-`edka <command> --help` shows the flags and examples of a command.
+With `--expected-generation`, Edka refuses the change if the deployment is no
+longer at that generation. `--wait` follows the rollout:
+
+```sh
+edka up api --field config.image_tag=v3 --field config.replicas:=3 --expected-generation 5 --wait
+```
+
+A Git deployment builds from its branch. `--wait` streams the build log and,
+with auto-deploy on, follows the rollout of the new image:
+
+```sh
+edka build api --wait
+```
+
+To go back, list the revisions and restore one:
+
+```sh
+edka deployments revisions api
+edka rollback api --generation 4
+```
+
+### Find out why a deployment fails
+
+`edka diagnose` reads the rollout, the pods, the Kubernetes events and the log of
+the failing pod. It prints each problem with the commands to run next, and
+changes nothing:
+
+```console
+$ edka diagnose api
+✗ Pod api-x2k starts and exits, 4 times so far.
+  back-off 5m0s restarting failed container
+  Next: Read what it printed last, under Logs.
+  Next: edka logs api --pod api-x2k --previous --tail 200
+  Next: edka rollback api --generation 4
+
+Deployment   api
+Cluster      production
+Namespace    default
+Status       deploying
+Image        ghcr.io/acme/api:v3
+Revision     generation 5 (applied 5, healthy 4)
+Rollout      failed: CrashLoopBackOff: back-off 5m0s restarting failed container
+Replicas     1/2 ready, 1 updated, 1 available
+
+POD       STATUS    READY   RESTARTS   REASON
+api-7d9   running   true    0          —
+api-x2k   failed    false   4          CrashLoopBackOff
+
+WARNING   LAST SEEN          COUNT   OBJECT        MESSAGE
+BackOff   2026-10-02 12:00   12      Pod api-x2k   Back-off restarting failed container api
+
+Logs of api-x2k, from the container before its last restart
+listening on :8080
+panic: DATABASE_URL is not set
+Error: api has a problem; see the finding above
+```
+
+Without a deployment, `edka diagnose` checks the cluster. Apps, previews,
+databases and cron jobs each have a `diagnose` of their own, such as
+`edka databases diagnose orders`.
+
+`edka logs` reads the failing pod with the most restarts, or else the newest pod:
+
+```sh
+edka logs api --follow
+edka logs api --since 15m --timestamps
+edka logs api --previous                 # The container before its last restart
+```
+
+### Variables and secrets
+
+```console
+$ edka env
+NAME        VALUE
+PORT        8080
+LOG_LEVEL   info
+API_TOKEN   (secret)
+```
+
+Each change starts a rollout. A secret's value comes from a hidden prompt or from
+stdin, never from the command line, where shell history would keep it:
+
+```sh
+edka env set LOG_LEVEL=debug --wait
+edka env set --secret DATABASE_URL
+printf %s "$API_TOKEN" | edka env set --secret API_TOKEN
+```
+
+### Clusters and kubectl
+
+```sh
+edka clusters create staging --wait
+edka clusters kubeconfig production --merge --use
+edka run --kubeconfig -- kubectl get pods -A
+```
+
+`--merge --use` adds the cluster to your kubeconfig and makes it kubectl's current
+context. `edka run --kubeconfig` gives one command a kubeconfig that expires after
+an hour, and deletes it when the command exits.
+
+### Apps and databases
+
+```sh
+edka apps install umami --set postgres_instance=postgres --set hostname=stats.example.com --wait
+edka databases backup orders
+edka databases backups orders
+```
+
+In a terminal, `apps install` asks for each setting the app needs that `--set`
+leaves out.
+
+### Scripts, CI and the API
+
+With `--json`, stdout holds only the result. Progress and errors go to stderr. A
+`diagnose` that finds a problem exits with 1:
+
+```sh
+edka deployments list --all --json --no-input
+edka diagnose api --json | jq '.findings[].next'
+```
+
+`edka api` has a command for each API endpoint, and calls a path directly:
+
+```sh
+edka api operations --search backup
+edka api clusters nodepools list --cluster production
+edka api get /api/inventory/resources --query kind=deployment --json
+```
 
 ## Documentation
 
