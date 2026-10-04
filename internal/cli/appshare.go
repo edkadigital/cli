@@ -74,6 +74,38 @@ func githubStatus(err error, status int) bool {
 	return err != nil && strings.Contains(err.Error(), fmt.Sprintf("HTTP %d", status))
 }
 
+// commitAuthor is the name and email a commit carries.
+type commitAuthor struct {
+	Name  string `json:"name"`
+	Email string `json:"email"`
+}
+
+// gitAuthor reads user.name and user.email from git config in dir, so the
+// identity a repository sets wins over the global one. An empty dir reads in
+// the current directory. missing names the keys git config does not set; both
+// are missing when git is not installed.
+func gitAuthor(ctx context.Context, dir string) (author commitAuthor, missing []string) {
+	read := func(key string) string {
+		args := []string{"config", "--get", key}
+		if dir != "" {
+			args = append([]string{"-C", dir}, args...)
+		}
+		out, err := runTool(ctx, nil, "git", args...)
+		if err != nil {
+			return ""
+		}
+		return strings.TrimSpace(string(out))
+	}
+	author = commitAuthor{Name: read("user.name"), Email: read("user.email")}
+	if author.Name == "" {
+		missing = append(missing, "user.name")
+	}
+	if author.Email == "" {
+		missing = append(missing, "user.email")
+	}
+	return author, missing
+}
+
 // sharedPackage is what the pull request says about a package, read from its template.
 type sharedPackage struct {
 	Name        string `yaml:"name"`
@@ -338,8 +370,10 @@ func waitForFork(parent context.Context, forkName, branch string, waiting func()
 // openPullRequest writes the package to a branch of the user's fork and opens
 // a pull request against the community repository. Everything goes through
 // the GitHub API as the account `gh` is signed in to: no clone, no push.
-// waiting is called with the name of the fork when GitHub is still creating it.
-func openPullRequest(ctx context.Context, pkg sharedPackage, files map[string]any, body string, waiting func(forkName string)) (pullRequestURL, branch string, err error) {
+// The commit carries author as its author and committer; without one, GitHub
+// picks an email of the account. waiting is called with the name of the fork
+// when GitHub is still creating it.
+func openPullRequest(ctx context.Context, pkg sharedPackage, files map[string]any, body string, author *commitAuthor, waiting func(forkName string)) (pullRequestURL, branch string, err error) {
 	// GitHub answers with the fork the account already has when there is one.
 	fork, err := githubAPI(ctx, "POST", "repos/"+communityRepository+"/forks", map[string]any{"default_branch_only": true})
 	if err != nil {
@@ -415,11 +449,16 @@ func openPullRequest(ctx context.Context, pkg sharedPackage, files map[string]an
 	if exists {
 		title = fmt.Sprintf("Update %s to %s", pkg.Name, pkg.Version)
 	}
-	created, err := githubAPI(ctx, "POST", "repos/"+forkName+"/git/commits", map[string]any{
+	newCommit := map[string]any{
 		"message": title,
 		"tree":    text(rootTree, "sha"),
 		"parents": []string{baseCommit},
-	})
+	}
+	if author != nil {
+		newCommit["author"] = author
+		newCommit["committer"] = author
+	}
+	created, err := githubAPI(ctx, "POST", "repos/"+forkName+"/git/commits", newCommit)
 	if err != nil {
 		return "", "", err
 	}
@@ -452,7 +491,7 @@ func openPullRequest(ctx context.Context, pkg sharedPackage, files map[string]an
 }
 
 func (a *App) shareCommand() *cobra.Command {
-	return &cobra.Command{Use: "share <directory or app>", Short: "Offer a custom app to the community catalog", Long: "Offer a custom app to the community catalog: check it against the rules\nof the catalog, then open a pull request to " + communityRepository + " from your\nGitHub account. Name a package directory, or a custom app your organization\npublished.\n\nThe pull request is opened with the GitHub CLI, as the account `gh` is signed\nin to. That account is one of the maintainers template.yaml lists. Edka\nmaintainers review the pull request, and a merged app is listed with a\nfollowing Edka release.\n\nThe command asks for confirmation before it opens anything; --yes skips it.", Args: cobra.ExactArgs(1), Example: "  edka apps share ./memos\n  edka apps share memos --yes", RunE: func(cmd *cobra.Command, args []string) error {
+	return &cobra.Command{Use: "share <directory or app>", Short: "Offer a custom app to the community catalog", Long: "Offer a custom app to the community catalog: check it against the rules\nof the catalog, then open a pull request to " + communityRepository + " from your\nGitHub account. Name a package directory, or a custom app your organization\npublished.\n\nThe pull request is opened with the GitHub CLI, as the account `gh` is signed\nin to. That account is one of the maintainers template.yaml lists. Edka\nmaintainers review the pull request, and a merged app is listed with a\nfollowing Edka release.\n\nThe commit carries the user.name and user.email git config sets in the\npackage directory, or in the current directory for a published app. Without\nboth, GitHub picks the commit email from the account.\n\nThe command asks for confirmation before it opens anything; --yes skips it.", Args: cobra.ExactArgs(1), Example: "  edka apps share ./memos\n  edka apps share memos --yes", RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 		files, err := a.sharedFiles(ctx, args[0])
 		if err != nil {
@@ -486,11 +525,23 @@ func (a *App) shareCommand() *cobra.Command {
 			return fmt.Errorf("%s is not under maintainers in template.yaml; a package is shared by one of its maintainers.\nAdd `- github: %q` under maintainers, raise the version and publish again", login, login)
 		}
 
-		if err := a.confirm(fmt.Sprintf("Open a pull request to %s with %s %s, from the GitHub account %s", communityRepository, pkg.Slug, pkg.Version, login)); err != nil {
+		// A package directory can sit in a repository with an identity of its own.
+		dir := ""
+		if info, err := os.Stat(args[0]); err == nil && info.IsDir() {
+			dir = args[0]
+		}
+		identity, missing := gitAuthor(ctx, dir)
+		author, committed := &identity, fmt.Sprintf("committed as %s <%s>", identity.Name, identity.Email)
+		if len(missing) > 0 {
+			author, committed = nil, "with the commit email GitHub picks"
+			a.message("git config sets no %s, so GitHub picks the commit email from the account %s. Set user.name and user.email to choose it.", strings.Join(missing, " and "), ui.Clean(login))
+		}
+
+		if err := a.confirm(fmt.Sprintf("Open a pull request to %s with %s %s, from the GitHub account %s, %s", communityRepository, pkg.Slug, pkg.Version, login, committed)); err != nil {
 			return err
 		}
 		capabilities, _ := result["capabilities"].(map[string]any)
-		pullRequestURL, branch, err := openPullRequest(ctx, pkg, files, pullRequestBody(pkg, capabilities), func(forkName string) {
+		pullRequestURL, branch, err := openPullRequest(ctx, pkg, files, pullRequestBody(pkg, capabilities), author, func(forkName string) {
 			a.message("Waiting for GitHub to finish creating the fork %s", ui.Clean(forkName))
 		})
 		if err != nil {

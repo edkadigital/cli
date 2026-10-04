@@ -8,6 +8,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -64,11 +67,13 @@ func fakeGitHub(t *testing.T, rules [][2]string) *[]ghCall {
 	return calls
 }
 
-// The GitHub answers of a first share by octocat: no package upstream yet, no
-// branch, no pull request.
+// The answers of a first share by octocat: git config names them, and GitHub
+// has no package upstream yet, no branch, no pull request.
 func firstShare() [][2]string {
 	return [][2]string{
 		{"api user --jq .login", "octocat\n"},
+		{"config --get user.name", "Mona Octocat\n"},
+		{"config --get user.email", "mona@example.com\n"},
 		{"POST repos/edkadigital/apps/forks", `{"full_name":"octocat/apps","default_branch":"main","owner":{"login":"octocat"}}`},
 		{"GET repos/octocat/apps/git/ref/heads/main", `{"ref":"refs/heads/main"}`},
 		{"POST repos/octocat/apps/merge-upstream", `{"merge_type":"none"}`},
@@ -232,16 +237,120 @@ func TestAppsShareComesFromAMaintainerOfThePackage(t *testing.T) {
 }
 
 func TestAppsShareAsksBeforeItOpensAnything(t *testing.T) {
-	dir := writePackage(t, map[string]string{"template.yaml": sharedTemplate})
-	server, _ := newStepAPI(t, map[string][]string{"POST /api/custom-apps/validate": {communityValid}})
-	calls := fakeGitHub(t, [][2]string{{"api user --jq .login", "octocat\n"}})
+	for name, test := range map[string]struct {
+		email string
+		label string
+	}{
+		"with a git identity":    {"mona@example.com\n", "Open a pull request to edkadigital/apps with memos 1.2.0, from the GitHub account octocat, committed as Mona Octocat <mona@example.com> requires confirmation; rerun with --yes"},
+		"without a git identity": {"!exit status 1", "Open a pull request to edkadigital/apps with memos 1.2.0, from the GitHub account octocat, with the commit email GitHub picks requires confirmation; rerun with --yes"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := writePackage(t, map[string]string{"template.yaml": sharedTemplate})
+			server, _ := newStepAPI(t, map[string][]string{"POST /api/custom-apps/validate": {communityValid}})
+			calls := fakeGitHub(t, [][2]string{
+				{"api user --jq .login", "octocat\n"},
+				{"config --get user.name", "Mona Octocat\n"},
+				{"config --get user.email", test.email},
+			})
 
-	_, _, err := execute(t, server.URL, "apps", "share", dir)
-	if err == nil || !strings.Contains(err.Error(), "Open a pull request to edkadigital/apps with memos 1.2.0, from the GitHub account octocat requires confirmation; rerun with --yes") {
-		t.Fatalf("err %v", err)
+			_, _, err := execute(t, server.URL, "apps", "share", dir)
+			if err == nil || !strings.Contains(err.Error(), test.label) {
+				t.Fatalf("err %v", err)
+			}
+			if writes := callsTo(*calls, "--method"); len(writes) != 0 {
+				t.Fatalf("called GitHub before the confirmation: %v", writes)
+			}
+		})
 	}
-	if len(*calls) != 1 {
-		t.Fatalf("calls %v", *calls)
+}
+
+func TestAppsShareCommitsAsTheGitIdentityOfThePackageDirectory(t *testing.T) {
+	dir := writePackage(t, map[string]string{"template.yaml": sharedTemplate})
+	server, _ := newStepAPI(t, map[string][]string{
+		"POST /api/custom-apps/validate":                   {communityValid},
+		"POST /api/custom-apps/memos/versions/1.2.0/share": {`{"success":true,"data":{}}`},
+	})
+	calls := fakeGitHub(t, firstShare())
+
+	_, errOut, err := execute(t, server.URL, "apps", "share", dir, "--yes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// git config is read in the package directory, where a repository can
+	// set an identity of its own.
+	for _, key := range []string{"user.name", "user.email"} {
+		if reads := callsTo(*calls, "git -C "+dir+" config --get "+key); len(reads) != 1 {
+			t.Fatalf("read %s in the package directory %d times: %v", key, len(reads), *calls)
+		}
+	}
+	commit := decode(t, callsTo(*calls, "POST repos/octocat/apps/git/commits")[0].stdin)
+	for _, role := range []string{"author", "committer"} {
+		identity, _ := commit[role].(map[string]any)
+		if len(identity) != 2 || identity["name"] != "Mona Octocat" || identity["email"] != "mona@example.com" {
+			t.Fatalf("commit %s %v", role, commit[role])
+		}
+	}
+	if strings.Contains(errOut, "GitHub picks") {
+		t.Fatalf("stderr %q", errOut)
+	}
+}
+
+func TestAppsShareLetsGitHubPickTheEmailWithoutAGitIdentity(t *testing.T) {
+	dir := writePackage(t, map[string]string{"template.yaml": sharedTemplate})
+	server, _ := newStepAPI(t, map[string][]string{
+		"POST /api/custom-apps/validate":                   {communityValid},
+		"POST /api/custom-apps/memos/versions/1.2.0/share": {`{"success":true,"data":{}}`},
+	})
+	// A name alone is not an identity GitHub takes.
+	calls := fakeGitHub(t, append([][2]string{{"config --get user.email", "!exit status 1"}}, firstShare()...))
+
+	_, errOut, err := execute(t, server.URL, "apps", "share", dir, "--yes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit := decode(t, callsTo(*calls, "POST repos/octocat/apps/git/commits")[0].stdin)
+	if _, named := commit["author"]; named {
+		t.Fatalf("commit %v", commit)
+	}
+	if _, named := commit["committer"]; named {
+		t.Fatalf("commit %v", commit)
+	}
+	// --yes skips the confirmation, so the note is the one place that says it.
+	if !strings.Contains(errOut, "git config sets no user.email, so GitHub picks the commit email from the account octocat. Set user.name and user.email to choose it.") || !strings.Contains(errOut, "✓ Opened https://github.com/edkadigital/apps/pull/7") {
+		t.Fatalf("stderr %q", errOut)
+	}
+}
+
+func TestGitAuthorPrefersTheIdentityOfTheRepository(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	global := filepath.Join(t.TempDir(), "gitconfig")
+	if err := os.WriteFile(global, []byte("[user]\n\tname = Global Name\n\temail = global@example.com\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GIT_CONFIG_GLOBAL", global)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	repository := t.TempDir()
+	ctx := context.Background()
+	for _, args := range [][]string{{"init", "--quiet"}, {"config", "user.email", "work@example.com"}} {
+		if _, err := runTool(ctx, nil, "git", append([]string{"-C", repository}, args...)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	author, missing := gitAuthor(ctx, repository)
+	if author != (commitAuthor{Name: "Global Name", Email: "work@example.com"}) || len(missing) != 0 {
+		t.Fatalf("in the repository: %v, missing %v", author, missing)
+	}
+	author, missing = gitAuthor(ctx, t.TempDir())
+	if author != (commitAuthor{Name: "Global Name", Email: "global@example.com"}) || len(missing) != 0 {
+		t.Fatalf("outside a repository: %v, missing %v", author, missing)
+	}
+
+	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(t.TempDir(), "absent"))
+	if author, missing = gitAuthor(ctx, t.TempDir()); strings.Join(missing, ",") != "user.name,user.email" {
+		t.Fatalf("without git config: %v, missing %v", author, missing)
 	}
 }
 
@@ -428,6 +537,10 @@ func TestAppsShareTakesThePublishedVersionOfAPackage(t *testing.T) {
 		t.Fatalf("validated %v", files)
 	}
 	if len(callsTo(*calls, "POST repos/octocat/apps/git/blobs")) != 2 {
+		t.Fatalf("calls %v", *calls)
+	}
+	// With no package directory, git config is read in the current directory.
+	if reads := callsTo(*calls, "git config --get user.email"); len(reads) != 1 {
 		t.Fatalf("calls %v", *calls)
 	}
 }
