@@ -1,5 +1,5 @@
 {
-  "source_sha": "47fa724b91d9efcb1a2ffc579ff4fa6853ef5093",
+  "source_sha": "ad5e3f49e48c562b9f04810cb99152d8ac4fae2f",
   "confirm_words": [
     "cancel",
     "cleanup-orphaned-nodes",
@@ -388,6 +388,24 @@
       ],
       "step_up": false,
       "confirm": true
+    },
+    {
+      "command": "clusters addons dependents list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/addons/:addonName/dependents",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "addonName",
+          "flag": "addon-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
     },
     {
       "command": "clusters addons list",
@@ -4193,6 +4211,16 @@
                   ]
                 }
               },
+              "env_from_secrets": {
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 253,
+                  "pattern": "^(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?)(?:\\.(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))*$"
+                }
+              },
               "volumes": {
                 "type": "array",
                 "items": {
@@ -4771,6 +4799,16 @@
             "properties": {},
             "additionalProperties": {
               "type": "string"
+            }
+          },
+          "env_from_secrets": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253,
+              "pattern": "^(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?)(?:\\.(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))*$"
             }
           },
           "volumes": {
@@ -6240,6 +6278,24 @@
       "confirm": false
     },
     {
+      "command": "clusters namespaces secrets list",
+      "method": "GET",
+      "path": "/api/clusters/:id/namespaces/:namespace/secrets",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "namespace",
+          "flag": "namespace"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
       "command": "clusters nat-gateway actions create",
       "method": "POST",
       "path": "/api/clusters/:id/nat-gateway/actions/:action",
@@ -6809,6 +6865,216 @@
       "confirm": true
     },
     {
+      "command": "clusters secret-stores create",
+      "method": "POST",
+      "path": "/api/clusters/:id/secret-stores",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false,
+      "body": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 53,
+            "pattern": "^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "aws-secrets-manager",
+              "aws-parameter-store",
+              "gcp-secret-manager",
+              "azure-key-vault",
+              "hashicorp-vault",
+              "openbao",
+              "akeyless",
+              "1password",
+              "doppler",
+              "infisical",
+              "bitwarden-secrets-manager",
+              "scaleway",
+              "gitlab",
+              "other"
+            ]
+          },
+          "config": {
+            "default": {},
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 65536
+            }
+          },
+          "credentials": {
+            "default": {},
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 65536
+            }
+          },
+          "namespaces": {
+            "default": [],
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63,
+              "pattern": "^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "provider"
+        ],
+        "examples": [
+          {
+            "name": "doppler-production",
+            "provider": "doppler",
+            "credentials": {
+              "token": "dp.st.production.xxxx"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "command": "clusters secret-stores delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:id/secret-stores/:storeName",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "storeName",
+          "flag": "store-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters secret-stores get",
+      "method": "GET",
+      "path": "/api/clusters/:id/secret-stores/:storeName",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "storeName",
+          "flag": "store-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters secret-stores list",
+      "method": "GET",
+      "path": "/api/clusters/:id/secret-stores",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters secret-stores update",
+      "method": "PUT",
+      "path": "/api/clusters/:id/secret-stores/:storeName",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "storeName",
+          "flag": "store-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false,
+      "body": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "config": {
+            "default": {},
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 65536
+            }
+          },
+          "credentials": {
+            "default": {},
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 65536
+            }
+          },
+          "namespaces": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63,
+              "pattern": "^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$"
+            }
+          }
+        },
+        "required": [
+          "namespaces"
+        ],
+        "examples": [
+          {
+            "config": {
+              "region": "eu-central-1"
+            },
+            "namespaces": [
+              "production"
+            ]
+          }
+        ]
+      }
+    },
+    {
       "command": "clusters secrets create",
       "method": "POST",
       "path": "/api/clusters/:id/secrets",
@@ -6959,6 +7225,402 @@
       ],
       "step_up": false,
       "confirm": false
+    },
+    {
+      "command": "clusters synced-secrets create",
+      "method": "POST",
+      "path": "/api/clusters/:id/synced-secrets",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false,
+      "body": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253,
+            "pattern": "^(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?)(?:\\.(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))*$"
+          },
+          "namespace": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63,
+            "pattern": "^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$"
+          },
+          "store": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 253,
+                "pattern": "^(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?)(?:\\.(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))*$"
+              },
+              "kind": {
+                "default": "ClusterSecretStore",
+                "type": "string",
+                "enum": [
+                  "ClusterSecretStore",
+                  "SecretStore"
+                ]
+              }
+            },
+            "required": [
+              "name"
+            ]
+          },
+          "refreshInterval": {
+            "default": "1h",
+            "type": "string",
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "6h",
+              "24h",
+              "0s"
+            ]
+          },
+          "source": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "const": "all"
+                  },
+                  "remoteKey": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2048
+                  }
+                },
+                "required": [
+                  "mode",
+                  "remoteKey"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "const": "keys"
+                  },
+                  "keys": {
+                    "minItems": 1,
+                    "maxItems": 200,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "secretKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 253,
+                          "pattern": "^[-._a-zA-Z0-9]+$"
+                        },
+                        "remoteKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2048
+                        },
+                        "property": {
+                          "type": "string",
+                          "maxLength": 1024
+                        }
+                      },
+                      "required": [
+                        "secretKey",
+                        "remoteKey"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "mode",
+                  "keys"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "const": "find"
+                  },
+                  "path": {
+                    "type": "string",
+                    "maxLength": 1024
+                  },
+                  "nameRegexp": {
+                    "type": "string",
+                    "maxLength": 1024
+                  }
+                },
+                "required": [
+                  "mode"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "namespace",
+          "store",
+          "source"
+        ],
+        "examples": [
+          {
+            "name": "api-env",
+            "namespace": "default",
+            "store": {
+              "name": "doppler-production"
+            },
+            "source": {
+              "mode": "find"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "command": "clusters synced-secrets delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:id/synced-secrets/:secretName",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "secretName",
+          "flag": "secret-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters synced-secrets get",
+      "method": "GET",
+      "path": "/api/clusters/:id/synced-secrets/:secretName",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "secretName",
+          "flag": "secret-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters synced-secrets list",
+      "method": "GET",
+      "path": "/api/clusters/:id/synced-secrets",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters synced-secrets sync",
+      "method": "POST",
+      "path": "/api/clusters/:id/synced-secrets/:secretName/sync",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "secretName",
+          "flag": "secret-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters synced-secrets update",
+      "method": "PUT",
+      "path": "/api/clusters/:id/synced-secrets/:secretName",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "secretName",
+          "flag": "secret-name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false,
+      "body": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "store": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 253,
+                "pattern": "^(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?)(?:\\.(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))*$"
+              },
+              "kind": {
+                "default": "ClusterSecretStore",
+                "type": "string",
+                "enum": [
+                  "ClusterSecretStore",
+                  "SecretStore"
+                ]
+              }
+            },
+            "required": [
+              "name"
+            ]
+          },
+          "refreshInterval": {
+            "default": "1h",
+            "type": "string",
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "6h",
+              "24h",
+              "0s"
+            ]
+          },
+          "source": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "const": "all"
+                  },
+                  "remoteKey": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2048
+                  }
+                },
+                "required": [
+                  "mode",
+                  "remoteKey"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "const": "keys"
+                  },
+                  "keys": {
+                    "minItems": 1,
+                    "maxItems": 200,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "secretKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 253,
+                          "pattern": "^[-._a-zA-Z0-9]+$"
+                        },
+                        "remoteKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2048
+                        },
+                        "property": {
+                          "type": "string",
+                          "maxLength": 1024
+                        }
+                      },
+                      "required": [
+                        "secretKey",
+                        "remoteKey"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "mode",
+                  "keys"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "const": "find"
+                  },
+                  "path": {
+                    "type": "string",
+                    "maxLength": 1024
+                  },
+                  "nameRegexp": {
+                    "type": "string",
+                    "maxLength": 1024
+                  }
+                },
+                "required": [
+                  "mode"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "store",
+          "source"
+        ],
+        "examples": [
+          {
+            "store": {
+              "name": "aws-production"
+            },
+            "refreshInterval": "15m",
+            "source": {
+              "mode": "all",
+              "remoteKey": "production/api"
+            }
+          }
+        ]
+      }
     },
     {
       "command": "clusters unarchive",
@@ -8041,6 +8703,16 @@
                     "name",
                     "value"
                   ]
+                }
+              },
+              "env_from_secrets": {
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 253,
+                  "pattern": "^(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?)(?:\\.(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))*$"
                 }
               },
               "volumes": {
