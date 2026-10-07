@@ -1,5 +1,5 @@
 {
-  "source_sha": "ad5e3f49e48c562b9f04810cb99152d8ac4fae2f",
+  "source_sha": "cd7b1a6605883623bbf7a834ec1fd29a1b20ca72",
   "confirm_words": [
     "cancel",
     "cleanup-orphaned-nodes",
@@ -4221,6 +4221,9 @@
                   "pattern": "^(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?)(?:\\.(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))*$"
                 }
               },
+              "restart_on_secret_change": {
+                "type": "boolean"
+              },
               "volumes": {
                 "type": "array",
                 "items": {
@@ -4810,6 +4813,9 @@
               "maxLength": 253,
               "pattern": "^(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?)(?:\\.(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))*$"
             }
+          },
+          "restart_on_secret_change": {
+            "type": "boolean"
           },
           "volumes": {
             "type": "array",
@@ -8714,6 +8720,9 @@
                   "maxLength": 253,
                   "pattern": "^(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?)(?:\\.(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))*$"
                 }
+              },
+              "restart_on_secret_change": {
+                "type": "boolean"
               },
               "volumes": {
                 "type": "array",
