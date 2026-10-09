@@ -129,6 +129,30 @@ func TestErrorKeepsValidationDetail(t *testing.T) {
 		t.Fatal(e.Error())
 	}
 }
+
+// The secret store and synced secret routes send "fields" as an object of
+// messages by field. Those fields are kept too, in name order.
+func TestErrorKeepsFieldsByName(t *testing.T) {
+	body := `{"error":"Check the highlighted fields","message":"Check the highlighted fields","fields":{"store":"Allowed in cs-troi","namespace":"This namespace does not exist","source.mode":["not","text"],"":"no field"}}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(400)
+		w.Write([]byte(body))
+	}))
+	defer server.Close()
+	c := Client{BaseURL: server.URL}
+	_, err := c.Do(context.Background(), "POST", "/api/clusters/c1/synced-secrets", nil, []byte(`{}`))
+	var e *Error
+	if !errors.As(err, &e) {
+		t.Fatalf("%#v", err)
+	}
+	if len(e.Fields) != 2 || e.Fields[0] != (FieldError{"namespace", "This namespace does not exist"}) || e.Fields[1] != (FieldError{"store", "Allowed in cs-troi"}) {
+		t.Fatalf("%#v", e.Fields)
+	}
+	if text := e.Error(); text != "Check the highlighted fields (HTTP 400)\n  namespace: This namespace does not exist\n  store: Allowed in cs-troi" {
+		t.Fatal(text)
+	}
+}
+
 func TestCancellationAndAPIError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Request-ID", "request-1")

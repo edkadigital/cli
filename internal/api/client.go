@@ -8,9 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 )
@@ -60,6 +62,34 @@ func clip(s string, n int) string {
 		count++
 	}
 	return s
+}
+
+// readFields reads a body's "fields": a list of {field, message}, or an object
+// of messages by field, which the secret store and synced secret routes send.
+// Fields of an object come in name order.
+func readFields(value any) []FieldError {
+	var fields []FieldError
+	add := func(name, text string) {
+		if name != "" && len(fields) < maxErrorFields {
+			fields = append(fields, FieldError{Field: clip(name, maxErrorField), Message: clip(text, maxErrorField)})
+		}
+	}
+	switch v := value.(type) {
+	case []any:
+		for _, item := range v {
+			field, _ := item.(map[string]any)
+			name, _ := field["field"].(string)
+			text, _ := field["message"].(string)
+			add(name, text)
+		}
+	case map[string]any:
+		for _, name := range slices.Sorted(maps.Keys(v)) {
+			if text, ok := v[name].(string); ok {
+				add(name, text)
+			}
+		}
+	}
+	return fields
 }
 
 func (e *Error) Error() string {
@@ -220,15 +250,7 @@ func (c *Client) Do(ctx context.Context, method, path string, query url.Values, 
 			reason, _ = v["error"].(string)
 			code, _ = v["code"].(string)
 			details, _ = v["details"].(string)
-			list, _ := v["fields"].([]any)
-			for _, item := range list {
-				field, _ := item.(map[string]any)
-				name, _ := field["field"].(string)
-				text, _ := field["message"].(string)
-				if name != "" && len(fields) < maxErrorFields {
-					fields = append(fields, FieldError{Field: clip(name, maxErrorField), Message: clip(text, maxErrorField)})
-				}
-			}
+			fields = readFields(v["fields"])
 			for _, k := range []string{"error_description", "message", "error"} {
 				if text, ok := v[k].(string); ok && text != "" {
 					message = text
