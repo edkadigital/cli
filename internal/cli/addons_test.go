@@ -260,6 +260,46 @@ func TestAddonsInstall(t *testing.T) {
 	}
 }
 
+func TestAddonsChangesEnvoyGatewayLikeTheGatewayView(t *testing.T) {
+	catalog, err := json.Marshal(map[string]any{"data": []any{
+		catalogEntry("envoy-gateway", "1.5.1", "networking", false, ""),
+		catalogEntry("tailscale-operator", "1.86.0", "networking", false, ""),
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	envoy := `{"id":"e1","cluster_id":"c1","addon_name":"envoy-gateway","version":"1.5.0","status":"installed","progress":100}`
+	queued := `{"message":"Addon installation initiated","data":{"cluster_id":"c2","addon_name":"envoy-gateway","version":"1.5.1","status":"installing","task_id":"8"}}`
+	server, api := addonAPI(t, map[string][]string{
+		"GET /api/addons/catalog":      {string(catalog)},
+		"GET /api/clusters/c1/addons":  {addonList(envoy)},
+		"GET /api/clusters/c2/addons":  {addonList()},
+		"POST /api/clusters/c2/addons": {queued},
+		"PUT /api/clusters/c1/addons":  {`{"message":"Addon upgrade initiated","version":"1.5.1"}`},
+	})
+
+	if _, _, err := execute(t, server.URL, "addons", "install", "envoy-gateway", "--cluster", "staging"); err != nil {
+		t.Fatal(err)
+	}
+	if got := api.bodies["POST /api/clusters/c2/addons"]; got != `{"addonName":"envoy-gateway"}` {
+		t.Fatal(got)
+	}
+
+	_, errOut, err := execute(t, server.URL, "addons", "update", "envoy-gateway", "--cluster", "sinaia", "--yes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	inOrder(t, errOut, "The Envoy proxies roll out again, so every gateway class briefly serves traffic from new pods.", "✓ Updating envoy-gateway to 1.5.1 in cluster sinaia")
+	if got := api.bodies["PUT /api/clusters/c1/addons"]; got != `{"addonName":"envoy-gateway","version":"1.5.1"}` {
+		t.Fatal(got)
+	}
+
+	// The Tailscale operator still needs the credentials the Gateway view asks for.
+	if _, _, err := execute(t, server.URL, "addons", "install", "tailscale-operator", "--cluster", "staging"); err == nil || !strings.Contains(err.Error(), "tailscale-operator is managed from Cluster > Gateway in the console") {
+		t.Fatal(err)
+	}
+}
+
 func TestAddonsUpdateNamesBothVersionsBeforeChanging(t *testing.T) {
 	server, api := addonAPI(t, map[string][]string{"PUT /api/clusters/c1/addons": {`{"message":"Addon upgrade initiated","version":"0.12.0"}`}})
 	for _, tc := range []struct {
