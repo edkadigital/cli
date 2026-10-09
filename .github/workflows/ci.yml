@@ -52,7 +52,7 @@ jobs:
           GOOS: ${{ matrix.goos }}
         with:
           # The Makefile names the same version.
-          version: v2.13.2
+          version: v2.14.0
   scripts:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
