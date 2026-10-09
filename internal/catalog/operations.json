@@ -1,5 +1,5 @@
 {
-  "source_sha": "cd7b1a6605883623bbf7a834ec1fd29a1b20ca72",
+  "source_sha": "b7aaee80887d8ba80d6be72f90665e2df71d1fbc",
   "confirm_words": [
     "cancel",
     "cleanup-orphaned-nodes",
@@ -4308,6 +4308,35 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "tcp_ports": {
+                "maxItems": 10,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "port": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 65535
+                    },
+                    "target_port": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 65535
+                    }
+                  },
+                  "required": [
+                    "port",
+                    "target_port"
+                  ]
+                }
+              },
+              "tcp_gateway_class": {
+                "type": "string"
+              },
+              "tcp_proxy_protocol": {
+                "type": "boolean"
               },
               "node_pool_name": {
                 "type": "string"
@@ -8808,6 +8837,35 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "tcp_ports": {
+                "maxItems": 10,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "port": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 65535
+                    },
+                    "target_port": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 65535
+                    }
+                  },
+                  "required": [
+                    "port",
+                    "target_port"
+                  ]
+                }
+              },
+              "tcp_gateway_class": {
+                "type": "string"
+              },
+              "tcp_proxy_protocol": {
+                "type": "boolean"
               },
               "node_pool_name": {
                 "type": "string"
