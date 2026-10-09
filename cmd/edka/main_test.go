@@ -79,6 +79,37 @@ func TestAPIErrorsKeepCodeAndFields(t *testing.T) {
 		t.Fatalf("code=%d stderr=%q", code, errOut)
 	}
 }
+
+// A script without a terminal reads where to confirm a passkey check from the
+// JSON error.
+func TestJSONErrorsNameThePasskeyCheck(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method + " " + r.URL.Path {
+		case "GET /api/clusters/c1/user-kubeconfig/download":
+			w.WriteHeader(http.StatusPreconditionRequired)
+			fmt.Fprint(w, `{"error":"step_up_required","message":"Recent identity verification is required.","operation":"clusters.kubeconfig"}`)
+		case "POST /api/cli/step-up":
+			w.WriteHeader(http.StatusCreated)
+			fmt.Fprint(w, `{"data":{"id":"s1","status":"pending","verify_url":"https://console.example/accounts/acme/cli/verify/s1","expires_at":"2026-10-09T12:05:00Z"}}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	out, errOut, code := runMain(t, []string{"EDKA_TOKEN=t", "EDKA_API_URL=" + server.URL}, "api", "get", "/api/clusters/c1/user-kubeconfig/download", "--json")
+	var value struct {
+		Error     string `json:"error"`
+		Status    int    `json:"status"`
+		Reason    string `json:"reason"`
+		VerifyURL string `json:"verify_url"`
+	}
+	if code != 1 || out != "" || json.Unmarshal([]byte(errOut), &value) != nil {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, out, errOut)
+	}
+	if value.Status != 428 || value.Reason != "step_up_required" || value.VerifyURL != "https://console.example/accounts/acme/cli/verify/s1" || !strings.Contains(value.Error, "Approve it at https://console.example/accounts/acme/cli/verify/s1") {
+		t.Fatal(errOut)
+	}
+}
 func TestErrorsKeepSuggestionIndent(t *testing.T) {
 	_, errOut, code := runMain(t, nil, "apps", "lsit")
 	if code != 1 || !strings.Contains(errOut, "Did you mean this?\n\tlist") {

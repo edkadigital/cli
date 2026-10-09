@@ -77,6 +77,10 @@ func run() int {
 			if errors.As(err, &settings) {
 				v["fields"] = settings.Fields
 			}
+			var stepUp *cli.StepUpError
+			if errors.As(err, &stepUp) {
+				v["verify_url"] = stepUp.URL
+			}
 			_ = json.NewEncoder(os.Stderr).Encode(v)
 		} else {
 			fmt.Fprintln(os.Stderr, "Error: "+message)

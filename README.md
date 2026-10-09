@@ -177,6 +177,18 @@ edka run --kubeconfig -- kubectl get pods -A
 context. `edka run --kubeconfig` gives one command a kubeconfig that expires after
 an hour, and deletes it when the command exits.
 
+An organization can ask for a passkey check before sensitive actions, such as a
+kubeconfig download. At a terminal, the command opens the check in the Edka
+console and continues after you confirm with your passkey. A command without a
+terminal prints the console address and stops, so run `edka verify` before a
+script. After you confirm, sensitive actions from the same login work for 5
+minutes:
+
+```sh
+edka verify
+edka clusters kubeconfig production --output-file production.yaml
+```
+
 ### Apps and databases
 
 ```sh

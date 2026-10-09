@@ -173,3 +173,21 @@ func TestCancellationAndAPIError(t *testing.T) {
 		t.Fatal("expected cancellation")
 	}
 }
+
+// A passkey check names its operation, and its hint names `edka verify`.
+func TestErrorKeepsStepUpOperation(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(428)
+		w.Write([]byte(`{"error":"step_up_required","message":"Recent identity verification is required.","operation":"clusters.kubeconfig"}`))
+	}))
+	defer server.Close()
+	c := Client{BaseURL: server.URL}
+	_, err := c.Do(context.Background(), "GET", "/api/clusters/c1/user-kubeconfig/download", nil, nil)
+	var e *Error
+	if !errors.As(err, &e) || e.Status != 428 || e.Reason != "step_up_required" || e.Operation != "clusters.kubeconfig" {
+		t.Fatalf("%#v", err)
+	}
+	if text := e.Error(); text != "Recent identity verification is required. (HTTP 428)\nConfirm with your passkey: run `edka verify`, then run the command again within 5 minutes." {
+		t.Fatal(text)
+	}
+}

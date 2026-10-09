@@ -38,7 +38,10 @@ type Error struct {
 	Fields  []FieldError
 	// Data is the body's "data", for a command that reads what a refused request
 	// answered, such as the findings of a package. Error does not print it.
-	Data      json.RawMessage
+	Data json.RawMessage
+	// Operation is the body's "operation": the action a passkey check
+	// (HTTP 428, reason "step_up_required") is for.
+	Operation string
 	RequestID string
 }
 
@@ -100,7 +103,7 @@ func (e *Error) Error() string {
 	case 403:
 		hint = "\nCheck your organization role and granted CLI permissions. Sensitive actions may require the console."
 	case 428:
-		hint = "\nOpen this action in the Edka console to verify your identity."
+		hint = "\nConfirm with your passkey: run `edka verify`, then run the command again within 5 minutes."
 	case 429:
 		hint = "\nToo many requests. Wait before trying again."
 	}
@@ -236,7 +239,7 @@ func (c *Client) Do(ctx context.Context, method, path string, query url.Values, 
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		message := http.StatusText(resp.StatusCode)
-		var reason, code, details string
+		var reason, code, details, operation string
 		var fields []FieldError
 		var payload json.RawMessage
 		var v map[string]any
@@ -250,6 +253,7 @@ func (c *Client) Do(ctx context.Context, method, path string, query url.Values, 
 			reason, _ = v["error"].(string)
 			code, _ = v["code"].(string)
 			details, _ = v["details"].(string)
+			operation, _ = v["operation"].(string)
 			fields = readFields(v["fields"])
 			for _, k := range []string{"error_description", "message", "error"} {
 				if text, ok := v[k].(string); ok && text != "" {
@@ -263,7 +267,7 @@ func (c *Client) Do(ctx context.Context, method, path string, query url.Values, 
 				}
 			}
 		}
-		return nil, &Error{Status: resp.StatusCode, Message: message, Reason: reason, Code: code, Details: clip(details, maxErrorDetails), Fields: fields, Data: payload, RequestID: resp.Header.Get("X-Request-ID")}
+		return nil, &Error{Status: resp.StatusCode, Message: message, Reason: reason, Code: code, Details: clip(details, maxErrorDetails), Fields: fields, Data: payload, Operation: operation, RequestID: resp.Header.Get("X-Request-ID")}
 	}
 	return &Response{Body: data, Status: resp.StatusCode, Header: resp.Header}, nil
 }
