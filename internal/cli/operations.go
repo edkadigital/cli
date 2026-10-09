@@ -70,7 +70,7 @@ func (a *App) addOperation(parent *cobra.Command, name string, op catalog.Operat
 	}
 	cmd := &cobra.Command{Use: use, Short: short, Long: long + "\n\nUse --query key=value for filters. For writes, pass --data @file.json\nor --field name=value. Use name:=value for typed JSON fields.", Args: args}
 	if op.StepUp {
-		cmd.Long += "\n\nThis operation retains Edka's console step-up policy."
+		cmd.Long += "\n\nAn organization can ask for a passkey check before this operation. At a\nterminal, the command opens the check in your browser and waits for you to\nconfirm. `edka verify` confirms ahead of time."
 	}
 	if op.Confirm {
 		cmd.Long += "\n\nThis operation asks for confirmation before it runs, or takes --yes."

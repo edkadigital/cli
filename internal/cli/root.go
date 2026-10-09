@@ -69,6 +69,9 @@ type App struct {
 	upgradeCmd      *cobra.Command
 	// updateCheck is the lookup of a newer release this command started.
 	updateCheck *updateCheck
+	// verifying is set while a passkey check runs, so its own requests never
+	// start another.
+	verifying bool
 }
 
 func New(version string, in io.Reader, out, errOut io.Writer) *cobra.Command {
@@ -450,7 +453,24 @@ func (a *App) client(ctx context.Context) (*api.Client, error) {
 	}
 	return &api.Client{BaseURL: a.current.APIURL, Token: token, Organization: a.organization, Version: a.Version, HTTP: a.HTTP}, nil
 }
+
+// request sends an API request. A request that needs a passkey check runs the
+// check, and after the user confirms it, request sends it once more.
 func (a *App) request(ctx context.Context, method, path string, query url.Values, body []byte) (*api.Response, error) {
+	response, err := a.send(ctx, method, path, query, body)
+	var apiError *api.Error
+	if a.verifying || !errors.As(err, &apiError) || apiError.Status != http.StatusPreconditionRequired || apiError.Reason != stepUpRequired {
+		return response, err
+	}
+	if err := a.stepUp(ctx, apiError); err != nil {
+		return nil, err
+	}
+	// A request that still needs the check fails with that answer.
+	return a.send(ctx, method, path, query, body)
+}
+
+// send sends an API request once.
+func (a *App) send(ctx context.Context, method, path string, query url.Values, body []byte) (*api.Response, error) {
 	var response *api.Response
 	err := a.busy(ctx, func() error {
 		c, err := a.client(ctx)
@@ -681,5 +701,5 @@ func (a *App) addAuth(root *cobra.Command) {
 		return a.render(response)
 	}}
 	markLocal(login)
-	root.AddCommand(login, logout, whoami)
+	root.AddCommand(login, logout, whoami, a.verifyCommand())
 }

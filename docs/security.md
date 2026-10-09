@@ -7,6 +7,15 @@ request. Tokens cannot cross from MCP to CLI because audiences and scopes differ
 Browser identity and platform administration endpoints are excluded from CLI
 access. Existing identity step-up requirements remain enforced.
 
+An organization can ask for a passkey check before sensitive actions. The CLI
+never handles the passkey. At a terminal, a command that Edka refuses for the
+check opens it in the Edka console in your browser, prints the address, and waits
+up to 5 minutes for you to confirm there. A command without a terminal, in CI, or
+with `--no-input` starts the check, prints the address and stops. `edka verify`
+starts a check and waits for it. A confirmed check lets sensitive actions from the
+same CLI login run for 5 minutes. The CLI opens only http and https addresses that
+Edka returns.
+
 PKCE verifiers and states use 256 bits of cryptographic randomness. Authorization
 codes are accepted only on a loopback listener after state and issuer validation.
 The callback never renders codes or tokens. Access/refresh token exchanges use
@@ -66,9 +75,10 @@ lookup is in `update-check.json` in the configuration directory.
 
 A per-profile lock serializes refresh rotation and ensures the replacement refresh
 token is saved before a command uses it. Mutations are not retried automatically,
-with one exception. `env set` and `env unset` send a settings change again when Edka
-refused it because the deployment changed after they read it. The refusal saves
-nothing, so sending the change again cannot apply it twice.
+with two exceptions. `env set` and `env unset` send a settings change again when Edka
+refused it because the deployment changed after they read it. A request that Edka
+refused for a passkey check is sent once more after you confirm the check. Each
+refusal saves nothing, so sending the request again cannot apply it twice.
 Deletes and known destructive lifecycle routes require explicit confirmation in
 interactive terminals and `--yes` in CI. The route catalog marks those routes. A raw
 path's query string, percent-encoding and letter case do not change which route it
