@@ -19,13 +19,18 @@ import (
 
 // managedAddons are the add-ons the console installs, updates and removes
 // from another cluster view, with that view's settings, instead of Add-ons.
+// Envoy Gateway and MetalLB are not among them: the Gateway view changes them
+// with the same calls as any other add-on.
 var managedAddons = map[string]string{
 	"zot":                              "Registries",
-	"envoy-gateway":                    "Gateway",
 	"tailscale-operator":               "Gateway",
-	"metallb":                          "Gateway",
 	"cloudflared":                      "Gateway",
 	"github-actions-runner-controller": "Actions",
+}
+
+// addonUpdateNotes say what an update does beyond the add-on's own pods.
+var addonUpdateNotes = map[string]string{
+	"envoy-gateway": "The Envoy proxies roll out again, so every gateway class briefly serves traffic from new pods.",
 }
 
 // managedElsewhere refuses a change to an add-on that another console view manages.
@@ -434,6 +439,9 @@ func (a *App) updateAddons(ctx context.Context, wait bool, timeout time.Duration
 	plan := []string{fmt.Sprintf("Updates in cluster %s:", shown)}
 	for _, row := range updates {
 		plan = append(plan, fmt.Sprintf("  %s %s to %s", ui.Clean(text(row, "addon_name")), ui.Clean(text(row, "version")), ui.Clean(text(row, "catalog_version"))))
+		if note := addonUpdateNotes[text(row, "addon_name")]; note != "" {
+			plan = append(plan, "    "+note)
+		}
 	}
 	a.message("%s", strings.Join(plan, "\n"))
 	count := fmt.Sprintf("%d add-ons", len(updates))
@@ -655,6 +663,9 @@ func (a *App) addAddons(root *cobra.Command) {
 		id, err := safeID(text(c.Record, "cluster_id"))
 		if err != nil {
 			return err
+		}
+		if note := addonUpdateNotes[c.Name]; note != "" {
+			a.message("%s", note)
 		}
 		if err := a.confirm(fmt.Sprintf("Update add-on %s in cluster %s from %s to %s", c.Name, text(c.Record, "cluster_name"), current, target)); err != nil {
 			return err
