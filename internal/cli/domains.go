@@ -87,13 +87,16 @@ func (a *App) resolveDomain(ctx context.Context, target string) (*candidate, str
 	return c, path, err
 }
 
-// domainRecords lists the DNS records a domain needs, as the console does: the
-// record that validates its certificate, then one record for each address of
-// its traffic class, for the domain and for an apex it includes.
+// domainRecords lists the DNS records a domain needs: the record that
+// validates its certificate, then one record for each address of its traffic
+// class, for the domain and for an apex it includes. The records of a wildcard
+// name are optional. They send every name under it that has no record of its
+// own to the cluster, so a zone with other hosts points only the hostnames the
+// cluster serves.
 func domainRecords(domain, class, delegation map[string]any) []map[string]any {
 	records := []map[string]any{}
 	if value := text(delegation, "record_value"); value != "" {
-		records = append(records, map[string]any{"name": text(delegation, "record_name"), "type": first(text(delegation, "record_type"), "CNAME"), "value": value, "purpose": "certificate"})
+		records = append(records, map[string]any{"name": text(delegation, "record_name"), "type": first(text(delegation, "record_type"), "CNAME"), "value": value, "purpose": "certificate", "required": true})
 	}
 	names := []string{text(domain, "domain")}
 	if isWildcard(domain) && domain["include_apex"] == true {
@@ -102,13 +105,18 @@ func domainRecords(domain, class, delegation map[string]any) []map[string]any {
 	// A Tailscale class is reached by its name, not by its tailnet address.
 	tailscale := text(class, "exposure_mode") == "tailscale-byod"
 	for _, name := range names {
+		optional := strings.HasPrefix(name, "*.")
+		purpose := "traffic"
+		if optional {
+			purpose = "traffic, optional"
+		}
 		for _, kind := range []string{"A", "AAAA", "CNAME"} {
 			for _, item := range asList(class["load_balancer_ips"]) {
 				address, _ := item.(string)
 				if address = strings.TrimSpace(address); address == "" || recordType(address) != kind || tailscale && kind != "CNAME" {
 					continue
 				}
-				record := map[string]any{"name": name, "type": kind, "value": address, "purpose": "traffic"}
+				record := map[string]any{"name": name, "type": kind, "value": address, "purpose": purpose, "required": !optional}
 				if !slices.ContainsFunc(records, func(r map[string]any) bool {
 					return r["name"] == name && r["type"] == kind && r["value"] == address
 				}) {
@@ -211,7 +219,19 @@ func (a *App) showDomain(view map[string]any, clusterName string) error {
 		return nil
 	}
 	fmt.Fprintln(a.Out)
-	return ui.Table(a.Out, []ui.Column{ui.Field("RECORD", "name"), ui.Field("TYPE", "type"), ui.Field("VALUE", "value"), ui.Field("FOR", "purpose")}, records, a.color)
+	if err := ui.Table(a.Out, []ui.Column{ui.Field("RECORD", "name"), ui.Field("TYPE", "type"), ui.Field("VALUE", "value"), ui.Field("FOR", "purpose")}, records, a.color); err != nil {
+		return err
+	}
+	if slices.ContainsFunc(records, func(r map[string]any) bool { return r["required"] == false }) {
+		a.message("The %s records are optional. They send every name under %s that has no record of its own to the cluster. With other hosts in the zone, point only the hostnames the cluster serves at the same addresses.", ui.Clean(text(domain, "domain")), ui.Clean(apexOf(domain)))
+	}
+	return nil
+}
+
+// askApex asks whether a wildcard's certificate covers its apex too, as the
+// console's Include switch does.
+func (a *App) askApex(apex string) (bool, error) {
+	return a.askYesNo(fmt.Sprintf("Include %s? It shares the DNS validation and the certificate", ui.Clean(apex)), false)
 }
 
 // quoted is a domain as a shell takes it: a wildcard needs quotes.
@@ -243,7 +263,7 @@ func (a *App) addDomains(root *cobra.Command) {
 
 	var class, validation string
 	var apex bool
-	add := &cobra.Command{Use: "add <domain>", Short: "Add a domain to a cluster", Long: "Add a hostname or a wildcard to the linked or selected cluster. The traffic\nclass --class names serves it, or the cluster's default one.\n\nA wildcard such as *.example.com is validated over DNS, and --apex makes its\ncertificate cover example.com too. A hostname is validated over HTTP, which\nneeds a public traffic class, or over DNS with --validation dns-01.\n\nThe command prints the DNS records to create. For a domain validated over DNS,\ncreate them and run `edka domains verify <domain>`.", Args: cobra.ExactArgs(1), Example: "  edka domains add '*.example.com' --apex\n  edka domains add app.example.com\n  edka domains add internal.example.com --class eg-ts --validation dns-01", RunE: func(cmd *cobra.Command, args []string) error {
+	add := &cobra.Command{Use: "add <domain>", Short: "Add a domain to a cluster", Long: "Add a hostname or a wildcard to the linked or selected cluster. The traffic\nclass --class names serves it, or the cluster's default one.\n\nA wildcard such as *.example.com is validated over DNS, and --apex makes its\ncertificate cover example.com too. In a terminal, a wildcard without --apex\nasks whether to include it. A hostname is validated over HTTP, which\nneeds a public traffic class, or over DNS with --validation dns-01.\n\nThe command prints the DNS records to create. For a domain validated over DNS,\ncreate them and run `edka domains verify <domain>`.", Args: cobra.ExactArgs(1), Example: "  edka domains add '*.example.com' --apex\n  edka domains add app.example.com\n  edka domains add internal.example.com --class eg-ts --validation dns-01", RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, name := cmd.Context(), strings.ToLower(strings.TrimSpace(args[0]))
 		wildcard := strings.HasPrefix(name, "*.")
 		switch {
@@ -280,6 +300,19 @@ func (a *App) addDomains(root *cobra.Command) {
 			return fmt.Errorf("cluster %s has no default traffic class; pass --class with one of %s", ui.Clean(cluster.Name), ui.Clean(strings.Join(known, ", ")))
 		case !slices.Contains(known, class):
 			return fmt.Errorf("cluster %s has no traffic class %q; choose one of %s", ui.Clean(cluster.Name), class, ui.Clean(strings.Join(known, ", ")))
+		}
+		// In a terminal, a wildcard asks about its apex unless --apex answers,
+		// or the cluster has the apex as a domain of its own.
+		if wildcard && !cmd.Flags().Changed("apex") && !a.noInput && ui.IsTerminal(a.Err) {
+			existing, err := a.objects(ctx, "/api/clusters/"+id+"/domains")
+			if err != nil {
+				return err
+			}
+			if apexName := strings.TrimPrefix(name, "*."); recordWith(existing, "domain", apexName) == nil {
+				if apex, err = a.askApex(apexName); err != nil {
+					return err
+				}
+			}
 		}
 		body := map[string]any{"domain": name, "ingress_class": class, "include_apex": apex}
 		if validation != "" {

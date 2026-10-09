@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 )
@@ -74,11 +76,14 @@ func TestDomainsListAndGet(t *testing.T) {
 		}
 	}
 
-	// A wildcard needs the record that validates it, and an address record for
-	// itself and for the apex it includes, IPv4 first.
-	out, _, err = execute(t, base, "domains", "get", "*.example.com")
+	// A wildcard needs the record that validates it. Its own address records
+	// are optional, and the apex it includes gets address records, IPv4 first.
+	out, errOut, err := execute(t, base, "domains", "get", "*.example.com")
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !strings.Contains(errOut, "The *.example.com records are optional. They send every name under example.com that has no record of its own to the cluster.") {
+		t.Fatal(errOut)
 	}
 	for _, want := range []string{
 		"Apex example.com included",
@@ -86,28 +91,33 @@ func TestDomainsListAndGet(t *testing.T) {
 		"Certificate ready: Certificate is up to date and has not expired Expires 2026-11-06 DNS ready: DNS verified.",
 		"RECORD TYPE VALUE FOR " +
 			"_acme-challenge.example.com CNAME abc123.acme.edka.net certificate " +
-			"*.example.com A 203.0.113.7 traffic *.example.com AAAA 2a01:db8::1 traffic " +
+			"*.example.com A 203.0.113.7 traffic, optional *.example.com AAAA 2a01:db8::1 traffic, optional " +
 			"example.com A 203.0.113.7 traffic example.com AAAA 2a01:db8::1 traffic",
 	} {
 		if !strings.Contains(squeeze(out), want) {
 			t.Fatalf("want %q in\n%s", want, out)
 		}
 	}
-	// A hostname validated over HTTP has no validation record.
-	out, _, err = execute(t, base, "domains", "get", "app.example.org")
-	if err != nil || !strings.Contains(squeeze(out), "RECORD TYPE VALUE FOR app.example.org A 203.0.113.7 traffic app.example.org AAAA 2a01:db8::1 traffic") || strings.Contains(out, "Apex") || strings.Contains(out, "certificate\n") {
-		t.Fatal(out, err)
+	// A hostname validated over HTTP has no validation record, and its address
+	// records are required.
+	out, errOut, err = execute(t, base, "domains", "get", "app.example.org")
+	if err != nil || !strings.Contains(squeeze(out), "RECORD TYPE VALUE FOR app.example.org A 203.0.113.7 traffic app.example.org AAAA 2a01:db8::1 traffic") || strings.Contains(out, "Apex") || strings.Contains(out, "certificate\n") || strings.Contains(errOut, "optional") {
+		t.Fatal(out, errOut, err)
 	}
 	// A Tailscale class is reached by its name.
 	out, _, err = execute(t, base, "domains", "get", "*.ts.example.com", "--json")
 	var view struct {
 		Data struct {
-			Records []map[string]string `json:"dns_records"`
-			Domain  map[string]any      `json:"domain"`
+			Records []map[string]any `json:"dns_records"`
+			Domain  map[string]any   `json:"domain"`
 		} `json:"data"`
 	}
 	if err != nil || json.Unmarshal([]byte(out), &view) != nil || len(view.Data.Records) != 2 || view.Data.Records[1]["type"] != "CNAME" || view.Data.Records[1]["value"] != "gw.tailnet.ts.net" || view.Data.Domain["id"] != "t1" {
 		t.Fatal(out, err)
+	}
+	// JSON says which records a domain needs.
+	if view.Data.Records[0]["required"] != true || view.Data.Records[1]["required"] != false {
+		t.Fatal(view.Data.Records)
 	}
 }
 
@@ -297,5 +307,22 @@ func TestRecordTypeFollowsTheAddress(t *testing.T) {
 		if got := recordType(address); got != want {
 			t.Errorf("%s: %s, want %s", address, got, want)
 		}
+	}
+}
+
+func TestDomainAddAsksAboutTheApex(t *testing.T) {
+	var errOut bytes.Buffer
+	a := &App{In: strings.NewReader("maybe\ny\n"), Err: &errOut}
+	include, err := a.askApex("example.com")
+	if err != nil || !include {
+		t.Fatal(include, err)
+	}
+	if !strings.Contains(errOut.String(), "Include example.com? It shares the DNS validation and the certificate [y/N] ") {
+		t.Fatal(errOut.String())
+	}
+	// An empty answer leaves the apex out, like the console's switch.
+	a = &App{In: strings.NewReader("\n"), Err: io.Discard}
+	if include, err := a.askApex("example.com"); err != nil || include {
+		t.Fatal(include, err)
 	}
 }
