@@ -91,7 +91,10 @@ A prompted value that contains an escape character is refused, because a termina
 late answer to a query would otherwise become part of the secret.
 `apps install` refuses secret settings in `--set` and takes them from a hidden prompt
 or a `--data` file. `registries add` reads a registry's password the same way, at a
-hidden prompt or from stdin, and Edka never returns it. `secrets set` reads each
+hidden prompt or from stdin, and Edka never returns it.
+`domains add --dns-provider cloudflare` and `domains update --replace-token` read a
+Cloudflare API token from `CLOUDFLARE_API_TOKEN`, from stdin or at a hidden prompt,
+never from an argument, and Edka never returns it either. `secrets set` reads each
 value at a hidden prompt, from stdin or from a file, never from an argument, and
 `secrets list` and `secrets get` show keys only. The terminal stops echoing before a hidden prompt appears.
 

@@ -40,7 +40,11 @@ commands refuse a cluster that has one and send nothing.
 records the console lists: the CNAME Edka returns for a certificate validated over
 DNS, and one record for each address of the domain's traffic class, CNAME only for
 a Tailscale class. When the cluster can't be reached, it shows the status Edka last
-recorded and no validation record, which Edka alone can build.
+recorded and no validation record, which Edka alone can build. A domain whose
+`dns_provider` is `cloudflare` has no CNAME. cert-manager writes the TXT record at
+`_acme-challenge` in the domain's Cloudflare zone. `get` shows the zone Edka
+recorded and that record's name, in `challenge` with `--json`, and leaves the
+record out of `dns_records`, which are the records to create.
 
 Each generated command maps to one method and path, and takes path flags, query
 parameters, a JSON body and typed fields. The catalog records the revision of the
