@@ -94,7 +94,7 @@ func registryPath(name string) (string, error) {
 // and the process list would keep. retry is the command as the user ran it,
 // which a hint pipes the password to.
 func (a *App) registryPassword(ctx context.Context, name, username, retry string) (string, error) {
-	return a.oneSecret(ctx, "the password", fmt.Sprintf("Password or token of %s for registry %s: ", ui.Clean(username), ui.Clean(name)), fmt.Errorf("pipe the password on stdin: printf %%s \"$PASSWORD\" | %s", retry))
+	return a.oneSecret(ctx, "the password", fmt.Sprintf("Password or token of %s for registry %s: ", ui.Clean(username), ui.Clean(name)), fmt.Errorf("pipe the password on stdin: %s", pipeHint("PASSWORD", retry)))
 }
 
 // bytesOf prints a size in the binary units Kubernetes uses.

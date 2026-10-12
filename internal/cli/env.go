@@ -227,7 +227,7 @@ func envAssignments(args []string, secret bool, retry func(key string) string) (
 		key, value, assigned := strings.Cut(arg, "=")
 		switch {
 		case secret && assigned:
-			return nil, nil, fmt.Errorf("secret values go at the prompt or on stdin, not in arguments that shell history keeps; for example: printf %%s \"$VALUE\" | %s", retry(key))
+			return nil, nil, fmt.Errorf("secret values go at the prompt or on stdin, not in arguments that shell history keeps; for example: %s", pipeHint("VALUE", retry(key)))
 		case !secret && !assigned:
 			return nil, nil, fmt.Errorf("set a variable as KEY=value, or a secret with --secret: %q", arg)
 		case !envName.MatchString(key):
@@ -332,7 +332,7 @@ func secretsPlan(keys []string, values map[string]string) envPlan {
 // command that sets the secret named key from stdin.
 func (a *App) secretValues(ctx context.Context, name string, keys []string, retry func(key string) string) (map[string]string, error) {
 	values := map[string]string{}
-	if !ui.InputTerminal(a.In) {
+	if !stdinTerminal(a) {
 		if len(keys) != 1 {
 			return nil, fmt.Errorf("stdin holds one secret value; set one secret at a time")
 		}
@@ -344,7 +344,7 @@ func (a *App) secretValues(ctx context.Context, name string, keys []string, retr
 		return values, nil
 	}
 	if a.noInput {
-		return nil, fmt.Errorf("pipe the value on stdin: printf %%s \"$VALUE\" | %s", retry(keys[0]))
+		return nil, errors.New(pipeEach(keys, retry))
 	}
 	for _, key := range keys {
 		value, err := a.promptSecret(ctx, fmt.Sprintf("Value for %s on %s: ", key, ui.Clean(name)), key)
@@ -354,6 +354,20 @@ func (a *App) secretValues(ctx context.Context, name string, keys []string, retr
 		values[key] = value
 	}
 	return values, nil
+}
+
+// stdinTerminal says whether stdin is a terminal, where a value is asked at a
+// hidden prompt rather than read from stdin. Tests replace it.
+var stdinTerminal = func(a *App) bool { return ui.InputTerminal(a.In) }
+
+// pipeEach is the hint that sets keys from stdin, which holds one value: a run
+// for each key, where retry is the command that sets one.
+func pipeEach(keys []string, retry func(key string) string) string {
+	run := pipeHint("VALUE", retry(keys[0]))
+	if len(keys) == 1 {
+		return "pipe the value on stdin: " + run
+	}
+	return fmt.Sprintf("pipe each value on stdin, one key per run: %s, then the same for %s", run, strings.Join(keys[1:], ", "))
 }
 
 // stdinSecret reads the one secret value on a stdin that is not a terminal,
@@ -384,14 +398,14 @@ type emptyStdin string
 func (what emptyStdin) Error() string { return "no value for " + string(what) + " on stdin" }
 
 // oneSecret reads one secret value from a stdin that is not a terminal, or at
-// a hidden prompt. noInput is the error when the command may not prompt. what
+// a hidden prompt. refusal is the error when the command may not prompt. what
 // names the value in an error.
-func (a *App) oneSecret(ctx context.Context, what, prompt string, noInput error) (string, error) {
-	if !ui.InputTerminal(a.In) {
+func (a *App) oneSecret(ctx context.Context, what, prompt string, refusal error) (string, error) {
+	if !stdinTerminal(a) {
 		return a.stdinSecret(what)
 	}
 	if a.noInput {
-		return "", noInput
+		return "", refusal
 	}
 	return a.promptSecret(ctx, prompt, what)
 }

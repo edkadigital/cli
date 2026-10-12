@@ -1067,3 +1067,63 @@ func TestInvocationRepeatsTheFlagsSet(t *testing.T) {
 		}
 	}
 }
+
+// A command to run next carries the global flags that choose where it acts,
+// and leaves out the ones that only change how this command ran.
+func TestFollowUpCarriesTheContextFlags(t *testing.T) {
+	root := New("test", strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
+	cmd, rest, err := root.Find(strings.Fields("domains add *.example.com --cluster prod --profile work --organization o1 --json --no-input"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.ParseFlags(rest); err != nil {
+		t.Fatal(err)
+	}
+	if got := followUp(cmd, "domains", "verify", "*.example.com", "--wait"); got != "edka domains verify '*.example.com' --wait --profile work --organization o1 --cluster prod" {
+		t.Fatal(got)
+	}
+	// A name from Edka cannot write escape sequences to the terminal.
+	if got := followUp(cmd, "domains", "get", "x\x1b[2J.example.com"); got != "edka domains get 'x.example.com' --profile work --organization o1 --cluster prod" {
+		t.Fatal(got)
+	}
+}
+
+// terminalStdin makes the commands take stdin for a terminal, where they ask
+// for a value at a prompt unless --no-input forbids it.
+func terminalStdin(t *testing.T) {
+	t.Helper()
+	previous := stdinTerminal
+	stdinTerminal = func(*App) bool { return true }
+	t.Cleanup(func() { stdinTerminal = previous })
+}
+
+// With --no-input, a command that needs a secret it may not prompt for gives
+// the command that pipes it, as the user ran it, and sends nothing.
+func TestNoInputHintsRepeatTheCommand(t *testing.T) {
+	terminalStdin(t)
+	t.Setenv("EDKA_CLOUDFLARE_API_TOKEN", "")
+	domains, domainsBase := domainAPI(t, nil)
+	cloudflare, cloudflareBase := cloudflareDomainAPI(t, nil)
+	registries, registriesBase := registryAPI(t, nil)
+	envServer, envBodies := envAPI(t, envConfig)
+	secrets, secretsBase := secretAPI(t, nil)
+	for _, test := range []struct {
+		base, line, want string
+	}{
+		{domainsBase, "domains add *.shop.example.com --dns-provider cloudflare --cluster sinaia", `set EDKA_CLOUDFLARE_API_TOKEN, or pipe the token on stdin: printf %s "$TOKEN" | edka domains add '*.shop.example.com' --cluster sinaia --dns-provider cloudflare --no-input`},
+		{cloudflareBase, "domains update *.cf.example.com --replace-token --apex", `set EDKA_CLOUDFLARE_API_TOKEN, or pipe the token on stdin: printf %s "$TOKEN" | edka domains update '*.cf.example.com' --apex --no-input --replace-token`},
+		{registriesBase, "registries add quay --type custom --url quay.io --username robot", `pipe the password on stdin: printf %s "$PASSWORD" | edka registries add quay --no-input --type custom --url quay.io --username robot`},
+		{envServer.URL, "env set --secret DATABASE_URL --deployment api", `pipe the value on stdin: printf %s "$VALUE" | edka env set DATABASE_URL --deployment api --no-input --secret`},
+		// Stdin holds one value, so each key takes a run of its own.
+		{envServer.URL, "env set --secret DATABASE_URL SESSION_KEY --deployment api", `pipe each value on stdin, one key per run: printf %s "$VALUE" | edka env set DATABASE_URL --deployment api --no-input --secret, then the same for SESSION_KEY`},
+		{secretsBase, "secrets --cluster sinaia set database PASSWORD HOST --namespace shop", `pipe each value on stdin, one key per run: printf %s "$VALUE" | edka secrets set database PASSWORD --cluster sinaia --namespace shop --no-input, then the same for HOST`},
+	} {
+		_, _, err := execute(t, test.base, append(strings.Fields(test.line), "--no-input")...)
+		if err == nil || err.Error() != test.want {
+			t.Errorf("edka %s: %v\nwant %s", test.line, err, test.want)
+		}
+	}
+	if domains.writes() != 0 || cloudflare.writes() != 0 || registries.writes() != 0 || len(*envBodies) != 0 || secrets.writes() != 0 {
+		t.Fatal(domains.requests, cloudflare.requests, registries.requests, *envBodies, secrets.requests)
+	}
+}

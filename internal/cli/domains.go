@@ -55,7 +55,7 @@ func (a *App) cloudflareToken(ctx context.Context, domain, retry string) (string
 		a.message("Using the Cloudflare API token in %s", cloudflareTokenEnv)
 		return token, nil
 	}
-	token, err := a.oneSecret(ctx, "the Cloudflare API token", fmt.Sprintf("Cloudflare API token for %s: ", ui.Clean(domain)), fmt.Errorf("set %s, or pipe the token on stdin: printf %%s \"$TOKEN\" | %s", cloudflareTokenEnv, retry))
+	token, err := a.oneSecret(ctx, "the Cloudflare API token", fmt.Sprintf("Cloudflare API token for %s: ", ui.Clean(domain)), fmt.Errorf("set %s, or pipe the token on stdin: %s", cloudflareTokenEnv, pipeHint("TOKEN", retry)))
 	// Piping the token, or the variable, helps only when stdin held nothing.
 	if errors.As(err, new(emptyStdin)) {
 		return "", fmt.Errorf("%w; pipe it, or set %s", err, cloudflareTokenEnv)
@@ -277,9 +277,6 @@ func (a *App) askApex(apex string) (bool, error) {
 	return a.askYesNo(fmt.Sprintf("Include %s? It shares the DNS validation and the certificate", ui.Clean(apex)), false)
 }
 
-// quoted is a domain as a shell takes it: a wildcard needs quotes.
-func quoted(domain string) string { return shellJoin([]string{domain}) }
-
 func (a *App) addDomains(root *cobra.Command) {
 	domains := &cobra.Command{Use: "domains", Aliases: []string{"domain"}, Short: "Add domains, issue their certificates and delete them", Long: "Manage the domains of a cluster. A domain is a hostname, such as\napp.example.com, or a wildcard, such as *.example.com, that a traffic class of\nthe cluster serves over HTTPS with a Let's Encrypt certificate.\n\nA wildcard is validated over DNS: you create one CNAME record, then run\n`edka domains verify <domain>`. With\n`edka domains add <domain> --dns-provider cloudflare`, cert-manager writes the\nchallenge TXT record in your Cloudflare zone with an API token instead. A\nhostname is validated over HTTP once it points at the cluster.\n`edka domains get` lists the DNS records a domain needs. Quote a wildcard, so\nthe shell leaves the * alone.", GroupID: "resources", Example: "  edka domains list\n  edka domains add '*.example.com' --apex\n  edka domains get '*.example.com'\n  edka domains verify '*.example.com' --wait\n  edka domains add '*.example.org' --dns-provider cloudflare\n  edka domains add app.example.com\n  edka domains delete app.example.com"}
 	a.strictGroup(domains)
@@ -401,14 +398,14 @@ func (a *App) addDomains(root *cobra.Command) {
 		if err := a.showDomain(view, cluster.Name); err != nil {
 			return err
 		}
-		domain := quoted(text(created, "domain"))
+		domain := text(created, "domain")
 		switch {
 		case viaCloudflare(created):
-			a.message("Next: create the records. Edka issues the certificate through the Cloudflare zone; follow it with `edka domains verify %s --wait`", domain)
+			a.message("Next: create the records. Edka issues the certificate through the Cloudflare zone; follow it with `%s`", followUp(cmd, "domains", "verify", domain, "--wait"))
 		case validationOf(created) == "dns-01":
-			a.message("Next: create the records, then run `edka domains verify %s`", domain)
+			a.message("Next: create the records, then run `%s`", followUp(cmd, "domains", "verify", domain))
 		default:
-			a.message("Next: create the records. Edka issues the certificate once the hostname reaches the cluster; check it with `edka domains get %s`", domain)
+			a.message("Next: create the records. Edka issues the certificate once the hostname reaches the cluster; check it with `%s`", followUp(cmd, "domains", "get", domain))
 		}
 		return nil
 	}}
@@ -445,7 +442,7 @@ func (a *App) addDomains(root *cobra.Command) {
 		}
 		name := ui.Clean(c.Name)
 		if validationOf(c.Record) != "dns-01" {
-			return fmt.Errorf("%s is validated over HTTP: Edka issues its certificate once the hostname reaches the cluster; check it with `edka domains get %s`", name, quoted(c.Name))
+			return fmt.Errorf("%s is validated over HTTP: Edka issues its certificate once the hostname reaches the cluster; check it with `%s`", name, followUp(cmd, "domains", "get", c.Name))
 		}
 		body := map[string]any{}
 		if len(namespaces) > 0 {
@@ -480,7 +477,7 @@ func (a *App) addDomains(root *cobra.Command) {
 				if waitCtx.Err() == nil {
 					return err
 				}
-				return fmt.Errorf("the certificate for %s is not ready yet: %w; Edka keeps checking, follow it with `edka domains get %s`", name, waitCtx.Err(), quoted(c.Name))
+				return fmt.Errorf("the certificate for %s is not ready yet: %w; Edka keeps checking, follow it with `%s`", name, waitCtx.Err(), followUp(cmd, "domains", "get", c.Name))
 			}
 			for text(certificate, "state") != "ready" {
 				if text(certificate, "state") == "error" {
@@ -506,7 +503,7 @@ func (a *App) addDomains(root *cobra.Command) {
 			}
 			a.message("✓ The certificate for %s is ready%s", name, valid)
 		} else {
-			a.message("Edka keeps checking. Follow it with `edka domains get %s`, or run verify with --wait", quoted(c.Name))
+			a.message("Edka keeps checking. Follow it with `%s`, or run verify with --wait", followUp(cmd, "domains", "get", c.Name))
 		}
 		if a.output != "table" {
 			return ui.Render(a.Out, jsonBody(map[string]any{"data": view}), a.output, false)
@@ -566,7 +563,7 @@ func (a *App) addDomains(root *cobra.Command) {
 			}
 			response = apexResponse
 			if includeApex {
-				a.message("✓ %s includes %s\n  Its DNS records: edka domains get %s", name, ui.Clean(apexOf(c.Record)), quoted(c.Name))
+				a.message("✓ %s includes %s\n  Its DNS records: %s", name, ui.Clean(apexOf(c.Record)), followUp(cmd, "domains", "get", c.Name))
 			} else {
 				a.message("✓ %s leaves out %s", name, ui.Clean(apexOf(c.Record)))
 			}

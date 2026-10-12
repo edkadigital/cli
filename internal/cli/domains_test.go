@@ -156,7 +156,7 @@ func TestDomainAdd(t *testing.T) {
 	if got := api.body("POST /api/clusters/c1/domains"); got != `{"domain":"*.shop.example.com","include_apex":true,"ingress_class":"eg"}` {
 		t.Fatal(got)
 	}
-	inOrder(t, errOut, "✓ Added *.shop.example.com to cluster sinaia\n", "  Note: _acme-challenge.shop.example.com points at another cluster.\n", "Next: create the records, then run `edka domains verify '*.shop.example.com'`\n")
+	inOrder(t, errOut, "✓ Added *.shop.example.com to cluster sinaia\n", "  Note: _acme-challenge.shop.example.com points at another cluster.\n", "Next: create the records, then run `edka domains verify '*.shop.example.com' --cluster sinaia`\n")
 	if !strings.Contains(squeeze(out), "_acme-challenge.shop.example.com CNAME new789.acme.edka.net certificate *.shop.example.com A 203.0.113.7 traffic") || !strings.Contains(squeeze(out), "shop.example.com AAAA 2a01:db8::1 traffic") {
 		t.Fatal(out)
 	}
@@ -173,7 +173,7 @@ func TestDomainAdd(t *testing.T) {
 	web := `{"id":"n3","cluster_id":"c1","domain":"www.example.org","ingress_class":"eg","is_wildcard":false,"validation_method":"http-01"}`
 	_, base = domainAPI(t, map[string][]string{"POST /api/clusters/c1/domains": {`{"success":true,"data":` + web + `}`}})
 	_, errOut, err = execute(t, base, "domains", "add", "www.example.org", "--cluster", "sinaia")
-	if err != nil || !strings.Contains(errOut, "Next: create the records. Edka issues the certificate once the hostname reaches the cluster; check it with `edka domains get www.example.org`") {
+	if err != nil || !strings.Contains(errOut, "Next: create the records. Edka issues the certificate once the hostname reaches the cluster; check it with `edka domains get www.example.org --cluster sinaia`") {
 		t.Fatal(errOut, err)
 	}
 
@@ -430,7 +430,7 @@ func TestDomainAddWithACloudflareToken(t *testing.T) {
 	if got := api.body("POST /api/clusters/c1/domains"); got != `{"cloudflare_api_token":"cf-token","dns_provider":"cloudflare","domain":"*.shop.example.com","include_apex":false,"ingress_class":"eg"}` {
 		t.Fatal(got)
 	}
-	inOrder(t, errOut, "✓ Added *.shop.example.com to cluster sinaia\n", "Next: create the records. Edka issues the certificate through the Cloudflare zone; follow it with `edka domains verify '*.shop.example.com' --wait`\n")
+	inOrder(t, errOut, "✓ Added *.shop.example.com to cluster sinaia\n", "Next: create the records. Edka issues the certificate through the Cloudflare zone; follow it with `edka domains verify '*.shop.example.com' --wait --cluster sinaia`\n")
 	if !strings.Contains(squeeze(out), "Cloudflare zone example.com Challenge record _acme-challenge.shop.example.com TXT") || strings.Contains(out, "CNAME") || strings.Contains(out+errOut, "cf-token") || strings.Contains(errOut, "Using the Cloudflare API token") {
 		t.Fatal(out, errOut)
 	}
@@ -463,7 +463,7 @@ func TestDomainAddWithACloudflareToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(errOut, err)
 	}
-	inOrder(t, errOut, "✓ Added *.shop.example.com to cluster sinaia\n", "  Note: Edka added the domain without the Cloudflare API token. It validates with the CNAME record below.\n", "Next: create the records, then run `edka domains verify '*.shop.example.com'`\n")
+	inOrder(t, errOut, "✓ Added *.shop.example.com to cluster sinaia\n", "  Note: Edka added the domain without the Cloudflare API token. It validates with the CNAME record below.\n", "Next: create the records, then run `edka domains verify '*.shop.example.com' --cluster sinaia`\n")
 	if !strings.Contains(squeeze(out), "_acme-challenge.shop.example.com CNAME new789.acme.edka.net certificate") || strings.Contains(out, "Cloudflare zone") {
 		t.Fatal(out)
 	}

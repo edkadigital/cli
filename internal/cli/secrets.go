@@ -144,7 +144,7 @@ func (a *App) secretInput(ctx context.Context, t secretTarget, keys []string, fi
 	switch {
 	case len(asked) == 0:
 		return values, nil
-	case !ui.InputTerminal(a.In):
+	case !stdinTerminal(a):
 		if len(asked) != 1 {
 			return nil, fmt.Errorf("stdin holds one value; set one key at a time, or give the others with --from-file")
 		}
@@ -155,7 +155,7 @@ func (a *App) secretInput(ctx context.Context, t secretTarget, keys []string, fi
 		values[asked[0]] = value
 		return values, nil
 	case a.noInput:
-		return nil, fmt.Errorf("pipe the value on stdin: printf %%s \"$VALUE\" | %s", retry(asked[0]))
+		return nil, errors.New(pipeEach(asked, retry))
 	}
 	for _, key := range asked {
 		value, err := a.promptSecret(ctx, fmt.Sprintf("Value for %s in secret %s: ", key, t.name), key)
@@ -224,7 +224,7 @@ func (a *App) addSecrets(root *cobra.Command) {
 		keys, files := []string{}, map[string]string{}
 		for _, key := range args[1:] {
 			if name, _, assigned := strings.Cut(key, "="); assigned {
-				return fmt.Errorf("values go at the prompt or on stdin, not in arguments that shell history keeps; for example: printf %%s \"$VALUE\" | %s", oneKey(name))
+				return fmt.Errorf("values go at the prompt or on stdin, not in arguments that shell history keeps; for example: %s", pipeHint("VALUE", oneKey(name)))
 			}
 			keys = append(keys, key)
 		}
