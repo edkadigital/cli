@@ -244,7 +244,7 @@ func TestDomainVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	inOrder(t, errOut, "DNS: pending: The CNAME record was not found yet.\n", "Certificate: not_found: No certificate yet\n", "Create this record at your DNS provider: _acme-challenge.example.com CNAME abc123.acme.edka.net\n", "Edka keeps checking. Follow it with `edka domains get '*.example.com'`, or run verify with --wait\n")
+	inOrder(t, errOut, "DNS: pending: The CNAME record was not found yet.\n", "Certificate: not_found: No certificate yet\n", "Create this record at your DNS provider: _acme-challenge.example.com CNAME abc123.acme.edka.net\n", "Edka keeps checking. Follow it with `edka domains get '*.example.com' --cluster sinaia`, or run verify with --wait\n")
 
 	// --wait follows the status until the certificate is ready, and prints a
 	// status once while it stays the same.
@@ -269,15 +269,31 @@ func TestDomainVerify(t *testing.T) {
 	}
 
 	_, base = domainAPI(t, map[string][]string{"POST /api/clusters/c1/domains/w1/wildcard-tls": {pending}, "GET /api/clusters/c1/domains/w1/wildcard-tls": {pending}})
-	if _, _, err := execute(t, base, "domains", "verify", "*.example.com", "--wait", "--wait-timeout", "40ms"); err == nil || !strings.Contains(err.Error(), "the certificate for *.example.com is not ready yet: context deadline exceeded; Edka keeps checking, follow it with `edka domains get '*.example.com'`") {
+	if _, _, err := execute(t, base, "domains", "verify", "*.example.com", "--wait", "--wait-timeout", "40ms"); err == nil || !strings.Contains(err.Error(), "the certificate for *.example.com is not ready yet: context deadline exceeded; Edka keeps checking, follow it with `edka domains get '*.example.com' --cluster sinaia`") {
 		t.Fatal(err)
+	}
+}
+
+func TestDomainHintsNameTheClusterOfTheDomain(t *testing.T) {
+	other := `{"id":"b1","cluster_id":"c2","domain":"*.brasov.example.com","ingress_class":"eg","is_wildcard":true,"include_apex":false,"validation_method":"dns-01","acme_delegation_id":"ghi789","tls_status":null}`
+	record := `{"record_name":"_acme-challenge.brasov.example.com","record_type":"CNAME","record_value":"ghi789.acme.edka.net"}`
+	api, base := domainAPI(t, map[string][]string{
+		"GET /api/clusters":                             {`{"data":[{"id":"c1","name":"sinaia"},{"id":"c2","name":"brasov"}]}`},
+		"GET /api/clusters/c2/domains":                  {`{"success":true,"data":[` + other + `]}`},
+		"POST /api/clusters/c2/domains/b1/wildcard-tls": {tlsView(other, record, missingStatus, missingDNS)},
+	})
+	// With no cluster set, verify finds the domain in brasov, and the hint
+	// names brasov rather than the first cluster.
+	_, errOut, err := execute(t, base, "domains", "verify", "*.brasov.example.com")
+	if err != nil || api.count("POST /api/clusters/c2/domains/b1/wildcard-tls") != 1 || !strings.Contains(errOut, "Edka keeps checking. Follow it with `edka domains get '*.brasov.example.com' --cluster brasov`, or run verify with --wait\n") {
+		t.Fatal(errOut, err, api.requests)
 	}
 }
 
 func TestDomainUpdateAndDelete(t *testing.T) {
 	api, base := domainAPI(t, map[string][]string{"PATCH /api/clusters/c1/domains/t1": {`{"success":true,"data":{"id":"t1","include_apex":true}}`}})
 	out, errOut, err := execute(t, base, "domains", "update", "*.ts.example.com", "--apex", "--json")
-	if err != nil || api.body("PATCH /api/clusters/c1/domains/t1") != `{"include_apex":true}` || !strings.Contains(errOut, "✓ *.ts.example.com includes ts.example.com\n  Its DNS records: edka domains get '*.ts.example.com'") || !strings.Contains(out, `"include_apex": true`) {
+	if err != nil || api.body("PATCH /api/clusters/c1/domains/t1") != `{"include_apex":true}` || !strings.Contains(errOut, "✓ *.ts.example.com includes ts.example.com\n  Its DNS records: edka domains get '*.ts.example.com' --cluster sinaia\n") || !strings.Contains(out, `"include_apex": true`) {
 		t.Fatal(out, errOut, err, api.body("PATCH /api/clusters/c1/domains/t1"))
 	}
 	_, errOut, err = execute(t, base, "domains", "update", "*.ts.example.com", "--apex=false")
