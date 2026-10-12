@@ -1096,6 +1096,19 @@ func TestFollowUpCarriesTheContextFlags(t *testing.T) {
 	if got := followUp(cmd, "nodepools", "delete", "<x>"); got != "edka nodepools delete '<x>' --profile work --organization o1 --cluster prod" {
 		t.Fatal(got)
 	}
+	// A flag set to "" chooses nothing, so the command to run leaves it out:
+	// `deployments create` refuses --deployment, even an empty one.
+	root = New("test", strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
+	cmd, rest, err = root.Find([]string{"up", "--deployment", "", "--cluster", "prod", "--data", "@x.json", "--diff"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.ParseFlags(rest); err != nil {
+		t.Fatal(err)
+	}
+	if got := followUp(cmd, "deployments", "create", "--dry-run"); got != "edka deployments create --dry-run --cluster prod" {
+		t.Fatal(got)
+	}
 }
 
 // A hint names the deployment it acts on, unless the user chose it with

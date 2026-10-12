@@ -317,19 +317,21 @@ type deploymentArg struct{ id, name string }
 
 // followUp is an edka command to run next, with each of the global flags that
 // choose where a command acts that the user set on cmd, so it reaches the same
-// resources. args are strings, placeholders and deploymentArgs. A flag that
-// args pass already keeps their value. An `edka api` command takes IDs through
-// its own flags and refuses --deployment, so it gets neither --cluster nor
-// --deployment. Its arguments may come from Edka, so it is cleaned for display.
+// resources. A flag set to "" chooses nothing, and some commands refuse even an
+// empty --deployment, so the command leaves it out. args are strings,
+// placeholders and deploymentArgs. A flag that args pass already keeps their
+// value. An `edka api` command takes IDs through its own flags and refuses
+// --deployment, so it gets neither --cluster nor --deployment. Its arguments
+// may come from Edka, so it is cleaned for display.
 func followUp(cmd *cobra.Command, args ...any) string {
 	words := []string{cmd.Root().Name()}
-	chosen := cmd.Flags().Lookup("deployment")
+	chosen := setFlag(cmd, "deployment")
 	for _, arg := range args {
 		switch arg := arg.(type) {
 		case placeholder:
 			words = append(words, "<"+string(arg)+">")
 		case deploymentArg:
-			if chosen != nil && chosen.Changed && (chosen.Value.String() == arg.id || chosen.Value.String() == arg.name) {
+			if chosen != "" && (chosen == arg.id || chosen == arg.name) {
 				continue
 			}
 			words = append(words, shellJoin([]string{arg.name}))
@@ -342,11 +344,20 @@ func followUp(cmd *cobra.Command, args ...any) string {
 		if slices.Contains(args, any("--"+name)) || endpoint && (name == "cluster" || name == "deployment") {
 			continue
 		}
-		if flag := cmd.Flags().Lookup(name); flag != nil && flag.Changed {
-			words = append(words, "--"+name, shellJoin([]string{flag.Value.String()}))
+		if value := setFlag(cmd, name); value != "" {
+			words = append(words, "--"+name, shellJoin([]string{value}))
 		}
 	}
 	return ui.Clean(strings.Join(words, " "))
+}
+
+// setFlag is the value the user gave the flag on cmd, or "" when they gave it
+// none.
+func setFlag(cmd *cobra.Command, name string) string {
+	if flag := cmd.Flags().Lookup(name); flag != nil && flag.Changed {
+		return flag.Value.String()
+	}
+	return ""
 }
 
 // pipeHint is the shell line that pipes $variable to command on stdin.
