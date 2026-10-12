@@ -483,7 +483,8 @@ func TestEnvDiffKeepsTheChecksOfTheChange(t *testing.T) {
 	}{
 		{[]string{"env", "unset", "MISSING"}, "api has no variable or secret named MISSING"},
 		{[]string{"env", "set", "API_TOKEN=plain"}, "API_TOKEN is a secret"},
-		{[]string{"env", "set", "--secret", "API_TOKEN=plain"}, "secret values go at the prompt or on stdin"},
+		// The hint names the deployment and every other flag, and never the value.
+		{[]string{"env", "set", "--secret", "API_TOKEN=plain"}, "secret values go at the prompt or on stdin, not in arguments that shell history keeps; for example: printf %s \"$VALUE\" | edka env set API_TOKEN --deployment api --diff --secret"},
 	} {
 		if _, _, err := execute(t, server.URL, append(tc.args, "--deployment", "api", "--diff")...); err == nil || !strings.Contains(err.Error(), tc.want) {
 			t.Errorf("%v: %v", tc.args, err)

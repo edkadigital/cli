@@ -109,7 +109,7 @@ func TestSecretSetRefusesBeforeSending(t *testing.T) {
 	for _, test := range []struct {
 		line, input, want string
 	}{
-		{"set database PASSWORD=hunter2", "", "values go at the prompt or on stdin, not in arguments that shell history keeps; for example: printf %s \"$VALUE\" | edka secrets set database PASSWORD"},
+		{"set database PASSWORD=hunter2 --namespace shop", "", "values go at the prompt or on stdin, not in arguments that shell history keeps; for example: printf %s \"$VALUE\" | edka secrets set database PASSWORD --cluster sinaia --namespace shop"},
 		{"set database", "x", "name the keys to set, or give them with --from-file KEY=path"},
 		{"set database PASS/WORD", "x", `invalid key "PASS/WORD"`},
 		{"set database PASSWORD PASSWORD", "x", "PASSWORD is given more than once"},

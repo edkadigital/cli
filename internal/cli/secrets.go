@@ -115,8 +115,8 @@ func (a *App) secretMissing(ctx context.Context, t secretTarget) error {
 // secretInput reads the value of each key: from the file a --from-file names
 // for it, else at a hidden prompt, or for one key from a stdin that is not a
 // terminal. A value is never an argument, which shell history and the process
-// list would keep.
-func (a *App) secretInput(ctx context.Context, t secretTarget, keys []string, files map[string]string) (map[string]string, error) {
+// list would keep. retry is the command that sets key from stdin.
+func (a *App) secretInput(ctx context.Context, t secretTarget, keys []string, files map[string]string, retry func(key string) string) (map[string]string, error) {
 	values := map[string]string{}
 	asked := []string{}
 	for _, key := range keys {
@@ -155,7 +155,7 @@ func (a *App) secretInput(ctx context.Context, t secretTarget, keys []string, fi
 		values[asked[0]] = value
 		return values, nil
 	case a.noInput:
-		return nil, fmt.Errorf("pipe the value on stdin: printf %%s \"$VALUE\" | edka secrets set %s %s", t.name, asked[0])
+		return nil, fmt.Errorf("pipe the value on stdin: printf %%s \"$VALUE\" | %s", retry(asked[0]))
 	}
 	for _, key := range asked {
 		value, err := a.promptSecret(ctx, fmt.Sprintf("Value for %s in secret %s: ", key, t.name), key)
@@ -219,10 +219,12 @@ func (a *App) addSecrets(root *cobra.Command) {
 	var fromFiles []string
 	set := namespaced(&cobra.Command{Use: "set <secret> [KEY...]", Short: "Create a secret, or set keys of one", Long: "Set keys of a secret, and create the secret when the namespace has none of that\nname. The keys left out keep their values.\n\nEach value is read at a hidden prompt. When stdin is not a terminal, the\ncommand reads one value from stdin and drops the final newline. A value on the\ncommand line is refused, because shell history keeps it and other local users\ncan read it in the process list. --from-file KEY=path takes the content of a\nfile as the value of a key.\n\nA pod that reads the secret as environment variables gets a new value when it\nrestarts.", Args: cobra.MinimumNArgs(1), Example: "  edka secrets set database PASSWORD REPLICA_PASSWORD --namespace shop\n  printf %s \"$TOKEN\" | edka secrets set github TOKEN\n  edka secrets set tls-ca --from-file ca.crt=./ca.crt", RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
+		// A hint repeats the command for one key, every flag included.
+		oneKey := func(key string) string { return invocation(cmd, []string{args[0], key}) }
 		keys, files := []string{}, map[string]string{}
 		for _, key := range args[1:] {
 			if name, _, assigned := strings.Cut(key, "="); assigned {
-				return fmt.Errorf("values go at the prompt or on stdin, not in arguments that shell history keeps; for example: printf %%s \"$VALUE\" | edka secrets set %s %s", args[0], name)
+				return fmt.Errorf("values go at the prompt or on stdin, not in arguments that shell history keeps; for example: printf %%s \"$VALUE\" | %s", oneKey(name))
 			}
 			keys = append(keys, key)
 		}
@@ -256,7 +258,7 @@ func (a *App) addSecrets(root *cobra.Command) {
 		if err != nil && (!errors.As(err, &apiError) || apiError.Status != 404) {
 			return err
 		}
-		values, err := a.secretInput(ctx, t, keys, files)
+		values, err := a.secretInput(ctx, t, keys, files, oneKey)
 		if err != nil {
 			return err
 		}
