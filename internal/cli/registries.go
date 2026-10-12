@@ -91,9 +91,10 @@ func registryPath(name string) (string, error) {
 
 // registryPassword reads a registry's password at a hidden prompt, or from a
 // stdin that is not a terminal. It is never an argument, which shell history
-// and the process list would keep.
-func (a *App) registryPassword(ctx context.Context, name, username string) (string, error) {
-	return a.oneSecret(ctx, "the password", fmt.Sprintf("Password or token of %s for registry %s: ", ui.Clean(username), ui.Clean(name)), fmt.Errorf("pipe the password on stdin: printf %%s \"$PASSWORD\" | edka registries add %s", name))
+// and the process list would keep. retry is the command as the user ran it,
+// which a hint pipes the password to.
+func (a *App) registryPassword(ctx context.Context, name, username, retry string) (string, error) {
+	return a.oneSecret(ctx, "the password", fmt.Sprintf("Password or token of %s for registry %s: ", ui.Clean(username), ui.Clean(name)), fmt.Errorf("pipe the password on stdin: printf %%s \"$PASSWORD\" | %s", retry))
 }
 
 // bytesOf prints a size in the binary units Kubernetes uses.
@@ -222,7 +223,7 @@ func (a *App) addRegistries(root *cobra.Command) {
 		case kind != "docker-hub" && address == "":
 			return fmt.Errorf("a %s registry needs --url, such as ghcr.io", kind)
 		}
-		password, err := a.registryPassword(ctx, name, username)
+		password, err := a.registryPassword(ctx, name, username, invocation(cmd, args))
 		if err != nil {
 			return err
 		}

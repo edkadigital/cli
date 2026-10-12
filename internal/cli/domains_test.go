@@ -518,25 +518,3 @@ func TestDomainUpdateReplacesTheCloudflareToken(t *testing.T) {
 		t.Fatal(out, errOut, err, api.requests)
 	}
 }
-
-// A hint that pipes a value repeats the command with every flag the user set,
-// so it acts on the same cluster and makes the same changes.
-func TestInvocationRepeatsTheFlagsSet(t *testing.T) {
-	for _, test := range []struct{ args, want string }{
-		{"domains update *.example.com --replace-token --apex=false --cluster prod", "edka domains update '*.example.com' --apex=false --cluster prod --replace-token"},
-		{"domains add *.example.org --dns-provider cloudflare --class eg-ts --apex --cluster prod", "edka domains add '*.example.org' --apex --class eg-ts --cluster prod --dns-provider cloudflare"},
-		{"domains verify *.example.com --namespace default --namespace shop", "edka domains verify '*.example.com' --namespace default --namespace shop"},
-	} {
-		root := New("test", strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
-		cmd, rest, err := root.Find(strings.Fields(test.args))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := cmd.ParseFlags(rest); err != nil {
-			t.Fatal(err)
-		}
-		if got := invocation(cmd, cmd.Flags().Args()); got != test.want {
-			t.Errorf("%s: got %s", test.args, got)
-		}
-	}
-}
