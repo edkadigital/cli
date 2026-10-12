@@ -502,7 +502,7 @@ func (a *App) reportEnv(ctx context.Context, cmd *cobra.Command, env *deployment
 	generation := submittedGeneration(record)
 	if !wait {
 		if generation > 0 {
-			done += fmt.Sprintf(" Generation %d is rolling out.\n  Next: %s", generation, followUp(cmd, "deployments", "status", env.name))
+			done += fmt.Sprintf(" Generation %d is rolling out.\n  Next: %s", generation, followUp(cmd, "deployments", "status", deploymentArg{env.id, env.name}))
 		}
 		a.message("%s", done)
 		if a.output != "table" {
@@ -511,7 +511,7 @@ func (a *App) reportEnv(ctx context.Context, cmd *cobra.Command, env *deployment
 		return nil
 	}
 	if generation <= 0 {
-		return fmt.Errorf("change saved but no revision generation returned; inspect `%s`", followUp(cmd, "deployments", "status", env.name))
+		return fmt.Errorf("change saved but no revision generation returned; inspect `%s`", followUp(cmd, "deployments", "status", deploymentArg{env.id, env.name}))
 	}
 	a.message("%s Waiting for generation %d…", done, generation)
 	return a.awaitGeneration(ctx, cmd, env.id, env.name, generation, timeout)

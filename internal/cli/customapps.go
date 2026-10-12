@@ -284,7 +284,7 @@ var appStatusLines = map[string]string{
 // waitApp prints an app operation's progress to stderr until the app is
 // installed or the operation fails, and returns the app as it was last read.
 // An install and an update wait the same way.
-func (a *App) waitApp(parent context.Context, cmd *cobra.Command, path, name string, timeout time.Duration) (*api.Response, map[string]any, error) {
+func (a *App) waitApp(parent context.Context, cmd *cobra.Command, cluster *candidate, path, name string, timeout time.Duration) (*api.Response, map[string]any, error) {
 	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
 	p := a.startProgress()
@@ -297,7 +297,7 @@ func (a *App) waitApp(parent context.Context, cmd *cobra.Command, path, name str
 		if status != "" {
 			state = "is still " + ui.Clean(status)
 		}
-		return fmt.Errorf("%s %s: %w; the operation continues, follow it with `%s`", shown, state, ctx.Err(), followUp(cmd, "apps", "get", name))
+		return fmt.Errorf("%s %s: %w; the operation continues, follow it with `%s`", shown, state, ctx.Err(), followUp(cmd, "apps", "get", name, "--cluster", cluster.Name))
 	}
 	for {
 		response, err := a.poll(ctx, p, path, nil)
@@ -318,7 +318,7 @@ func (a *App) waitApp(parent context.Context, cmd *cobra.Command, path, name str
 			if message != "" {
 				message = ": " + ui.Clean(message)
 			}
-			return nil, nil, fmt.Errorf("%s failed%s\nFind the cause with `%s`", shown, message, followUp(cmd, "apps", "diagnose", name))
+			return nil, nil, fmt.Errorf("%s failed%s\nFind the cause with `%s`", shown, message, followUp(cmd, "apps", "diagnose", name, "--cluster", cluster.Name))
 		}
 		p.say("status", first(appStatusLines[status], status))
 		p.say("message", message)
@@ -479,7 +479,7 @@ func (a *App) customAppCommands() []*cobra.Command {
 		if wait && waitTimeout <= 0 {
 			return fmt.Errorf("wait-timeout must be positive")
 		}
-		c, err := a.resolveApp(cmd.Context(), args[0])
+		c, err := a.resolveApp(cmd.Context(), cmd, args[0])
 		if err != nil {
 			return err
 		}
@@ -524,10 +524,10 @@ func (a *App) customAppCommands() []*cobra.Command {
 			if a.output != "table" {
 				return a.render(response)
 			}
-			a.message("✓ Updating %s to %s; follow it with `%s`", c.Name, next, followUp(cmd, "apps", "get", c.Name))
+			a.message("✓ Updating %s to %s; follow it with `%s`", c.Name, next, followUp(cmd, "apps", "get", c.Name, "--cluster", text(c.Record, "cluster_name")))
 			return nil
 		}
-		if _, _, err := a.waitApp(cmd.Context(), cmd, path, c.Name, waitTimeout); err != nil {
+		if _, _, err := a.waitApp(cmd.Context(), cmd, clusterOf(c), path, c.Name, waitTimeout); err != nil {
 			return err
 		}
 		if a.output != "table" {

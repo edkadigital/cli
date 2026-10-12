@@ -1088,8 +1088,41 @@ func TestFollowUpCarriesTheContextFlags(t *testing.T) {
 	}
 	// A flag the command to run names keeps its value, and a placeholder stays
 	// for the reader to replace.
-	if got := followUp(cmd, "registries", "remove", "ghcr", "--cluster", "<cluster>"); got != "edka registries remove ghcr --cluster <cluster> --profile work --organization o1" {
+	if got := followUp(cmd, "registries", "remove", "ghcr", "--cluster", placeholder("cluster")); got != "edka registries remove ghcr --cluster <cluster> --profile work --organization o1" {
 		t.Fatal(got)
+	}
+	// A name that looks like a placeholder is quoted, so a shell does not read
+	// < and > as redirections.
+	if got := followUp(cmd, "nodepools", "delete", "<x>"); got != "edka nodepools delete '<x>' --profile work --organization o1 --cluster prod" {
+		t.Fatal(got)
+	}
+}
+
+// A hint names the deployment it acts on, unless the user chose it with
+// --deployment: the flag, which may hold an ID, then names it alone.
+func TestFollowUpNamesTheDeploymentOnce(t *testing.T) {
+	for _, tc := range []struct {
+		line       string
+		deployment deploymentArg
+		want       string
+	}{
+		{"env set A=1 --deployment d1", deploymentArg{"d1", "api"}, "edka deployments status --deployment d1"},
+		{"env set A=1 --deployment api", deploymentArg{"d1", "api"}, "edka deployments status --deployment api"},
+		{"env set A=1 --cluster prod", deploymentArg{"d1", "api"}, "edka deployments status api --cluster prod"},
+		// The argument chose another deployment than the one the flag names.
+		{"up web --deployment api", deploymentArg{"d2", "web"}, "edka deployments status web --deployment api"},
+	} {
+		root := New("test", strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
+		cmd, rest, err := root.Find(strings.Fields(tc.line))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := cmd.ParseFlags(rest); err != nil {
+			t.Fatal(err)
+		}
+		if got := followUp(cmd, "deployments", "status", tc.deployment); got != tc.want {
+			t.Errorf("%s: got %s", tc.line, got)
+		}
 	}
 }
 

@@ -62,8 +62,8 @@ func cronjobDetail(m map[string]any) string {
 	return strings.Trim(text(m, "schedule")+" · "+text(m, "cluster_name"), " ·")
 }
 
-func (a *App) resolveCronjob(ctx context.Context, target string) (*candidate, string, error) {
-	c, err := a.resolveScoped(ctx, "cronjob", "cronjobs", target, "no cronjobs; create one with `edka api clusters cronjobs create --help`", cronjobNames, cronjobDetail)
+func (a *App) resolveCronjob(ctx context.Context, cmd *cobra.Command, target string) (*candidate, string, error) {
+	c, err := a.resolveScoped(ctx, cmd, "cronjob", "cronjobs", target, "no cronjobs; create one with `edka api clusters cronjobs create --help`", cronjobNames, cronjobDetail)
 	if err != nil {
 		return nil, "", err
 	}
@@ -84,7 +84,7 @@ func (a *App) addCronjobs(root *cobra.Command) {
 	}}
 	list.Flags().BoolVar(&all, "all", false, "List cronjobs in every cluster, not only the linked one")
 	get := &cobra.Command{Use: "get [cronjob]", Short: "Show a cronjob and its last run", Args: cobra.MaximumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		c, path, err := a.resolveCronjob(cmd.Context(), argument(args))
+		c, path, err := a.resolveCronjob(cmd.Context(), cmd, argument(args))
 		if err != nil {
 			return err
 		}
@@ -136,7 +136,7 @@ func (a *App) addCronjobs(root *cobra.Command) {
 		if limit < 1 || limit > 100 {
 			return fmt.Errorf("limit must be between 1 and 100")
 		}
-		_, path, err := a.resolveCronjob(cmd.Context(), argument(args))
+		_, path, err := a.resolveCronjob(cmd.Context(), cmd, argument(args))
 		if err != nil {
 			return err
 		}
@@ -154,7 +154,7 @@ func (a *App) addCronjobs(root *cobra.Command) {
 	runs.Flags().IntVar(&limit, "limit", 20, "Number of runs (1–100)")
 	var job string
 	logs := a.logsCommand("logs [cronjob]", "Read a run's logs; the newest run by default", func(cmd *cobra.Command, target string) (string, error) {
-		_, path, err := a.resolveCronjob(cmd.Context(), target)
+		_, path, err := a.resolveCronjob(cmd.Context(), cmd, target)
 		if err != nil {
 			return "", err
 		}
@@ -166,7 +166,7 @@ func (a *App) addCronjobs(root *cobra.Command) {
 	})
 	logs.Flags().StringVar(&job, "run", "", "Run name from `edka cronjobs runs` (default: the newest)")
 	trigger := &cobra.Command{Use: "trigger <cronjob>", Short: "Start a run now", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		c, path, err := a.resolveCronjob(cmd.Context(), args[0])
+		c, path, err := a.resolveCronjob(cmd.Context(), cmd, args[0])
 		if err != nil {
 			return err
 		}
@@ -174,7 +174,7 @@ func (a *App) addCronjobs(root *cobra.Command) {
 		if err != nil {
 			return err
 		}
-		a.message("✓ Queued a run of %s\n  Next: %s", ui.Clean(c.Name), followUp(cmd, "cronjobs", "runs", c.Name))
+		a.message("✓ Queued a run of %s\n  Next: %s", ui.Clean(c.Name), followUp(cmd, "cronjobs", "runs", c.Name, "--cluster", text(c.Record, "cluster_name")))
 		if a.output != "table" {
 			return a.render(response)
 		}
@@ -182,7 +182,7 @@ func (a *App) addCronjobs(root *cobra.Command) {
 	}}
 	suspendCommand := func(use, short string, suspend bool) *cobra.Command {
 		return &cobra.Command{Use: use + " <cronjob>", Short: short, Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-			c, path, err := a.resolveCronjob(cmd.Context(), args[0])
+			c, path, err := a.resolveCronjob(cmd.Context(), cmd, args[0])
 			if err != nil {
 				return err
 			}
@@ -191,7 +191,7 @@ func (a *App) addCronjobs(root *cobra.Command) {
 				return err
 			}
 			if suspend {
-				a.message("✓ Suspending %s; scheduled runs stop until `%s`", ui.Clean(c.Name), followUp(cmd, "cronjobs", "resume", c.Name))
+				a.message("✓ Suspending %s; scheduled runs stop until `%s`", ui.Clean(c.Name), followUp(cmd, "cronjobs", "resume", c.Name, "--cluster", text(c.Record, "cluster_name")))
 			} else {
 				a.message("✓ Resuming %s", ui.Clean(c.Name))
 			}
@@ -202,7 +202,7 @@ func (a *App) addCronjobs(root *cobra.Command) {
 		}}
 	}
 	remove := &cobra.Command{Use: "delete <cronjob>", Short: "Delete a cronjob and its Kubernetes resources", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		c, path, err := a.resolveCronjob(cmd.Context(), args[0])
+		c, path, err := a.resolveCronjob(cmd.Context(), cmd, args[0])
 		if err != nil {
 			return err
 		}

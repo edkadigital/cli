@@ -111,7 +111,7 @@ func (a *App) addUp(root *cobra.Command) {
 		name = first(name, text(record, "name"), id)
 		generation := submittedGeneration(record)
 		if generation <= 0 {
-			return fmt.Errorf("deployment submitted but no revision generation returned; inspect `%s`", followUp(cmd, "deployments", "status", name))
+			return fmt.Errorf("deployment submitted but no revision generation returned; inspect `%s`", followUp(cmd, "deployments", "status", deploymentArg{id, name}))
 		}
 		a.message("Deployment submitted. Waiting for generation %d…", generation)
 		return a.awaitGeneration(cmd.Context(), cmd, id, name, generation, waitTimeout)
@@ -193,7 +193,7 @@ func (a *App) buildCommand() *cobra.Command {
 			return err
 		}
 		if git, known := gitSource(deployment); known && !git {
-			return fmt.Errorf("%s is an image deployment with no GitHub repository to build; deploy image changes with `%s`", ui.Clean(c.Name), followUp(cmd, "up", c.Name, "--wait"))
+			return fmt.Errorf("%s is an image deployment with no GitHub repository to build; deploy image changes with `%s`", ui.Clean(c.Name), followUp(cmd, "up", deploymentArg{c.ID, c.Name}, "--wait"))
 		}
 		// A rollout the build starts has a later generation than the current one.
 		before := number(deployment["spec_generation"])
@@ -265,14 +265,14 @@ func (a *App) followBuild(ctx context.Context, cmd *cobra.Command, id, name, bui
 			return err
 		}
 		if generation == 0 {
-			return fmt.Errorf("the build succeeded, but no rollout of it started; deploy it with `%s`", followUp(cmd, "up", name, "--wait"))
+			return fmt.Errorf("the build succeeded, but no rollout of it started; deploy it with `%s`", followUp(cmd, "up", deploymentArg{id, name}, "--wait"))
 		}
 		a.message("Auto-deploy started generation %d…", generation)
 		if _, err := a.waitDeployment(ctx, cmd, id, name, generation); err != nil {
 			return err
 		}
 	} else {
-		a.message("  Auto-deploy is off. Next: %s", followUp(cmd, "up", name, "--wait"))
+		a.message("  Auto-deploy is off. Next: %s", followUp(cmd, "up", deploymentArg{id, name}, "--wait"))
 	}
 	if a.output != "table" {
 		return a.render(detail)

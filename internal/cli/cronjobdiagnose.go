@@ -31,7 +31,7 @@ func (a *App) cronjobDiagnoseCommand() *cobra.Command {
 		if tail < 1 || tail > 2000 {
 			return fmt.Errorf("tail must be between 1 and 2000")
 		}
-		c, path, err := a.resolveCronjob(cmd.Context(), argument(args))
+		c, path, err := a.resolveCronjob(cmd.Context(), cmd, argument(args))
 		if err != nil {
 			return err
 		}

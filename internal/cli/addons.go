@@ -280,23 +280,23 @@ func (a *App) showAddon(m map[string]any) error {
 }
 
 // showInstalled reads an add-on again from its cluster and prints it.
-func (a *App) showInstalled(ctx context.Context, cmd *cobra.Command, clusterID, name string) error {
-	a.cluster = clusterID
+func (a *App) showInstalled(ctx context.Context, cmd *cobra.Command, cluster *candidate, name string) error {
+	a.cluster = cluster.ID
 	rows, err := a.addonRows(ctx, false)
 	if err != nil {
 		return err
 	}
 	row := recordWith(rows, "addon_name", name)
 	if row == nil {
-		return fmt.Errorf("add-on %q was %w; inspect `%s`", name, errNotFound, followUp(cmd, "addons", "list"))
+		return fmt.Errorf("add-on %q was %w; inspect `%s`", name, errNotFound, followUp(cmd, "addons", "list", "--cluster", cluster.Name))
 	}
 	return a.showAddon(row)
 }
 
 // waitAddon prints an add-on operation's progress to stderr until the add-on
 // is installed, or until it is gone when removing.
-func (a *App) waitAddon(parent context.Context, cmd *cobra.Command, clusterID, name string, removing bool, timeout time.Duration) error {
-	cluster, err := safeID(clusterID)
+func (a *App) waitAddon(parent context.Context, cmd *cobra.Command, cluster *candidate, name string, removing bool, timeout time.Duration) error {
+	id, err := safeID(cluster.ID)
 	if err != nil {
 		return err
 	}
@@ -313,9 +313,9 @@ func (a *App) waitAddon(parent context.Context, cmd *cobra.Command, clusterID, n
 		if status != "" {
 			state = "is still " + ui.Clean(status)
 		}
-		return fmt.Errorf("%s %s: %w; the operation continues, follow it with `%s`", shown, state, ctx.Err(), followUp(cmd, "addons", "list"))
+		return fmt.Errorf("%s %s: %w; the operation continues, follow it with `%s`", shown, state, ctx.Err(), followUp(cmd, "addons", "list", "--cluster", cluster.Name))
 	}
-	path := "/api/clusters/" + cluster + "/addons"
+	path := "/api/clusters/" + id + "/addons"
 	for {
 		response, err := a.poll(ctx, p, path, nil)
 		if err != nil {
@@ -330,7 +330,7 @@ func (a *App) waitAddon(parent context.Context, cmd *cobra.Command, clusterID, n
 		case row == nil && removing:
 			return nil
 		case row == nil:
-			return fmt.Errorf("add-on %q was %w; inspect `%s`", name, errNotFound, followUp(cmd, "addons", "list"))
+			return fmt.Errorf("add-on %q was %w; inspect `%s`", name, errNotFound, followUp(cmd, "addons", "list", "--cluster", cluster.Name))
 		}
 		status = text(row, "status")
 		reason := addonError(row)
@@ -343,9 +343,9 @@ func (a *App) waitAddon(parent context.Context, cmd *cobra.Command, clusterID, n
 				reason = ": " + ui.Clean(reason)
 			}
 			if removing {
-				return fmt.Errorf("uninstalling %s failed%s\nRetry with `%s`", shown, reason, followUp(cmd, "addons", "uninstall", name))
+				return fmt.Errorf("uninstalling %s failed%s\nRetry with `%s`", shown, reason, followUp(cmd, "addons", "uninstall", name, "--cluster", cluster.Name))
 			}
-			return fmt.Errorf("%s failed%s\nRetry with `%s`, or remove it with `%s`", shown, reason, followUp(cmd, "addons", "install", name), followUp(cmd, "addons", "uninstall", name))
+			return fmt.Errorf("%s failed%s\nRetry with `%s`, or remove it with `%s`", shown, reason, followUp(cmd, "addons", "install", name, "--cluster", cluster.Name), followUp(cmd, "addons", "uninstall", name, "--cluster", cluster.Name))
 		case status == "failed":
 			reread = true
 		default:
@@ -417,7 +417,7 @@ func (a *App) updateAddons(ctx context.Context, cmd *cobra.Command, wait bool, t
 		name, status := ui.Clean(text(row, "addon_name")), text(row, "status")
 		switch {
 		case status == "failed":
-			skipped = append(skipped, fmt.Sprintf("  %s failed; retry with `%s`", name, followUp(cmd, "addons", "install", text(row, "addon_name"))))
+			skipped = append(skipped, fmt.Sprintf("  %s failed; retry with `%s`", name, followUp(cmd, "addons", "install", text(row, "addon_name"), "--cluster", cluster.Name)))
 		case status != "installed":
 			skipped = append(skipped, fmt.Sprintf("  %s is %s", name, ui.Clean(status)))
 		case row["managed_from"] != nil && text(row, "catalog_version") != "" && newerVersion(text(row, "catalog_version"), text(row, "version")):
@@ -480,13 +480,13 @@ func (a *App) updateAddons(ctx context.Context, cmd *cobra.Command, wait bool, t
 			continue
 		}
 		a.message("Updating %s to %s…", ui.Clean(name), ui.Clean(target))
-		if err := a.waitAddon(ctx, cmd, cluster.ID, name, false, timeout); err != nil {
+		if err := a.waitAddon(ctx, cmd, cluster, name, false, timeout); err != nil {
 			return notStarted(err, updates[i+1:])
 		}
 		a.message("✓ Updated %s to %s", ui.Clean(name), ui.Clean(target))
 	}
 	if !wait {
-		a.message("  Check progress: %s", followUp(cmd, "addons", "list"))
+		a.message("  Check progress: %s", followUp(cmd, "addons", "list", "--cluster", cluster.Name))
 		if a.output != "table" {
 			return ui.Render(a.Out, jsonBody(map[string]any{"data": started}), a.output, false)
 		}
@@ -585,7 +585,7 @@ func (a *App) addAddons(root *cobra.Command) {
 		response, err := a.request(ctx, "POST", "/api/clusters/"+id+"/addons", nil, jsonBody(body))
 		var apiError *api.Error
 		if errors.As(err, &apiError) && apiError.Status == 409 && apiError.Reason == "Addon already installed" {
-			return fmt.Errorf("%w\nUpdate it with `%s`", err, followUp(cmd, "addons", "update", name))
+			return fmt.Errorf("%w\nUpdate it with `%s`", err, followUp(cmd, "addons", "update", name, "--cluster", cluster.Name))
 		}
 		if err != nil {
 			return err
@@ -600,18 +600,18 @@ func (a *App) addAddons(root *cobra.Command) {
 			dependencies = "\n  It depends on " + ui.Clean(strings.Join(required, ", ")) + ". Edka installs the missing ones first."
 		}
 		if !wait {
-			a.message("✓ Installing %s%s\n  Next: %s", what, dependencies, followUp(cmd, "addons", "get", name))
+			a.message("✓ Installing %s%s\n  Next: %s", what, dependencies, followUp(cmd, "addons", "get", name, "--cluster", cluster.Name))
 			if a.output != "table" {
 				return a.render(response)
 			}
 			return nil
 		}
 		a.message("Installing %s…%s", what, dependencies)
-		if err := a.waitAddon(ctx, cmd, cluster.ID, name, false, waitTimeout); err != nil {
+		if err := a.waitAddon(ctx, cmd, cluster, name, false, waitTimeout); err != nil {
 			return err
 		}
 		a.message("✓ Installed %s in cluster %s", name, ui.Clean(cluster.Name))
-		return a.showInstalled(ctx, cmd, cluster.ID, name)
+		return a.showInstalled(ctx, cmd, cluster, name)
 	}}
 	install.Flags().StringVar(&version, "version", "", "Chart version to install (default: the catalog version)")
 	waitFlags(install, "installed")
@@ -638,6 +638,7 @@ func (a *App) addAddons(root *cobra.Command) {
 			return err
 		}
 		name, cluster, current := ui.Clean(c.Name), ui.Clean(text(c.Record, "cluster_name")), text(c.Record, "version")
+		where := clusterOf(c)
 		switch status := text(c.Record, "status"); status {
 		case "installed":
 		case "failed":
@@ -645,9 +646,9 @@ func (a *App) addAddons(root *cobra.Command) {
 			if problem := addonError(c.Record); problem != "" {
 				reason = ": " + ui.Clean(problem)
 			}
-			return fmt.Errorf("%s failed in cluster %s%s\nRetry with `%s`, or remove it with `%s`", name, cluster, reason, followUp(cmd, "addons", "install", c.Name), followUp(cmd, "addons", "uninstall", c.Name))
+			return fmt.Errorf("%s failed in cluster %s%s\nRetry with `%s`, or remove it with `%s`", name, cluster, reason, followUp(cmd, "addons", "install", c.Name, "--cluster", where.Name), followUp(cmd, "addons", "uninstall", c.Name, "--cluster", where.Name))
 		default:
-			return fmt.Errorf("%s is %s in cluster %s; follow it with `%s`", name, ui.Clean(status), cluster, followUp(cmd, "addons", "get", c.Name))
+			return fmt.Errorf("%s is %s in cluster %s; follow it with `%s`", name, ui.Clean(status), cluster, followUp(cmd, "addons", "get", c.Name, "--cluster", where.Name))
 		}
 		target := first(version, text(c.Record, "catalog_version"))
 		switch {
@@ -675,18 +676,18 @@ func (a *App) addAddons(root *cobra.Command) {
 			return err
 		}
 		if !wait {
-			a.message("✓ Updating %s to %s in cluster %s\n  Check progress: %s", name, ui.Clean(target), cluster, followUp(cmd, "addons", "get", c.Name))
+			a.message("✓ Updating %s to %s in cluster %s\n  Check progress: %s", name, ui.Clean(target), cluster, followUp(cmd, "addons", "get", c.Name, "--cluster", where.Name))
 			if a.output != "table" {
 				return a.render(response)
 			}
 			return nil
 		}
 		a.message("Updating %s to %s in cluster %s…", name, ui.Clean(target), cluster)
-		if err := a.waitAddon(ctx, cmd, text(c.Record, "cluster_id"), c.Name, false, waitTimeout); err != nil {
+		if err := a.waitAddon(ctx, cmd, where, c.Name, false, waitTimeout); err != nil {
 			return err
 		}
 		a.message("✓ Updated %s to %s in cluster %s", name, ui.Clean(target), cluster)
-		return a.showInstalled(ctx, cmd, text(c.Record, "cluster_id"), c.Name)
+		return a.showInstalled(ctx, cmd, where, c.Name)
 	}}
 	update.Flags().StringVar(&version, "version", "", "Chart version to update to (default: the catalog version)")
 	update.Flags().BoolVar(&updateAll, "all", false, "Update every add-on in the cluster that has a newer catalog version")
@@ -703,10 +704,10 @@ func (a *App) addAddons(root *cobra.Command) {
 		if err := managedElsewhere(cmd, c.Name); err != nil {
 			return err
 		}
-		name, cluster := ui.Clean(c.Name), ui.Clean(text(c.Record, "cluster_name"))
+		name, cluster, where := ui.Clean(c.Name), ui.Clean(text(c.Record, "cluster_name")), clusterOf(c)
 		// Edka queues an uninstall beside an operation that is still running.
 		if status := text(c.Record, "status"); addonSteps[status] != "" {
-			return fmt.Errorf("%s is %s in cluster %s; follow it with `%s`", name, ui.Clean(status), cluster, followUp(cmd, "addons", "get", c.Name))
+			return fmt.Errorf("%s is %s in cluster %s; follow it with `%s`", name, ui.Clean(status), cluster, followUp(cmd, "addons", "get", c.Name, "--cluster", where.Name))
 		}
 		if c.Record["required"] == true {
 			return fmt.Errorf("%s is a required add-on and can't be uninstalled", name)
@@ -727,12 +728,12 @@ func (a *App) addAddons(root *cobra.Command) {
 		}
 		if wait {
 			a.message("Uninstalling %s from cluster %s…", name, cluster)
-			if err := a.waitAddon(ctx, cmd, text(c.Record, "cluster_id"), c.Name, true, waitTimeout); err != nil {
+			if err := a.waitAddon(ctx, cmd, where, c.Name, true, waitTimeout); err != nil {
 				return err
 			}
 			a.message("✓ Uninstalled %s from cluster %s", name, cluster)
 		} else {
-			a.message("✓ Uninstalling %s from cluster %s\n  Check progress: %s", name, cluster, followUp(cmd, "addons", "list"))
+			a.message("✓ Uninstalling %s from cluster %s\n  Check progress: %s", name, cluster, followUp(cmd, "addons", "list", "--cluster", where.Name))
 		}
 		if a.output != "table" {
 			return a.render(response)

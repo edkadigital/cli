@@ -229,7 +229,7 @@ func (a *App) waitDeployment(ctx context.Context, cmd *cobra.Command, id, name s
 		}
 		status := text(record, "status")
 		if current == generation && (status == "failed" || status == "error") {
-			return nil, rolloutFailed(cmd, name, generation, text(record, "status_message"))
+			return nil, rolloutFailed(cmd, deploymentArg{id, name}, generation, text(record, "status_message"))
 		}
 		p.say("message", text(record, "status_message"))
 		if current == generation && number(record["applied_generation"]) == generation {
@@ -247,14 +247,14 @@ func (a *App) waitDeployment(ctx context.Context, cmd *cobra.Command, id, name s
 					a.message("✓ %s is running generation %d", ui.Clean(name), generation)
 					return runtime, nil
 				case "failed":
-					return nil, rolloutFailed(cmd, name, generation, text(state, "message"))
+					return nil, rolloutFailed(cmd, deploymentArg{id, name}, generation, text(state, "message"))
 				}
 			}
 		} else {
 			p.say("step", fmt.Sprintf("Applying generation %d…", generation))
 		}
 		if err := pause(ctx, pollInterval); err != nil {
-			return nil, fmt.Errorf("generation %d did not finish: %w; inspect `%s`", generation, err, followUp(cmd, "deployments", "status", name))
+			return nil, fmt.Errorf("generation %d did not finish: %w; inspect `%s`", generation, err, followUp(cmd, "deployments", "status", deploymentArg{id, name}))
 		}
 	}
 }
@@ -269,12 +269,12 @@ func (a *App) runtimeState(ctx context.Context, p *progress, id string) (*api.Re
 	return response, state, err
 }
 
-func rolloutFailed(cmd *cobra.Command, name string, generation int, reason string) error {
+func rolloutFailed(cmd *cobra.Command, deployment deploymentArg, generation int, reason string) error {
 	message := fmt.Sprintf("generation %d failed", generation)
 	if reason != "" {
 		message += ": " + reason
 	}
-	return fmt.Errorf("%s\nFind the cause with `%s`", message, followUp(cmd, "diagnose", name))
+	return fmt.Errorf("%s\nFind the cause with `%s`", message, followUp(cmd, "diagnose", deployment))
 }
 
 // replaced explains a generation that a later one replaced before it rolled
@@ -287,8 +287,8 @@ func (a *App) replaced(ctx context.Context, cmd *cobra.Command, id, name string,
 			if reason := text(revision, "status_message"); reason != "" {
 				message += ": " + reason
 			}
-			return fmt.Errorf("%s\nGeneration %d replaced it\nFind the cause with `%s`", message, current, followUp(cmd, "diagnose", name))
+			return fmt.Errorf("%s\nGeneration %d replaced it\nFind the cause with `%s`", message, current, followUp(cmd, "diagnose", deploymentArg{id, name}))
 		}
 	}
-	return fmt.Errorf("generation %d was replaced by generation %d; inspect `%s`", generation, current, followUp(cmd, "deployments", "revisions", name))
+	return fmt.Errorf("generation %d was replaced by generation %d; inspect `%s`", generation, current, followUp(cmd, "deployments", "revisions", deploymentArg{id, name}))
 }

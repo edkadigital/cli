@@ -29,7 +29,7 @@ func (a *App) appDiagnoseCommand() *cobra.Command {
 		if tail < 1 || tail > 2000 {
 			return fmt.Errorf("tail must be between 1 and 2000")
 		}
-		c, err := a.resolveApp(cmd.Context(), argument(args))
+		c, err := a.resolveApp(cmd.Context(), cmd, argument(args))
 		if err != nil {
 			return err
 		}

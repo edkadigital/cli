@@ -154,7 +154,7 @@ func (a *App) askHostname(ctx context.Context, cmd *cobra.Command, cluster, clus
 	}
 	choices := domainChoices(domains, trafficClass)
 	if len(choices) == 0 {
-		return "", fmt.Errorf("no domains in cluster %s use traffic class %s; add one with `%s`, or set the hostname with --set %s=<hostname>", ui.Clean(clusterName), ui.Clean(trafficClass), followUp(cmd, "domains", "add", "<domain>", "--class", trafficClass), f.Name)
+		return "", fmt.Errorf("no domains in cluster %s use traffic class %s; add one with `%s`, or set the hostname with --set %s=<hostname>", ui.Clean(clusterName), ui.Clean(trafficClass), followUp(cmd, "domains", "add", placeholder("domain"), "--class", trafficClass), f.Name)
 	}
 	if len(choices) == 1 {
 		a.message("Domain: %s, the only one for traffic class %s", ui.Clean(choices[0].Name), ui.Clean(trafficClass))

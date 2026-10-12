@@ -269,7 +269,7 @@ func (a *App) addRegistries(root *cobra.Command) {
 			return err
 		}
 		if len(clusters) > 0 {
-			return fmt.Errorf("registry %s is used by %s; take it from each cluster first with `%s`", name, plural(len(clusters), "cluster ", "clusters ")+ui.Clean(strings.Join(clusters, ", ")), followUp(cmd, "registries", "remove", name, "--cluster", "<cluster>"))
+			return fmt.Errorf("registry %s is used by %s; take it from each cluster first with `%s`", name, plural(len(clusters), "cluster ", "clusters ")+ui.Clean(strings.Join(clusters, ", ")), followUp(cmd, "registries", "remove", name, "--cluster", placeholder("cluster")))
 		}
 		if err := a.confirm("Delete registry " + name + " and its credentials"); err != nil {
 			return err

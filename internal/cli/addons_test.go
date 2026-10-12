@@ -341,6 +341,12 @@ func TestAddonsUpdateNamesBothVersionsBeforeChanging(t *testing.T) {
 	if _, _, err := execute(t, server.URL, "addons", "update", "cert-manager", "--cluster", "sinaia", "--version", "1.15.0", "--yes"); err != nil || api.bodies["PUT /api/clusters/c1/addons"] != `{"addonName":"cert-manager","version":"1.15.0"}` {
 		t.Fatal(err, api.bodies)
 	}
+	// trust-manager is in staging too, so a hint about the one chosen by ID
+	// names its cluster.
+	_, errOut, err = execute(t, server.URL, "addons", "update", "x2", "--yes")
+	if err != nil || !strings.Contains(errOut, "Check progress: edka addons get trust-manager --cluster sinaia\n") {
+		t.Fatal(errOut, err)
+	}
 }
 
 func TestAddonsUpdateAllFollowsDependencies(t *testing.T) {

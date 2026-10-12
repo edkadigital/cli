@@ -682,18 +682,18 @@ func (a *App) installCommand() *cobra.Command {
 		}
 		appID, err := safeID(text(record, "app_id"))
 		if err != nil {
-			return fmt.Errorf("installation started but no app ID returned; inspect `%s`", followUp(cmd, "apps", "list"))
+			return fmt.Errorf("installation started but no app ID returned; inspect `%s`", followUp(cmd, "apps", "list", "--cluster", cluster.Name))
 		}
 		instance := first(name, text(record, "instance_slug"), app.Name)
 		if !wait {
-			a.message("✓ Installing %s in cluster %s as %s.\n  Next: %s", ui.Clean(app.Name), ui.Clean(cluster.Name), ui.Clean(instance), followUp(cmd, "apps", "get", instance))
+			a.message("✓ Installing %s in cluster %s as %s.\n  Next: %s", ui.Clean(app.Name), ui.Clean(cluster.Name), ui.Clean(instance), followUp(cmd, "apps", "get", instance, "--cluster", cluster.Name))
 			if a.output != "table" {
 				return a.render(response)
 			}
 			return nil
 		}
 		a.message("Installing %s in cluster %s as %s…", ui.Clean(app.Name), ui.Clean(cluster.Name), ui.Clean(instance))
-		installed, m, err := a.waitApp(ctx, cmd, "/api/clusters/"+clusterID+"/apps/"+appID, instance, waitTimeout)
+		installed, m, err := a.waitApp(ctx, cmd, cluster, "/api/clusters/"+clusterID+"/apps/"+appID, instance, waitTimeout)
 		if err != nil {
 			return err
 		}

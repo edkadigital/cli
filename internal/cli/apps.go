@@ -51,8 +51,8 @@ func (a *App) appRows(ctx context.Context, all bool) ([]map[string]any, error) {
 func (a *App) appChoices() lister { return a.scopedChoices("apps/instances", appNames, appDetail) }
 
 // resolveApp selects an installed app by ID, name, instance or release name.
-func (a *App) resolveApp(ctx context.Context, target string) (*candidate, error) {
-	return a.resolveScoped(ctx, "app", "apps/instances", target, "no apps installed; browse them with `edka apps catalog`", appNames, appDetail)
+func (a *App) resolveApp(ctx context.Context, cmd *cobra.Command, target string) (*candidate, error) {
+	return a.resolveScoped(ctx, cmd, "app", "apps/instances", target, "no apps installed; browse them with `edka apps catalog`", appNames, appDetail)
 }
 
 // showApp prints an installed app's summary.
@@ -97,7 +97,7 @@ func (a *App) addApps(root *cobra.Command) {
 	}}
 	list.Flags().BoolVar(&all, "all", false, "List apps in every cluster, not only the linked one")
 	get := &cobra.Command{Use: "get [app]", Short: "Show an installed app", Args: cobra.MaximumNArgs(1), Example: "  edka apps get strapi\n  edka apps get strapi --json", RunE: func(cmd *cobra.Command, args []string) error {
-		c, err := a.resolveApp(cmd.Context(), argument(args))
+		c, err := a.resolveApp(cmd.Context(), cmd, argument(args))
 		if err != nil {
 			return err
 		}
@@ -119,7 +119,7 @@ func (a *App) addApps(root *cobra.Command) {
 		return a.showApp(m, text(c.Record, "cluster_name"), c.ID)
 	}}
 	logs := a.logsCommand("logs [app]", "Read an app's logs; follow with --follow", func(cmd *cobra.Command, target string) (string, error) {
-		c, err := a.resolveApp(cmd.Context(), target)
+		c, err := a.resolveApp(cmd.Context(), cmd, target)
 		if err != nil {
 			return "", err
 		}
@@ -127,7 +127,7 @@ func (a *App) addApps(root *cobra.Command) {
 		return path + "/logs", err
 	})
 	uninstall := &cobra.Command{Use: "uninstall <app>", Short: "Uninstall an app from its cluster", Args: cobra.ExactArgs(1), Example: "  edka apps uninstall onlinetest\n  edka apps uninstall onlinetest --yes", RunE: func(cmd *cobra.Command, args []string) error {
-		c, err := a.resolveApp(cmd.Context(), args[0])
+		c, err := a.resolveApp(cmd.Context(), cmd, args[0])
 		if err != nil {
 			return err
 		}
