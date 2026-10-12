@@ -505,7 +505,7 @@ func (a *App) customAppCommands() []*cobra.Command {
 			if a.output != "table" {
 				return ui.Render(a.Out, jsonBody(map[string]any{"data": map[string]any{"app_id": c.ID, "version": installed, "updated": false}}), a.output, false)
 			}
-			a.message("✓ %s already runs %s", c.Name, installed)
+			a.message("✓ %s already runs %s", ui.Clean(c.Name), ui.Clean(installed))
 			return nil
 		}
 		changes, err := a.versionChanges(cmd.Context(), path, next)
@@ -524,7 +524,7 @@ func (a *App) customAppCommands() []*cobra.Command {
 			if a.output != "table" {
 				return a.render(response)
 			}
-			a.message("✓ Updating %s to %s; follow it with `%s`", c.Name, next, followUp(cmd, "apps", "get", c.Name, "--cluster", text(c.Record, "cluster_name")))
+			a.message("✓ Updating %s to %s; follow it with `%s`", ui.Clean(c.Name), ui.Clean(next), followUp(cmd, "apps", "get", c.Name, "--cluster", text(c.Record, "cluster_name")))
 			return nil
 		}
 		if _, _, err := a.waitApp(cmd.Context(), cmd, clusterOf(c), path, c.Name, waitTimeout); err != nil {
@@ -533,7 +533,7 @@ func (a *App) customAppCommands() []*cobra.Command {
 		if a.output != "table" {
 			return ui.Render(a.Out, jsonBody(map[string]any{"data": map[string]any{"app_id": c.ID, "version": next, "updated": true, "changes": changes}}), a.output, false)
 		}
-		a.message("✓ %s runs %s", c.Name, next)
+		a.message("✓ %s runs %s", ui.Clean(c.Name), ui.Clean(next))
 		return nil
 	}}
 	update.Flags().StringVar(&toVersion, "version", "", "Version to move to; defaults to the latest")
