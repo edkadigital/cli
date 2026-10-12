@@ -128,7 +128,7 @@ func TestAppsInstallSendsOnlyTheChosenSettings(t *testing.T) {
 	if len(*bodies) != 1 || (*bodies)[0] != `{"configuration":{}}` {
 		t.Fatal(*bodies)
 	}
-	if out != "" || errOut != "✓ Installing Whiteboard in cluster sinaia as whiteboard.\n  Next: edka apps get whiteboard\n" {
+	if out != "" || errOut != "✓ Installing Whiteboard in cluster sinaia as whiteboard.\n  Next: edka apps get whiteboard --cluster sinaia\n" {
 		t.Fatalf("%q %q", out, errOut)
 	}
 	out, _, err = execute(t, server.URL, "apps", "install", "Whiteboard", "--cluster", "sinaia", "--name", "Team board", "--json")
@@ -215,7 +215,7 @@ func TestAppsInstallNamesSettingsTheAppDoesNotHave(t *testing.T) {
 	server, _, _ := installAPI(t, []string{rejected}, nil)
 	_, _, err := execute(t, server.URL, "apps", "install", "whiteboard", "--cluster", "sinaia", "--data", `{"labels":{},"replicas":0}`)
 	want := "Whiteboard cannot install with these settings:\n  labels: Unknown field\n  replicas: Number must be greater than or equal to 1. Pods to run\n" +
-		"Remove labels from --data; list the app's settings with `edka apps catalog whiteboard`.\nSet the others with --set key=value."
+		"Remove labels from --data; list the app's settings with `edka apps catalog whiteboard --cluster sinaia`.\nSet the others with --set key=value."
 	if err == nil || err.Error() != want {
 		t.Fatalf("%q", err)
 	}
@@ -331,7 +331,7 @@ func TestAppsInstallWaitEndsDuringARequestWithTheHint(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 	_, _, err := execute(t, server.URL, "apps", "install", "whiteboard", "--cluster", "sinaia", "--wait", "--wait-timeout", "100ms")
-	if err == nil || !strings.Contains(err.Error(), "whiteboard has not finished") || !strings.Contains(err.Error(), "follow it with `edka apps get whiteboard`") {
+	if err == nil || !strings.Contains(err.Error(), "whiteboard has not finished") || !strings.Contains(err.Error(), "follow it with `edka apps get whiteboard --cluster sinaia`") {
 		t.Fatal(err)
 	}
 }
@@ -342,7 +342,7 @@ func TestAppsInstallWaitReportsAFailure(t *testing.T) {
 		`{"data":{"id":"app-1","status":"failed","progress":{"message":"Helm release failed: timed out waiting for the condition"}}}`,
 	})
 	_, _, err := execute(t, server.URL, "apps", "install", "whiteboard", "--cluster", "sinaia", "--wait")
-	want := "whiteboard failed: Helm release failed: timed out waiting for the condition\nFind the cause with `edka apps diagnose whiteboard`"
+	want := "whiteboard failed: Helm release failed: timed out waiting for the condition\nFind the cause with `edka apps diagnose whiteboard --cluster sinaia`"
 	if err == nil || err.Error() != want {
 		t.Fatal(err)
 	}

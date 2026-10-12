@@ -182,7 +182,7 @@ func TestNodePoolAddRefusesWhatEdkaWould(t *testing.T) {
 		{"add workers --type cx33 --taint dedicated=core:Never", "a taint is key=value:effect"},
 		{"add workers", `required flag(s) "type" not set`},
 		{"scale default", "pass --nodes, or --min and --max"},
-		{"scale default --nodes 0", "to remove the pool, run `edka nodepools delete default`"},
+		{"scale default --nodes 0", "to remove the pool, run `edka nodepools delete default --cluster sinaia`"},
 		{"scale default --nodes 3 --max 5", "not both"},
 		{"scale default --max 5", "has a set number of servers; change it with --nodes, or pass both --min and --max"},
 		{"scale burst --nodes 3", "autoscales between 1 and 5 servers; change the range with --min and --max"},

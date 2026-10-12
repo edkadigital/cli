@@ -217,7 +217,7 @@ func TestDeploymentsCreateGitFollowsTheFirstBuild(t *testing.T) {
 	routes["POST /api/clusters/c1/deployments/git"] = []string{`{"data":{"id":"d1","name":"api","spec_generation":4,"initial_build":null}}`}
 	server, _ = sequenceAPI(t, routes)
 	_, _, err = execute(t, server.URL, "deployments", "create", "--git", "--cluster", "sinaia", "--field", "name=api", "--wait")
-	if err == nil || !strings.Contains(err.Error(), "its first build did not start; start one with `edka build api --wait`") {
+	if err == nil || !strings.Contains(err.Error(), "its first build did not start; start one with `edka build api --wait --cluster sinaia`") {
 		t.Fatal(err)
 	}
 }

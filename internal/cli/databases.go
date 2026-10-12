@@ -169,14 +169,14 @@ func (a *App) addDatabases(root *cobra.Command) {
 		if err != nil {
 			return err
 		}
-		a.message("✓ Started a backup of %s\n  Next: edka databases backups %s", ui.Clean(c.Name), ui.Clean(c.Name))
+		a.message("✓ Started a backup of %s\n  Next: %s", ui.Clean(c.Name), followUp(cmd, "databases", "backups", c.Name))
 		if a.output != "table" {
 			return a.render(response)
 		}
 		return nil
 	}}
-	logs := a.logsCommand("logs [database]", "Read a database's logs; follow with --follow", func(ctx context.Context, target string) (string, error) {
-		_, path, err := a.resolveDatabase(ctx, target)
+	logs := a.logsCommand("logs [database]", "Read a database's logs; follow with --follow", func(cmd *cobra.Command, target string) (string, error) {
+		_, path, err := a.resolveDatabase(cmd.Context(), target)
 		return path + "/logs", err
 	})
 	var force bool

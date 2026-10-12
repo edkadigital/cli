@@ -145,24 +145,24 @@ func (a *App) clusterCreateCommand() *cobra.Command {
 		}
 		id, err := safeID(text(created, "clusterId"))
 		if err != nil {
-			return fmt.Errorf("cluster submitted but no ID returned; inspect `edka clusters list`")
+			return fmt.Errorf("cluster submitted but no ID returned; inspect `%s`", followUp(cmd, "clusters", "list"))
 		}
 		if !wait {
-			a.message("✓ Creating cluster %s\n  Next: edka clusters get %s", ui.Clean(name), ui.Clean(name))
+			a.message("✓ Creating cluster %s\n  Next: %s", ui.Clean(name), followUp(cmd, "clusters", "get", name))
 			return a.render(response)
 		}
 
 		a.message("Creating cluster %s…", ui.Clean(name))
 		waitCtx, cancel := context.WithTimeout(ctx, waitTimeout)
 		defer cancel()
-		if err := a.waitCluster(waitCtx, id, name, map[string]bool{}); err != nil {
-			return a.clusterWaitError(waitCtx, name, err)
+		if err := a.waitCluster(waitCtx, cmd, id, name, map[string]bool{}); err != nil {
+			return a.clusterWaitError(waitCtx, cmd, name, err)
 		}
 		a.message("✓ Cluster %s is active", ui.Clean(name))
 		if mergeKubeconfig {
 			downloaded, err := a.request(ctx, "GET", "/api/clusters/"+id+"/user-kubeconfig/download", nil, nil)
 			if err != nil {
-				return fmt.Errorf("cluster %s is active, but its kubeconfig could not be downloaded: %w\nRetry with: edka clusters kubeconfig %s --merge", ui.Clean(name), err, ui.Clean(name))
+				return fmt.Errorf("cluster %s is active, but its kubeconfig could not be downloaded: %w\nRetry with: %s", ui.Clean(name), err, followUp(cmd, "clusters", "kubeconfig", name, "--merge"))
 			}
 			if err := a.mergeKubeconfig(target, entries, id, name, downloaded.Body, use); err != nil {
 				return err
@@ -333,7 +333,7 @@ func (a *App) clusterPrice(ctx context.Context, body map[string]any) []string {
 // waitCluster prints a cluster's events to stderr until the cluster is active.
 // seen holds the IDs of the events that are not printed, such as those of
 // earlier changes.
-func (a *App) waitCluster(ctx context.Context, id, name string, seen map[string]bool) error {
+func (a *App) waitCluster(ctx context.Context, cmd *cobra.Command, id, name string, seen map[string]bool) error {
 	p := a.startProgress()
 	last := ""
 	for {
@@ -367,7 +367,7 @@ func (a *App) waitCluster(ctx context.Context, id, name string, seen map[string]
 		case "active", "running":
 			return nil
 		case "failed", "error":
-			return fmt.Errorf("cluster %s failed: %s\nFind the cause with `edka clusters diagnose %s`", ui.Clean(name), first(last, status), ui.Clean(name))
+			return fmt.Errorf("cluster %s failed: %s\nFind the cause with `%s`", ui.Clean(name), first(last, status), followUp(cmd, "clusters", "diagnose", name))
 		}
 		p.say("status", first(clusterWaitSteps[status], "Status: "+status))
 		if err := pause(ctx, pollInterval); err != nil {
@@ -377,11 +377,11 @@ func (a *App) waitCluster(ctx context.Context, id, name string, seen map[string]
 }
 
 // clusterWaitError explains a wait for a new cluster that ran out of time.
-func (a *App) clusterWaitError(ctx context.Context, name string, err error) error {
+func (a *App) clusterWaitError(ctx context.Context, cmd *cobra.Command, name string, err error) error {
 	if ctx.Err() == nil {
 		return err
 	}
-	return fmt.Errorf("cluster %s is not active yet: %w; it keeps provisioning, follow it with `edka clusters get %s`", ui.Clean(name), ctx.Err(), ui.Clean(name))
+	return fmt.Errorf("cluster %s is not active yet: %w; it keeps provisioning, follow it with `%s`", ui.Clean(name), ctx.Err(), followUp(cmd, "clusters", "get", name))
 }
 
 func asList(v any) []any {

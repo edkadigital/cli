@@ -118,8 +118,8 @@ func (a *App) addApps(root *cobra.Command) {
 		}
 		return a.showApp(m, text(c.Record, "cluster_name"), c.ID)
 	}}
-	logs := a.logsCommand("logs [app]", "Read an app's logs; follow with --follow", func(ctx context.Context, target string) (string, error) {
-		c, err := a.resolveApp(ctx, target)
+	logs := a.logsCommand("logs [app]", "Read an app's logs; follow with --follow", func(cmd *cobra.Command, target string) (string, error) {
+		c, err := a.resolveApp(cmd.Context(), target)
 		if err != nil {
 			return "", err
 		}
@@ -151,7 +151,7 @@ func (a *App) addApps(root *cobra.Command) {
 			if err != nil {
 				return err
 			}
-			app, err := a.resolveCatalogApp(cmd.Context(), cluster, args[0])
+			app, err := a.resolveCatalogApp(cmd.Context(), cmd, cluster, args[0])
 			if err != nil {
 				return err
 			}

@@ -284,11 +284,11 @@ var appStatusLines = map[string]string{
 // waitApp prints an app operation's progress to stderr until the app is
 // installed or the operation fails, and returns the app as it was last read.
 // An install and an update wait the same way.
-func (a *App) waitApp(parent context.Context, path, name string, timeout time.Duration) (*api.Response, map[string]any, error) {
+func (a *App) waitApp(parent context.Context, cmd *cobra.Command, path, name string, timeout time.Duration) (*api.Response, map[string]any, error) {
 	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
 	p := a.startProgress()
-	shown, command, status := ui.Clean(name), shellJoin([]string{name}), ""
+	shown, status := ui.Clean(name), ""
 	unfinished := func(err error) error {
 		if ctx.Err() == nil {
 			return err
@@ -297,7 +297,7 @@ func (a *App) waitApp(parent context.Context, path, name string, timeout time.Du
 		if status != "" {
 			state = "is still " + ui.Clean(status)
 		}
-		return fmt.Errorf("%s %s: %w; the operation continues, follow it with `edka apps get %s`", shown, state, ctx.Err(), command)
+		return fmt.Errorf("%s %s: %w; the operation continues, follow it with `%s`", shown, state, ctx.Err(), followUp(cmd, "apps", "get", name))
 	}
 	for {
 		response, err := a.poll(ctx, p, path, nil)
@@ -318,7 +318,7 @@ func (a *App) waitApp(parent context.Context, path, name string, timeout time.Du
 			if message != "" {
 				message = ": " + ui.Clean(message)
 			}
-			return nil, nil, fmt.Errorf("%s failed%s\nFind the cause with `edka apps diagnose %s`", shown, message, command)
+			return nil, nil, fmt.Errorf("%s failed%s\nFind the cause with `%s`", shown, message, followUp(cmd, "apps", "diagnose", name))
 		}
 		p.say("status", first(appStatusLines[status], status))
 		p.say("message", message)
@@ -377,7 +377,7 @@ func (a *App) customAppCommands() []*cobra.Command {
 			return ui.Render(a.Out, jsonBody(map[string]any{"data": map[string]any{"directory": dir, "files": len(files)}}), a.output, false)
 		}
 		a.message("✓ Wrote %d files to %s", len(files), dir)
-		a.message("Next: edit %s, then run `edka apps validate %s`", filepath.Join(dir, "template.yaml"), dir)
+		a.message("Next: edit %s, then run `%s`", filepath.Join(dir, "template.yaml"), followUp(cmd, "apps", "validate", dir))
 		return nil
 	}}
 	initCmd.Flags().StringVar(&image, "image", "", "Image repository without a tag, such as ghcr.io/usememos/memos")
@@ -524,10 +524,10 @@ func (a *App) customAppCommands() []*cobra.Command {
 			if a.output != "table" {
 				return a.render(response)
 			}
-			a.message("✓ Updating %s to %s; follow it with `edka apps get %s`", c.Name, next, c.Name)
+			a.message("✓ Updating %s to %s; follow it with `%s`", c.Name, next, followUp(cmd, "apps", "get", c.Name))
 			return nil
 		}
-		if _, _, err := a.waitApp(cmd.Context(), path, c.Name, waitTimeout); err != nil {
+		if _, _, err := a.waitApp(cmd.Context(), cmd, path, c.Name, waitTimeout); err != nil {
 			return err
 		}
 		if a.output != "table" {

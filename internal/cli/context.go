@@ -148,9 +148,9 @@ func (a *App) addContext(root *cobra.Command) {
 			rows = append(rows, row(name))
 		}
 		return ui.Render(a.Out, jsonBody(rows), a.output, a.color)
-	}}, &cobra.Command{Use: "use <name>", Short: "Set the default profile", Args: cobra.ExactArgs(1), ValidArgsFunction: firstArgument(a.profileNames), RunE: func(_ *cobra.Command, args []string) error {
+	}}, &cobra.Command{Use: "use <name>", Short: "Set the default profile", Args: cobra.ExactArgs(1), ValidArgsFunction: firstArgument(a.profileNames), RunE: func(cmd *cobra.Command, args []string) error {
 		if _, exists := a.cfg.Profiles[args[0]]; !exists {
-			return fmt.Errorf("profile %q does not exist; run `edka login --profile %s`", args[0], args[0])
+			return fmt.Errorf("profile %q does not exist; run `%s`", args[0], followUp(cmd, "login", "--profile", args[0]))
 		}
 		a.cfg.Active = args[0]
 		if err := config.Save(a.dir, a.cfg); err != nil {
@@ -174,7 +174,7 @@ func (a *App) addContext(root *cobra.Command) {
 			return fmt.Errorf("can't confirm profile %q is signed out: %w", name, err)
 		}
 		if signedIn {
-			return fmt.Errorf("profile %q is signed in; run `edka logout --profile %s` first", name, name)
+			return fmt.Errorf("profile %q is signed in; run `%s` first", name, followUp(cmd, "logout", "--profile", name))
 		}
 		delete(a.cfg.Profiles, name)
 		wasActive := a.cfg.Active == name

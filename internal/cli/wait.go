@@ -11,6 +11,7 @@ import (
 
 	"github.com/edkadigital/cli/internal/api"
 	"github.com/edkadigital/cli/internal/ui"
+	"github.com/spf13/cobra"
 )
 
 // pollInterval is how often a wait reads the API again.
@@ -211,7 +212,7 @@ func (a *App) buildRollout(ctx context.Context, id string, before int, imageTag 
 // waitDeployment waits until generation rolls out healthy and returns the
 // runtime status. Progress goes to stderr: pods updated and ready, pods that
 // fail, and messages from Edka such as an unreachable cluster.
-func (a *App) waitDeployment(ctx context.Context, id, name string, generation int) (*api.Response, error) {
+func (a *App) waitDeployment(ctx context.Context, cmd *cobra.Command, id, name string, generation int) (*api.Response, error) {
 	p := a.startProgress()
 	for {
 		response, err := a.poll(ctx, p, "/api/deployments/"+id, nil)
@@ -224,11 +225,11 @@ func (a *App) waitDeployment(ctx context.Context, id, name string, generation in
 		}
 		current := number(record["spec_generation"])
 		if current > generation {
-			return nil, a.replaced(ctx, id, name, generation, current)
+			return nil, a.replaced(ctx, cmd, id, name, generation, current)
 		}
 		status := text(record, "status")
 		if current == generation && (status == "failed" || status == "error") {
-			return nil, rolloutFailed(name, generation, text(record, "status_message"))
+			return nil, rolloutFailed(cmd, name, generation, text(record, "status_message"))
 		}
 		p.say("message", text(record, "status_message"))
 		if current == generation && number(record["applied_generation"]) == generation {
@@ -246,14 +247,14 @@ func (a *App) waitDeployment(ctx context.Context, id, name string, generation in
 					a.message("✓ %s is running generation %d", ui.Clean(name), generation)
 					return runtime, nil
 				case "failed":
-					return nil, rolloutFailed(name, generation, text(state, "message"))
+					return nil, rolloutFailed(cmd, name, generation, text(state, "message"))
 				}
 			}
 		} else {
 			p.say("step", fmt.Sprintf("Applying generation %d…", generation))
 		}
 		if err := pause(ctx, pollInterval); err != nil {
-			return nil, fmt.Errorf("generation %d did not finish: %w; inspect `edka deployments status %s`", generation, err, name)
+			return nil, fmt.Errorf("generation %d did not finish: %w; inspect `%s`", generation, err, followUp(cmd, "deployments", "status", name))
 		}
 	}
 }
@@ -268,26 +269,26 @@ func (a *App) runtimeState(ctx context.Context, p *progress, id string) (*api.Re
 	return response, state, err
 }
 
-func rolloutFailed(name string, generation int, reason string) error {
+func rolloutFailed(cmd *cobra.Command, name string, generation int, reason string) error {
 	message := fmt.Sprintf("generation %d failed", generation)
 	if reason != "" {
 		message += ": " + reason
 	}
-	return fmt.Errorf("%s\nFind the cause with `edka diagnose %s`", message, name)
+	return fmt.Errorf("%s\nFind the cause with `%s`", message, followUp(cmd, "diagnose", name))
 }
 
 // replaced explains a generation that a later one replaced before it rolled
 // out, such as the automatic rollback after it failed. A diagnosis explains
 // one that failed; the revisions show which change replaced the other.
-func (a *App) replaced(ctx context.Context, id, name string, generation, current int) error {
+func (a *App) replaced(ctx context.Context, cmd *cobra.Command, id, name string, generation, current int) error {
 	if response, err := a.request(ctx, "GET", fmt.Sprintf("/api/deployments/%s/revisions/%d", id, generation), nil, nil); err == nil {
 		if revision, err := identityData(response.Body); err == nil && text(revision, "status") == "failed" {
 			message := fmt.Sprintf("generation %d failed", generation)
 			if reason := text(revision, "status_message"); reason != "" {
 				message += ": " + reason
 			}
-			return fmt.Errorf("%s\nGeneration %d replaced it\nFind the cause with `edka diagnose %s`", message, current, name)
+			return fmt.Errorf("%s\nGeneration %d replaced it\nFind the cause with `%s`", message, current, followUp(cmd, "diagnose", name))
 		}
 	}
-	return fmt.Errorf("generation %d was replaced by generation %d; inspect `edka deployments revisions %s`", generation, current, name)
+	return fmt.Errorf("generation %d was replaced by generation %d; inspect `%s`", generation, current, followUp(cmd, "deployments", "revisions", name))
 }

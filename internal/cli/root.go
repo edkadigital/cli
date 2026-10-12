@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -304,17 +305,32 @@ func invocation(cmd *cobra.Command, args []string) string {
 // contextFlags are the global flags that choose where a command acts.
 var contextFlags = []string{"profile", "api-url", "credential-store", "organization", "cluster", "deployment"}
 
+// placeholder is an argument for the reader to replace, such as <cluster>.
+var placeholder = regexp.MustCompile(`^<[a-z-]+>$`)
+
 // followUp is an edka command to run next, with each of the global flags that
 // choose where a command acts that the user set on cmd, so it reaches the same
-// resources. Its arguments may come from Edka, so it is cleaned for display.
+// resources. A flag that args pass already keeps their value. An `edka api`
+// command takes IDs through its own flags and refuses --deployment, so it gets
+// neither --cluster nor --deployment. A placeholder stays unquoted. Its
+// arguments may come from Edka, so it is cleaned for display.
 func followUp(cmd *cobra.Command, args ...string) string {
 	words := append([]string{cmd.Root().Name()}, args...)
+	endpoint := len(args) > 0 && args[0] == "api"
 	for _, name := range contextFlags {
+		if slices.Contains(args, "--"+name) || endpoint && (name == "cluster" || name == "deployment") {
+			continue
+		}
 		if flag := cmd.Flags().Lookup(name); flag != nil && flag.Changed {
 			words = append(words, "--"+name, flag.Value.String())
 		}
 	}
-	return ui.Clean(shellJoin(words))
+	for i, word := range words {
+		if !placeholder.MatchString(word) {
+			words[i] = shellJoin([]string{word})
+		}
+	}
+	return ui.Clean(strings.Join(words, " "))
 }
 
 // pipeHint is the shell line that pipes $variable to command on stdin.
@@ -447,9 +463,9 @@ func (a *App) resolveContext(cmd *cobra.Command) error {
 	current, exists := a.cfg.Profiles[a.profile]
 	if !exists && !local(cmd) {
 		if a.profileFlag == "" && os.Getenv("EDKA_PROFILE") == "" && a.profile == linkedProfile {
-			return fmt.Errorf("profile %q from %s does not exist; run `edka login --profile %s`, or `edka unlink` in %s", a.profile, a.linkPath, a.profile, filepath.Dir(a.linkPath))
+			return fmt.Errorf("profile %q from %s does not exist; run `%s`, or `edka unlink` in %s", a.profile, a.linkPath, followUp(cmd, "login", "--profile", a.profile), filepath.Dir(a.linkPath))
 		}
-		return fmt.Errorf("profile %q does not exist; run `edka login --profile %s`", a.profile, a.profile)
+		return fmt.Errorf("profile %q does not exist; run `%s`", a.profile, followUp(cmd, "login", "--profile", a.profile))
 	}
 	a.current = current
 	base := first(a.apiFlag, os.Getenv("EDKA_API_URL"), current.APIURL, config.DefaultAPI)

@@ -14,7 +14,12 @@ import (
 	"time"
 
 	"github.com/edkadigital/cli/internal/config"
+	"github.com/spf13/cobra"
 )
+
+// bareCommand is `edka` run without flags, for the hints of a helper a test
+// calls directly.
+func bareCommand() *cobra.Command { return &cobra.Command{Use: "edka"} }
 
 // fastPolls makes waits poll without pausing.
 func fastPolls(t *testing.T) {
@@ -267,7 +272,7 @@ func TestWaitExplainsFailedRollouts(t *testing.T) {
 			t.Setenv("EDKA_TOKEN", "test-token")
 			server, _ := sequenceAPI(t, tc.routes)
 			a := App{current: config.Profile{APIURL: server.URL}, Out: &bytes.Buffer{}, Err: &bytes.Buffer{}, HTTP: server.Client()}
-			_, err := a.waitDeployment(t.Context(), "d1", "api", 2)
+			_, err := a.waitDeployment(t.Context(), bareCommand(), "d1", "api", 2)
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatal(err)
 			}
@@ -326,7 +331,7 @@ func TestWaitStopsWhenReadsKeepFailing(t *testing.T) {
 		server, requests := sequenceAPI(t, map[string][]string{"GET /api/deployments/d1": {tc.response}})
 		var errOut bytes.Buffer
 		a := App{current: config.Profile{APIURL: server.URL}, Out: &bytes.Buffer{}, Err: &errOut, HTTP: server.Client()}
-		_, err := a.waitDeployment(t.Context(), "d1", "api", 2)
+		_, err := a.waitDeployment(t.Context(), bareCommand(), "d1", "api", 2)
 		if err == nil || !strings.Contains(err.Error(), tc.want) {
 			t.Fatal(err)
 		}
@@ -343,7 +348,7 @@ func TestWaitTimeoutDuringRetriesKeepsTheDeadline(t *testing.T) {
 	a := App{current: config.Profile{APIURL: server.URL}, Out: &bytes.Buffer{}, Err: &bytes.Buffer{}, HTTP: server.Client()}
 	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
 	defer cancel()
-	if _, err := a.waitDeployment(ctx, "d1", "api", 2); !errors.Is(err, context.DeadlineExceeded) {
+	if _, err := a.waitDeployment(ctx, bareCommand(), "d1", "api", 2); !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatal(err)
 	}
 }
@@ -363,7 +368,7 @@ func TestWaitTimeoutAsAReadFailsKeepsTheDeadline(t *testing.T) {
 	a := App{current: config.Profile{APIURL: "https://api.example"}, Out: &bytes.Buffer{}, Err: &bytes.Buffer{}, HTTP: &http.Client{Transport: lateFailure{}}}
 	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
 	defer cancel()
-	_, err := a.waitDeployment(ctx, "d1", "api", 2)
+	_, err := a.waitDeployment(ctx, bareCommand(), "d1", "api", 2)
 	if !errors.Is(err, context.DeadlineExceeded) || !strings.Contains(err.Error(), "the last read failed: Service unavailable (HTTP 503)") {
 		t.Fatal(err)
 	}

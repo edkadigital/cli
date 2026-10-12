@@ -84,10 +84,10 @@ func previewCandidates(rows []map[string]any) []candidate {
 // resolvePreview selects a preview of the context deployment by its pull
 // request number, written 12 or #12. It returns the deployment, the preview as
 // Edka lists it, and the preview's path.
-func (a *App) resolvePreview(ctx context.Context, target string) (*candidate, map[string]any, string, error) {
+func (a *App) resolvePreview(ctx context.Context, cmd *cobra.Command, target string) (*candidate, map[string]any, string, error) {
 	target = strings.TrimPrefix(strings.TrimSpace(target), "#")
 	if target != "" && strings.Trim(target, "0123456789") != "" {
-		return nil, nil, "", fmt.Errorf("a preview is named by its pull request number, such as 12; list them with `edka previews list`")
+		return nil, nil, "", fmt.Errorf("a preview is named by its pull request number, such as 12; list them with `%s`", followUp(cmd, "previews", "list"))
 	}
 	c, path, err := a.previewDeployment(ctx, "")
 	if err != nil {
@@ -102,11 +102,11 @@ func (a *App) resolvePreview(ctx context.Context, target string) (*candidate, ma
 	case len(candidates) == 0:
 		return nil, nil, "", fmt.Errorf("%s has no previews; a pull request gets one when previews are on for the deployment", ui.Clean(c.Name))
 	case target == "" && len(candidates) > 1 && a.noInput:
-		return nil, nil, "", fmt.Errorf("%s has %d previews; name a pull request from `edka previews list`", ui.Clean(c.Name), len(candidates))
+		return nil, nil, "", fmt.Errorf("%s has %d previews; name a pull request from `%s`", ui.Clean(c.Name), len(candidates), followUp(cmd, "previews", "list"))
 	}
 	preview, err := a.pick(ctx, "preview", candidates, target)
 	if errors.Is(err, errNotFound) {
-		return nil, nil, "", fmt.Errorf("%s has no preview of pull request #%s; list them with `edka previews list`", ui.Clean(c.Name), target)
+		return nil, nil, "", fmt.Errorf("%s has no preview of pull request #%s; list them with `%s`", ui.Clean(c.Name), target, followUp(cmd, "previews", "list"))
 	}
 	if err != nil {
 		return nil, nil, "", err
@@ -146,7 +146,7 @@ func (a *App) addPreviews(root *cobra.Command) {
 	}}
 	list.Flags().BoolVar(&deleted, "deleted", false, "Include deleted previews")
 	status := &cobra.Command{Use: "status [pr]", Short: "Show a preview, its replicas and pods", Long: "Show a preview as Edka records it, and what runs for it in the cluster. A\npreview that is still building or that failed runs nothing yet; the command\nthen shows the record with its error and says so on stderr.", Args: cobra.MaximumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		_, preview, path, err := a.resolvePreview(cmd.Context(), argument(args))
+		_, preview, path, err := a.resolvePreview(cmd.Context(), cmd, argument(args))
 		if err != nil {
 			return err
 		}
@@ -196,12 +196,12 @@ func (a *App) addPreviews(root *cobra.Command) {
 		}
 		return nil
 	}}
-	logs := a.logsCommand("logs [pr]", "Read a preview's logs; follow with --follow", func(ctx context.Context, target string) (string, error) {
-		_, _, path, err := a.resolvePreview(ctx, target)
+	logs := a.logsCommand("logs [pr]", "Read a preview's logs; follow with --follow", func(cmd *cobra.Command, target string) (string, error) {
+		_, _, path, err := a.resolvePreview(cmd.Context(), cmd, target)
 		return path + "/logs", err
 	})
 	open := &cobra.Command{Use: "open [pr]", Short: "Open a preview in the browser", Long: "Print a preview's URL to stderr and open it in the browser. With --json, or\nwithout a terminal, the command prints the URL on stdout and opens nothing.", Args: cobra.MaximumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		_, preview, _, err := a.resolvePreview(cmd.Context(), argument(args))
+		_, preview, _, err := a.resolvePreview(cmd.Context(), cmd, argument(args))
 		if err != nil {
 			return err
 		}
@@ -218,7 +218,7 @@ func (a *App) addPreviews(root *cobra.Command) {
 		return auth.OpenBrowser(address)
 	}}
 	remove := &cobra.Command{Use: "delete <pr>", Short: "Delete a preview and what runs for it", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		c, preview, path, err := a.resolvePreview(cmd.Context(), args[0])
+		c, preview, path, err := a.resolvePreview(cmd.Context(), cmd, args[0])
 		if err != nil {
 			return err
 		}

@@ -109,9 +109,9 @@ func (a *App) poolRows(ctx context.Context, all bool) ([]map[string]any, error) 
 }
 
 // resolvePool selects a node pool by ID or name.
-func (a *App) resolvePool(ctx context.Context, target string) (*candidate, error) {
+func (a *App) resolvePool(ctx context.Context, cmd *cobra.Command, target string) (*candidate, error) {
 	if target == "" && a.noInput {
-		return nil, fmt.Errorf("name the node pool; list them with `edka nodepools list`")
+		return nil, fmt.Errorf("name the node pool; list them with `%s`", followUp(cmd, "nodepools", "list"))
 	}
 	rows, err := a.poolRows(ctx, false)
 	if err != nil {
@@ -238,13 +238,13 @@ func (a *App) startPoolChange(ctx context.Context) (*poolChange, error) {
 }
 
 // find returns the entry of a pool named by ID or name, and the pool as read.
-func (c *poolChange) find(target string) (entry, pool map[string]any, err error) {
+func (c *poolChange) find(cmd *cobra.Command, target string) (entry, pool map[string]any, err error) {
 	for i, row := range c.pools {
 		if target == text(row, "id") || target == text(row, "name") {
 			return c.entries[i], row, nil
 		}
 	}
-	return nil, nil, fmt.Errorf("node pool %q was not found in cluster %s; list them with `edka nodepools list`", target, ui.Clean(c.cluster.Name))
+	return nil, nil, fmt.Errorf("node pool %q was not found in cluster %s; list them with `%s`", target, ui.Clean(c.cluster.Name), followUp(cmd, "nodepools", "list"))
 }
 
 // body is the update request. It names the time each pool last changed, so
@@ -282,7 +282,7 @@ func (w *poolWrite) flags(cmd *cobra.Command, until string) {
 // until the cluster is active again. It returns the time the wait ends, for
 // the caller to wait for the pool itself. The time is zero when the command
 // has nothing more to do: after a dry run, or without --wait.
-func (a *App) applyPoolChange(ctx context.Context, change *poolChange, w poolWrite, confirmation, started string) (time.Time, error) {
+func (a *App) applyPoolChange(ctx context.Context, cmd *cobra.Command, change *poolChange, w poolWrite, confirmation, started string) (time.Time, error) {
 	none := time.Time{}
 	if w.wait && w.waitTimeout <= 0 {
 		return none, fmt.Errorf("wait-timeout must be positive")
@@ -317,9 +317,8 @@ func (a *App) applyPoolChange(ctx context.Context, change *poolChange, w poolWri
 	if err != nil {
 		return none, err
 	}
-	name := ui.Clean(change.cluster.Name)
 	if !w.wait {
-		a.message("✓ %s\n  Check progress: edka nodepools list --cluster %s", started, name)
+		a.message("✓ %s\n  Check progress: %s", started, followUp(cmd, "nodepools", "list", "--cluster", change.cluster.Name))
 		if a.output != "table" {
 			return none, a.render(response)
 		}
@@ -329,18 +328,18 @@ func (a *App) applyPoolChange(ctx context.Context, change *poolChange, w poolWri
 	deadline := time.Now().Add(w.waitTimeout)
 	waitCtx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
-	if err := a.waitCluster(waitCtx, id, change.cluster.Name, seen); err != nil {
-		return none, unfinished(waitCtx, err, name)
+	if err := a.waitCluster(waitCtx, cmd, id, change.cluster.Name, seen); err != nil {
+		return none, unfinished(waitCtx, cmd, err, change.cluster.Name)
 	}
 	return deadline, nil
 }
 
 // unfinished explains a wait that ran out of time: the change keeps running.
-func unfinished(ctx context.Context, err error, cluster string) error {
+func unfinished(ctx context.Context, cmd *cobra.Command, err error, cluster string) error {
 	if ctx.Err() == nil {
 		return err
 	}
-	return fmt.Errorf("the change is not finished: %w; it keeps running, follow it with `edka nodepools list --cluster %s`", ctx.Err(), cluster)
+	return fmt.Errorf("the change is not finished: %w; it keeps running, follow it with `%s`", ctx.Err(), followUp(cmd, "nodepools", "list", "--cluster", cluster))
 }
 
 // clusterEvents reads a cluster's latest events, or none when the read fails.
@@ -382,7 +381,7 @@ func (a *App) currentPool(ctx context.Context, p *progress, cluster *candidate, 
 
 // settlePool waits until a pool has the servers it is set to have, and returns
 // it. An autoscaling pool has as many as its workloads need.
-func (a *App) settlePool(ctx context.Context, deadline time.Time, cluster *candidate, name string) (map[string]any, error) {
+func (a *App) settlePool(ctx context.Context, cmd *cobra.Command, deadline time.Time, cluster *candidate, name string) (map[string]any, error) {
 	ctx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
 	p := a.startProgress()
@@ -390,15 +389,15 @@ func (a *App) settlePool(ctx context.Context, deadline time.Time, cluster *candi
 		pool, err := a.currentPool(ctx, p, cluster, name)
 		switch {
 		case err != nil:
-			return nil, unfinished(ctx, err, ui.Clean(cluster.Name))
+			return nil, unfinished(ctx, cmd, err, cluster.Name)
 		case pool == nil:
-			return nil, fmt.Errorf("cluster %s is active, but it has no node pool %s; inspect `edka nodepools list --cluster %s`", ui.Clean(cluster.Name), name, ui.Clean(cluster.Name))
+			return nil, fmt.Errorf("cluster %s is active, but it has no node pool %s; inspect `%s`", ui.Clean(cluster.Name), name, followUp(cmd, "nodepools", "list", "--cluster", cluster.Name))
 		case pool["autoscaling_enabled"] == true || number(pool["actual_count"]) == number(pool["desired_count"]):
 			return pool, nil
 		}
 		p.say("servers", fmt.Sprintf("Node pool %s has %d of %s…", name, number(pool["actual_count"]), servers(number(pool["desired_count"]))))
 		if err := pause(ctx, pollInterval); err != nil {
-			return nil, unfinished(ctx, err, ui.Clean(cluster.Name))
+			return nil, unfinished(ctx, cmd, err, cluster.Name)
 		}
 	}
 }
@@ -456,7 +455,7 @@ func (a *App) addNodePools(root *cobra.Command) {
 	}}
 	list.Flags().BoolVar(&all, "all", false, "List node pools in every cluster, not only the linked one")
 	get := &cobra.Command{Use: "get [pool]", Short: "Show a node pool, its labels and taints", Args: cobra.MaximumNArgs(1), Example: "  edka nodepools get workers\n  edka nodepools get workers --cluster production --json", RunE: func(cmd *cobra.Command, args []string) error {
-		c, err := a.resolvePool(cmd.Context(), argument(args))
+		c, err := a.resolvePool(cmd.Context(), cmd, argument(args))
 		if err != nil {
 			return err
 		}
@@ -497,7 +496,7 @@ func (a *App) addNodePools(root *cobra.Command) {
 			return err
 		}
 		cluster := ui.Clean(change.cluster.Name)
-		if _, _, err := change.find(name); err == nil {
+		if _, _, err := change.find(cmd, name); err == nil {
 			return fmt.Errorf("cluster %s already has a node pool named %s", cluster, name)
 		}
 		where := first(location, text(change.cluster.Record, "location"))
@@ -527,11 +526,11 @@ func (a *App) addNodePools(root *cobra.Command) {
 		if autoscaling {
 			size = fmt.Sprintf("%d–%d × %s in %s, autoscaling", minimum, maximum, serverType, where)
 		}
-		deadline, err := a.applyPoolChange(ctx, change, adding, fmt.Sprintf("Add node pool %s to cluster %s with %s", name, change.cluster.Name, size), fmt.Sprintf("Adding node pool %s to cluster %s", name, cluster))
+		deadline, err := a.applyPoolChange(ctx, cmd, change, adding, fmt.Sprintf("Add node pool %s to cluster %s with %s", name, change.cluster.Name, size), fmt.Sprintf("Adding node pool %s to cluster %s", name, cluster))
 		if err != nil || deadline.IsZero() {
 			return err
 		}
-		pool, err := a.settlePool(ctx, deadline, change.cluster, name)
+		pool, err := a.settlePool(ctx, cmd, deadline, change.cluster, name)
 		if err != nil {
 			return err
 		}
@@ -589,13 +588,13 @@ func (a *App) addNodePools(root *cobra.Command) {
 		case setNodes && (setMin || setMax):
 			return fmt.Errorf("pass --nodes, or --min and --max, not both")
 		case setNodes && scaleNodes < 1:
-			return fmt.Errorf("--nodes must be at least 1; to remove the pool, run `edka nodepools delete %s`", args[0])
+			return fmt.Errorf("--nodes must be at least 1; to remove the pool, run `%s`", followUp(cmd, "nodepools", "delete", args[0]))
 		}
 		change, err := a.startPoolChange(ctx)
 		if err != nil {
 			return err
 		}
-		entry, pool, err := change.find(args[0])
+		entry, pool, err := change.find(cmd, args[0])
 		if err != nil {
 			return err
 		}
@@ -647,11 +646,11 @@ func (a *App) addNodePools(root *cobra.Command) {
 			}
 			return nil
 		}
-		deadline, err := a.applyPoolChange(ctx, change, scaling, confirmation, fmt.Sprintf("Scaling node pool %s in cluster %s", name, cluster))
+		deadline, err := a.applyPoolChange(ctx, cmd, change, scaling, confirmation, fmt.Sprintf("Scaling node pool %s in cluster %s", name, cluster))
 		if err != nil || deadline.IsZero() {
 			return err
 		}
-		current, err := a.settlePool(ctx, deadline, change.cluster, text(pool, "name"))
+		current, err := a.settlePool(ctx, cmd, deadline, change.cluster, text(pool, "name"))
 		if err != nil {
 			return err
 		}
@@ -670,7 +669,7 @@ func (a *App) addNodePools(root *cobra.Command) {
 		if err != nil {
 			return err
 		}
-		_, pool, err := change.find(args[0])
+		_, pool, err := change.find(cmd, args[0])
 		if err != nil {
 			return err
 		}
@@ -687,7 +686,7 @@ func (a *App) addNodePools(root *cobra.Command) {
 			from = ", the last one of cluster " + change.cluster.Name + ","
 		}
 		confirmation := fmt.Sprintf("Delete node pool %s%s with its %s", text(pool, "name"), from, servers(max(number(pool["actual_count"]), number(pool["desired_count"]))))
-		deadline, err := a.applyPoolChange(ctx, change, removing, confirmation, fmt.Sprintf("Deleting node pool %s from cluster %s", name, cluster))
+		deadline, err := a.applyPoolChange(ctx, cmd, change, removing, confirmation, fmt.Sprintf("Deleting node pool %s from cluster %s", name, cluster))
 		if err != nil || deadline.IsZero() {
 			return err
 		}
@@ -699,7 +698,7 @@ func (a *App) addNodePools(root *cobra.Command) {
 			current, err := a.currentPool(waitCtx, p, change.cluster, text(pool, "name"))
 			switch {
 			case err != nil:
-				return unfinished(waitCtx, err, cluster)
+				return unfinished(waitCtx, cmd, err, change.cluster.Name)
 			case current == nil:
 				a.message("✓ Deleted node pool %s from cluster %s", name, cluster)
 				if a.output != "table" {
@@ -711,7 +710,7 @@ func (a *App) addNodePools(root *cobra.Command) {
 			}
 			p.say("deleting", "Waiting for the servers to be deleted…")
 			if err := pause(waitCtx, pollInterval); err != nil {
-				return unfinished(waitCtx, err, cluster)
+				return unfinished(waitCtx, cmd, err, change.cluster.Name)
 			}
 		}
 	}}

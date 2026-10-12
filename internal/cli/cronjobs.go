@@ -153,8 +153,8 @@ func (a *App) addCronjobs(root *cobra.Command) {
 	}}
 	runs.Flags().IntVar(&limit, "limit", 20, "Number of runs (1–100)")
 	var job string
-	logs := a.logsCommand("logs [cronjob]", "Read a run's logs; the newest run by default", func(ctx context.Context, target string) (string, error) {
-		_, path, err := a.resolveCronjob(ctx, target)
+	logs := a.logsCommand("logs [cronjob]", "Read a run's logs; the newest run by default", func(cmd *cobra.Command, target string) (string, error) {
+		_, path, err := a.resolveCronjob(cmd.Context(), target)
 		if err != nil {
 			return "", err
 		}
@@ -174,7 +174,7 @@ func (a *App) addCronjobs(root *cobra.Command) {
 		if err != nil {
 			return err
 		}
-		a.message("✓ Queued a run of %s\n  Next: edka cronjobs runs %s", ui.Clean(c.Name), ui.Clean(c.Name))
+		a.message("✓ Queued a run of %s\n  Next: %s", ui.Clean(c.Name), followUp(cmd, "cronjobs", "runs", c.Name))
 		if a.output != "table" {
 			return a.render(response)
 		}
@@ -191,7 +191,7 @@ func (a *App) addCronjobs(root *cobra.Command) {
 				return err
 			}
 			if suspend {
-				a.message("✓ Suspending %s; scheduled runs stop until `edka cronjobs resume %s`", ui.Clean(c.Name), ui.Clean(c.Name))
+				a.message("✓ Suspending %s; scheduled runs stop until `%s`", ui.Clean(c.Name), followUp(cmd, "cronjobs", "resume", c.Name))
 			} else {
 				a.message("✓ Resuming %s", ui.Clean(c.Name))
 			}
