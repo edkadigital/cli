@@ -103,7 +103,9 @@ func (a *App) envCommand() *cobra.Command {
 		if wait && waitTimeout <= 0 {
 			return fmt.Errorf("wait-timeout must be positive")
 		}
-		keys, values, err := envAssignments(args, secret)
+		// A hint repeats the command for one secret, every flag included.
+		oneKey := func(key string) string { return invocation(cmd, []string{key}) }
+		keys, values, err := envAssignments(args, secret, oneKey)
 		if err != nil {
 			return err
 		}
@@ -119,7 +121,7 @@ func (a *App) envCommand() *cobra.Command {
 		if secret {
 			// The values are read first, so the lists are not as old as a
 			// prompt takes to answer by the time the change is sent.
-			secretValues, err := a.secretValues(cmd.Context(), c.Name, keys)
+			secretValues, err := a.secretValues(cmd.Context(), c.Name, keys, oneKey)
 			if err != nil {
 				return err
 			}
@@ -218,13 +220,14 @@ func (a *App) envCommand() *cobra.Command {
 }
 
 // envAssignments parses KEY=value arguments, or secret names when secret is set.
-func envAssignments(args []string, secret bool) ([]string, map[string]string, error) {
+// retry is the command that sets the secret named key from stdin.
+func envAssignments(args []string, secret bool, retry func(key string) string) ([]string, map[string]string, error) {
 	keys, values := []string{}, map[string]string{}
 	for _, arg := range args {
 		key, value, assigned := strings.Cut(arg, "=")
 		switch {
 		case secret && assigned:
-			return nil, nil, fmt.Errorf("secret values go at the prompt or on stdin, not in arguments that shell history keeps; for example: printf %%s \"$VALUE\" | edka env set --secret %s", key)
+			return nil, nil, fmt.Errorf("secret values go at the prompt or on stdin, not in arguments that shell history keeps; for example: %s", pipeHint("VALUE", retry(key)))
 		case !secret && !assigned:
 			return nil, nil, fmt.Errorf("set a variable as KEY=value, or a secret with --secret: %q", arg)
 		case !envName.MatchString(key):
@@ -325,10 +328,11 @@ func secretsPlan(keys []string, values map[string]string) envPlan {
 }
 
 // secretValues reads each value at a hidden prompt, or one value from stdin
-// when stdin is not a terminal, without the newline that ends it.
-func (a *App) secretValues(ctx context.Context, name string, keys []string) (map[string]string, error) {
+// when stdin is not a terminal, without the newline that ends it. retry is the
+// command that sets the secret named key from stdin.
+func (a *App) secretValues(ctx context.Context, name string, keys []string, retry func(key string) string) (map[string]string, error) {
 	values := map[string]string{}
-	if !ui.InputTerminal(a.In) {
+	if !stdinTerminal(a) {
 		if len(keys) != 1 {
 			return nil, fmt.Errorf("stdin holds one secret value; set one secret at a time")
 		}
@@ -340,7 +344,7 @@ func (a *App) secretValues(ctx context.Context, name string, keys []string) (map
 		return values, nil
 	}
 	if a.noInput {
-		return nil, fmt.Errorf("pipe the value on stdin: printf %%s \"$VALUE\" | edka env set --secret %s", keys[0])
+		return nil, errors.New(pipeEach(keys, retry))
 	}
 	for _, key := range keys {
 		value, err := a.promptSecret(ctx, fmt.Sprintf("Value for %s on %s: ", key, ui.Clean(name)), key)
@@ -350,6 +354,20 @@ func (a *App) secretValues(ctx context.Context, name string, keys []string) (map
 		values[key] = value
 	}
 	return values, nil
+}
+
+// stdinTerminal says whether stdin is a terminal, where a value is asked at a
+// hidden prompt rather than read from stdin. Tests replace it.
+var stdinTerminal = func(a *App) bool { return ui.InputTerminal(a.In) }
+
+// pipeEach is the hint that sets keys from stdin, which holds one value: a run
+// for each key, where retry is the command that sets one.
+func pipeEach(keys []string, retry func(key string) string) string {
+	run := pipeHint("VALUE", retry(keys[0]))
+	if len(keys) == 1 {
+		return "pipe the value on stdin: " + run
+	}
+	return fmt.Sprintf("pipe each value on stdin, one key per run: %s, then the same for %s", run, strings.Join(keys[1:], ", "))
 }
 
 // stdinSecret reads the one secret value on a stdin that is not a terminal,
@@ -369,9 +387,27 @@ func (a *App) stdinSecret(what string) (string, error) {
 		value = strings.TrimSuffix(value, "\n")
 	}
 	if value == "" {
-		return "", fmt.Errorf("no value for %s on stdin", what)
+		return "", emptyStdin(what)
 	}
 	return value, nil
+}
+
+// emptyStdin is the error of a stdin that holds no value. It names the value.
+type emptyStdin string
+
+func (what emptyStdin) Error() string { return "no value for " + string(what) + " on stdin" }
+
+// oneSecret reads one secret value from a stdin that is not a terminal, or at
+// a hidden prompt. refusal is the error when the command may not prompt. what
+// names the value in an error.
+func (a *App) oneSecret(ctx context.Context, what, prompt string, refusal error) (string, error) {
+	if !stdinTerminal(a) {
+		return a.stdinSecret(what)
+	}
+	if a.noInput {
+		return "", refusal
+	}
+	return a.promptSecret(ctx, prompt, what)
 }
 
 // promptSecret reads one value at a hidden prompt. what names the value in an error.

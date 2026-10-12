@@ -23,6 +23,7 @@ import (
 	"github.com/edkadigital/cli/internal/credential"
 	"github.com/edkadigital/cli/internal/ui"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 type App struct {
@@ -271,6 +272,54 @@ func shellJoin(args []string) string {
 		}
 	}
 	return strings.Join(quoted, " ")
+}
+
+// invocation is cmd as the user ran it: its arguments, then each flag they set,
+// global ones included, so a hint that repeats it acts on the same resources.
+// It copies the value of every flag, so a command with a flag that can hold a
+// secret must not use it.
+func invocation(cmd *cobra.Command, args []string) string {
+	words := append(strings.Fields(cmd.CommandPath()), args...)
+	cmd.Flags().Visit(func(flag *pflag.Flag) {
+		name := "--" + flag.Name
+		switch value := flag.Value.(type) {
+		case pflag.SliceValue:
+			for _, item := range value.GetSlice() {
+				words = append(words, name, item)
+			}
+		default:
+			switch {
+			case value.Type() != "bool":
+				words = append(words, name, value.String())
+			case value.String() == "true":
+				words = append(words, name)
+			default:
+				words = append(words, name+"=false")
+			}
+		}
+	})
+	return shellJoin(words)
+}
+
+// contextFlags are the global flags that choose where a command acts.
+var contextFlags = []string{"profile", "api-url", "credential-store", "organization", "cluster", "deployment"}
+
+// followUp is an edka command to run next, with each of the global flags that
+// choose where a command acts that the user set on cmd, so it reaches the same
+// resources. Its arguments may come from Edka, so it is cleaned for display.
+func followUp(cmd *cobra.Command, args ...string) string {
+	words := append([]string{cmd.Root().Name()}, args...)
+	for _, name := range contextFlags {
+		if flag := cmd.Flags().Lookup(name); flag != nil && flag.Changed {
+			words = append(words, "--"+name, flag.Value.String())
+		}
+	}
+	return ui.Clean(shellJoin(words))
+}
+
+// pipeHint is the shell line that pipes $variable to command on stdin.
+func pipeHint(variable, command string) string {
+	return fmt.Sprintf("printf %%s \"$%s\" | %s", variable, command)
 }
 func mark(annotation string, commands ...*cobra.Command) {
 	for _, c := range commands {

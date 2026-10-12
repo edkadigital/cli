@@ -3,12 +3,15 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
+	"os"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/edkadigital/cli/internal/api"
 	"github.com/edkadigital/cli/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -28,6 +31,36 @@ func validationOf(m map[string]any) string {
 		return "dns-01"
 	}
 	return "http-01"
+}
+
+// viaCloudflare says whether a domain validates through its own Cloudflare
+// zone: cert-manager writes the challenge TXT record there with the domain's
+// API token, and no CNAME record points the challenge at Edka.
+func viaCloudflare(m map[string]any) bool { return text(m, "dns_provider") == "cloudflare" }
+
+// challengeName is the name Let's Encrypt reads to validate a domain over DNS.
+func challengeName(m map[string]any) string { return "_acme-challenge." + apexOf(m) }
+
+// cloudflareTokenEnv is the variable a Cloudflare API token is read from. It is
+// not CLOUDFLARE_API_TOKEN, which wrangler and Terraform read and which often
+// holds a token for more zones than the domain's.
+const cloudflareTokenEnv = "EDKA_CLOUDFLARE_API_TOKEN"
+
+// cloudflareToken reads a Cloudflare API token from EDKA_CLOUDFLARE_API_TOKEN,
+// from a stdin that is not a terminal, or at a hidden prompt. It is never an
+// argument, which shell history and the process list would keep. retry is the
+// command as the user ran it, which a hint pipes the token to.
+func (a *App) cloudflareToken(ctx context.Context, domain, retry string) (string, error) {
+	if token := strings.TrimSpace(os.Getenv(cloudflareTokenEnv)); token != "" {
+		a.message("Using the Cloudflare API token in %s", cloudflareTokenEnv)
+		return token, nil
+	}
+	token, err := a.oneSecret(ctx, "the Cloudflare API token", fmt.Sprintf("Cloudflare API token for %s: ", ui.Clean(domain)), fmt.Errorf("set %s, or pipe the token on stdin: %s", cloudflareTokenEnv, pipeHint("TOKEN", retry)))
+	// Piping the token, or the variable, helps only when stdin held nothing.
+	if errors.As(err, new(emptyStdin)) {
+		return "", fmt.Errorf("%w; pipe it, or set %s", err, cloudflareTokenEnv)
+	}
+	return token, err
 }
 
 // tlsOf returns the certificate and DNS status Edka last recorded for a domain.
@@ -92,10 +125,12 @@ func (a *App) resolveDomain(ctx context.Context, target string) (*candidate, str
 // class, for the domain and for an apex it includes. The records of a wildcard
 // name are optional. They send every name under it that has no record of its
 // own to the cluster, so a zone with other hosts points only the hostnames the
-// cluster serves.
+// cluster serves. A domain validated through its Cloudflare zone has no
+// validation record to create: a CNAME at the challenge name would block the
+// TXT record cert-manager writes there.
 func domainRecords(domain, class, delegation map[string]any) []map[string]any {
 	records := []map[string]any{}
-	if value := text(delegation, "record_value"); value != "" {
+	if value := text(delegation, "record_value"); value != "" && !viaCloudflare(domain) {
 		records = append(records, map[string]any{"name": text(delegation, "record_name"), "type": first(text(delegation, "record_type"), "CNAME"), "value": value, "purpose": "certificate", "required": true})
 	}
 	names := []string{text(domain, "domain")}
@@ -177,6 +212,10 @@ func (a *App) domainView(ctx context.Context, row map[string]any) (map[string]an
 	domain, _ := view["domain"].(map[string]any)
 	view["traffic_class"] = class
 	view["dns_records"] = domainRecords(domain, class, delegation)
+	// cert-manager writes this record itself, so it is not among the records to create.
+	if viaCloudflare(domain) {
+		view["challenge"] = map[string]any{"provider": "cloudflare", "zone_name": text(domain, "dns_zone_name"), "record_name": challengeName(domain), "record_type": "TXT"}
+	}
 	return view, nil
 }
 
@@ -189,6 +228,7 @@ func (a *App) showDomain(view map[string]any, clusterName string) error {
 	class, _ := view["traffic_class"].(map[string]any)
 	certificate, _ := view["status"].(map[string]any)
 	dns, _ := view["dns"].(map[string]any)
+	challenge, _ := view["challenge"].(map[string]any)
 	apex := ""
 	if isWildcard(domain) {
 		apex = "not included"
@@ -205,6 +245,8 @@ func (a *App) showDomain(view map[string]any, clusterName string) error {
 		{"Apex", apex},
 		{"Traffic class", trafficClass},
 		{"Validation", validationOf(domain)},
+		{"Cloudflare zone", text(challenge, "zone_name")},
+		{"Challenge record", strings.TrimSpace(text(challenge, "record_name") + " " + text(challenge, "record_type"))},
 		{"Certificate", stateLine(certificate)},
 		{"Expires", expiry(certificate)},
 		{"DNS", stateLine(dns)},
@@ -214,16 +256,17 @@ func (a *App) showDomain(view map[string]any, clusterName string) error {
 	}, a.color); err != nil {
 		return err
 	}
-	records, _ := view["dns_records"].([]map[string]any)
-	if len(records) == 0 {
-		return nil
+	if records, _ := view["dns_records"].([]map[string]any); len(records) > 0 {
+		fmt.Fprintln(a.Out)
+		if err := ui.Table(a.Out, []ui.Column{ui.Field("RECORD", "name"), ui.Field("TYPE", "type"), ui.Field("VALUE", "value"), ui.Field("FOR", "purpose")}, records, a.color); err != nil {
+			return err
+		}
+		if slices.ContainsFunc(records, func(r map[string]any) bool { return r["required"] == false }) {
+			a.message("The %s records are optional. They send every name under %s that has no record of its own to the cluster. With other hosts in the zone, point only the hostnames the cluster serves at the same addresses.", ui.Clean(text(domain, "domain")), ui.Clean(apexOf(domain)))
+		}
 	}
-	fmt.Fprintln(a.Out)
-	if err := ui.Table(a.Out, []ui.Column{ui.Field("RECORD", "name"), ui.Field("TYPE", "type"), ui.Field("VALUE", "value"), ui.Field("FOR", "purpose")}, records, a.color); err != nil {
-		return err
-	}
-	if slices.ContainsFunc(records, func(r map[string]any) bool { return r["required"] == false }) {
-		a.message("The %s records are optional. They send every name under %s that has no record of its own to the cluster. With other hosts in the zone, point only the hostnames the cluster serves at the same addresses.", ui.Clean(text(domain, "domain")), ui.Clean(apexOf(domain)))
+	if challenge != nil {
+		a.message("cert-manager writes the TXT record at %s with the Cloudflare API token, for each issuance and renewal. A CNAME record at that name blocks it.", ui.Clean(text(challenge, "record_name")))
 	}
 	return nil
 }
@@ -234,11 +277,8 @@ func (a *App) askApex(apex string) (bool, error) {
 	return a.askYesNo(fmt.Sprintf("Include %s? It shares the DNS validation and the certificate", ui.Clean(apex)), false)
 }
 
-// quoted is a domain as a shell takes it: a wildcard needs quotes.
-func quoted(domain string) string { return shellJoin([]string{domain}) }
-
 func (a *App) addDomains(root *cobra.Command) {
-	domains := &cobra.Command{Use: "domains", Aliases: []string{"domain"}, Short: "Add domains, issue their certificates and delete them", Long: "Manage the domains of a cluster. A domain is a hostname, such as\napp.example.com, or a wildcard, such as *.example.com, that a traffic class of\nthe cluster serves over HTTPS with a Let's Encrypt certificate.\n\nA wildcard is validated over DNS: you create one CNAME record, then run\n`edka domains verify <domain>`. A hostname is validated over HTTP once it points at the\ncluster. `edka domains get` lists the DNS records a domain needs. Quote a\nwildcard, so the shell leaves the * alone.", GroupID: "resources", Example: "  edka domains list\n  edka domains add '*.example.com' --apex\n  edka domains get '*.example.com'\n  edka domains verify '*.example.com' --wait\n  edka domains add app.example.com\n  edka domains delete app.example.com"}
+	domains := &cobra.Command{Use: "domains", Aliases: []string{"domain"}, Short: "Add domains, issue their certificates and delete them", Long: "Manage the domains of a cluster. A domain is a hostname, such as\napp.example.com, or a wildcard, such as *.example.com, that a traffic class of\nthe cluster serves over HTTPS with a Let's Encrypt certificate.\n\nA wildcard is validated over DNS: you create one CNAME record, then run\n`edka domains verify <domain>`. With\n`edka domains add <domain> --dns-provider cloudflare`, cert-manager writes the\nchallenge TXT record in your Cloudflare zone with an API token instead. A\nhostname is validated over HTTP once it points at the cluster.\n`edka domains get` lists the DNS records a domain needs. Quote a wildcard, so\nthe shell leaves the * alone.", GroupID: "resources", Example: "  edka domains list\n  edka domains add '*.example.com' --apex\n  edka domains get '*.example.com'\n  edka domains verify '*.example.com' --wait\n  edka domains add '*.example.org' --dns-provider cloudflare\n  edka domains add app.example.com\n  edka domains delete app.example.com"}
 	a.strictGroup(domains)
 	var all bool
 	list := &cobra.Command{Use: "list", Short: "List domains and their certificates", Long: "List the domains of the linked or selected cluster, or of every cluster when\nnone is linked. Use --all to include every cluster. CERTIFICATE is the state\nEdka last recorded; `edka domains get` reads it from the cluster.", Args: cobra.NoArgs, Example: "  edka domains list\n  edka domains list --all --json", RunE: func(cmd *cobra.Command, _ []string) error {
@@ -249,7 +289,7 @@ func (a *App) addDomains(root *cobra.Command) {
 		return a.renderRows(rows, domainColumns)
 	}}
 	list.Flags().BoolVar(&all, "all", false, "List domains in every cluster, not only the linked one")
-	get := &cobra.Command{Use: "get [domain]", Short: "Show a domain, its certificate and the DNS records it needs", Long: "Show a domain with the state of its certificate, read from the cluster, and\nthe DNS records it needs: the CNAME that validates a certificate over DNS, and\nthe records that point the domain at its traffic class.", Args: cobra.MaximumNArgs(1), Example: "  edka domains get '*.example.com'\n  edka domains get app.example.com --json", RunE: func(cmd *cobra.Command, args []string) error {
+	get := &cobra.Command{Use: "get [domain]", Short: "Show a domain, its certificate and the DNS records it needs", Long: "Show a domain with the state of its certificate, read from the cluster, and\nthe DNS records it needs: the CNAME that validates a certificate over DNS, and\nthe records that point the domain at its traffic class. A domain added with\n--dns-provider cloudflare needs no CNAME. For it, get shows the Cloudflare zone\nand the challenge record cert-manager writes there.", Args: cobra.MaximumNArgs(1), Example: "  edka domains get '*.example.com'\n  edka domains get app.example.com --json", RunE: func(cmd *cobra.Command, args []string) error {
 		c, _, err := a.resolveDomain(cmd.Context(), argument(args))
 		if err != nil {
 			return err
@@ -261,11 +301,12 @@ func (a *App) addDomains(root *cobra.Command) {
 		return a.showDomain(view, text(c.Record, "cluster_name"))
 	}}
 
-	var class, validation string
+	var class, validation, dnsProvider string
 	var apex bool
-	add := &cobra.Command{Use: "add <domain>", Short: "Add a domain to a cluster", Long: "Add a hostname or a wildcard to the linked or selected cluster. The traffic\nclass --class names serves it, or the cluster's default one.\n\nA wildcard such as *.example.com is validated over DNS, and --apex makes its\ncertificate cover example.com too. In a terminal, a wildcard without --apex\nasks whether to include it. A hostname is validated over HTTP, which\nneeds a public traffic class, or over DNS with --validation dns-01.\n\nThe command prints the DNS records to create. For a domain validated over DNS,\ncreate them and run `edka domains verify <domain>`.", Args: cobra.ExactArgs(1), Example: "  edka domains add '*.example.com' --apex\n  edka domains add app.example.com\n  edka domains add internal.example.com --class eg-ts --validation dns-01", RunE: func(cmd *cobra.Command, args []string) error {
+	add := &cobra.Command{Use: "add <domain>", Short: "Add a domain to a cluster", Long: "Add a hostname or a wildcard to the linked or selected cluster. The traffic\nclass --class names serves it, or the cluster's default one.\n\nA wildcard such as *.example.com is validated over DNS, and --apex makes its\ncertificate cover example.com too. In a terminal, a wildcard without --apex\nasks whether to include it. A hostname is validated over HTTP, which\nneeds a public traffic class, or over DNS with --validation dns-01.\n\nOver DNS, you point _acme-challenge under the domain at Edka with a CNAME\nrecord. With --dns-provider cloudflare, cert-manager writes the challenge TXT\nrecord in the domain's Cloudflare zone instead, with an API token that has Zone\nRead and DNS Edit on the zone. The command reads the token from\nEDKA_CLOUDFLARE_API_TOKEN, from stdin when stdin is not a terminal, or at a\nhidden prompt, never from an argument. Edka checks the token against the zone\nbefore it adds the domain, then starts issuing the certificate.\n\nThe command prints the DNS records to create. For a domain validated with a\nCNAME record, create them and run `edka domains verify <domain>`.", Args: cobra.ExactArgs(1), Example: "  edka domains add '*.example.com' --apex\n  edka domains add app.example.com\n  edka domains add internal.example.com --class eg-ts --validation dns-01\n  printf %s \"$TOKEN\" | edka domains add '*.example.org' --dns-provider cloudflare", RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, name := cmd.Context(), strings.ToLower(strings.TrimSpace(args[0]))
 		wildcard := strings.HasPrefix(name, "*.")
+		dnsProvider = strings.ToLower(strings.TrimSpace(dnsProvider))
 		switch {
 		case validation != "" && validation != "dns-01" && validation != "http-01":
 			return fmt.Errorf("--validation is dns-01 or http-01")
@@ -273,6 +314,14 @@ func (a *App) addDomains(root *cobra.Command) {
 			return fmt.Errorf("a wildcard is validated over DNS; leave --validation out")
 		case apex && !wildcard:
 			return fmt.Errorf("--apex needs a wildcard such as '*.%s'", name)
+		case dnsProvider != "" && dnsProvider != "cloudflare":
+			return fmt.Errorf("--dns-provider is cloudflare")
+		case dnsProvider != "" && validation == "http-01":
+			return fmt.Errorf("--dns-provider validates over DNS; leave --validation out")
+		}
+		// The provider writes the challenge record, so a hostname is validated over DNS.
+		if dnsProvider != "" && !wildcard {
+			validation = "dns-01"
 		}
 		cluster, err := a.resolveCluster(ctx, "")
 		if err != nil {
@@ -318,6 +367,13 @@ func (a *App) addDomains(root *cobra.Command) {
 		if validation != "" {
 			body["validation_method"] = validation
 		}
+		if dnsProvider != "" {
+			token, err := a.cloudflareToken(ctx, name, invocation(cmd, args))
+			if err != nil {
+				return err
+			}
+			body["dns_provider"], body["cloudflare_api_token"] = dnsProvider, token
+		}
 		response, err := a.request(ctx, "POST", "/api/clusters/"+id+"/domains", nil, jsonBody(body))
 		if err != nil {
 			return err
@@ -331,6 +387,10 @@ func (a *App) addDomains(root *cobra.Command) {
 		if warning := responseWarning(response.Body); warning != "" {
 			a.message("  Note: %s", ui.Clean(warning))
 		}
+		// An Edka API without the option ignores it and adds a domain with a CNAME record.
+		if dnsProvider != "" && !viaCloudflare(created) {
+			a.message("  Note: Edka added the domain without the Cloudflare API token. It validates with the CNAME record below.")
+		}
 		view, err := a.domainView(ctx, created)
 		if err != nil {
 			return err
@@ -338,18 +398,23 @@ func (a *App) addDomains(root *cobra.Command) {
 		if err := a.showDomain(view, cluster.Name); err != nil {
 			return err
 		}
-		domain := quoted(text(created, "domain"))
-		if validationOf(created) == "dns-01" {
-			a.message("Next: create the records, then run `edka domains verify %s`", domain)
-		} else {
-			a.message("Next: create the records. Edka issues the certificate once the hostname reaches the cluster; check it with `edka domains get %s`", domain)
+		domain := text(created, "domain")
+		switch {
+		case viaCloudflare(created):
+			a.message("Next: create the records. Edka issues the certificate through the Cloudflare zone; follow it with `%s`", followUp(cmd, "domains", "verify", domain, "--wait"))
+		case validationOf(created) == "dns-01":
+			a.message("Next: create the records, then run `%s`", followUp(cmd, "domains", "verify", domain))
+		default:
+			a.message("Next: create the records. Edka issues the certificate once the hostname reaches the cluster; check it with `%s`", followUp(cmd, "domains", "get", domain))
 		}
 		return nil
 	}}
 	add.Flags().StringVar(&class, "class", "", "Traffic class that serves the domain (default: the cluster's default)")
 	add.Flags().StringVar(&validation, "validation", "", "How Let's Encrypt validates a hostname: http-01 or dns-01 (default: http-01)")
 	add.Flags().BoolVar(&apex, "apex", false, "For a wildcard, cover the hostname it is under too")
+	add.Flags().StringVar(&dnsProvider, "dns-provider", "", "Write the challenge record in the domain's zone at this DNS provider: cloudflare")
 	a.completesFlag(add, "validation", values("http-01", "dns-01"))
+	a.completesFlag(add, "dns-provider", values("cloudflare"))
 	a.completesFlag(add, "class", a.offers(func(ctx context.Context) ([]candidate, error) {
 		cluster, err := a.clusterID(ctx)
 		if err != nil {
@@ -366,7 +431,7 @@ func (a *App) addDomains(root *cobra.Command) {
 	var namespaces []string
 	var wait bool
 	var waitTimeout time.Duration
-	verify := &cobra.Command{Use: "verify <domain>", Short: "Check a domain's DNS record and issue its certificate", Long: "Check the CNAME record of a domain validated over DNS. When the record is in\nplace, Edka issues the certificate. Until then it keeps checking, and\n`edka domains get` shows the record to create.\n\nWith --wait, the DNS and certificate status go to stderr until the certificate\nis ready.\n\nOn a cluster with an ingress controller, --namespace names each namespace that\ngets a copy of a wildcard certificate. A Gateway API class needs none.", Args: cobra.ExactArgs(1), Example: "  edka domains verify '*.example.com' --wait\n  edka domains verify '*.example.com' --namespace default --namespace shop", RunE: func(cmd *cobra.Command, args []string) error {
+	verify := &cobra.Command{Use: "verify <domain>", Short: "Check a domain's DNS record and issue its certificate", Long: "Check the CNAME record of a domain validated over DNS. When the record is in\nplace, Edka issues the certificate. Until then it keeps checking, and\n`edka domains get` shows the record to create. For a domain added with\n--dns-provider cloudflare, Edka checks that no CNAME record blocks the\nchallenge name in the Cloudflare zone, then issues the certificate.\n\nWith --wait, the DNS and certificate status go to stderr until the certificate\nis ready.\n\nOn a cluster with an ingress controller, --namespace names each namespace that\ngets a copy of a wildcard certificate. A Gateway API class needs none.", Args: cobra.ExactArgs(1), Example: "  edka domains verify '*.example.com' --wait\n  edka domains verify '*.example.com' --namespace default --namespace shop", RunE: func(cmd *cobra.Command, args []string) error {
 		if wait && waitTimeout <= 0 {
 			return fmt.Errorf("wait-timeout must be positive")
 		}
@@ -377,7 +442,7 @@ func (a *App) addDomains(root *cobra.Command) {
 		}
 		name := ui.Clean(c.Name)
 		if validationOf(c.Record) != "dns-01" {
-			return fmt.Errorf("%s is validated over HTTP: Edka issues its certificate once the hostname reaches the cluster; check it with `edka domains get %s`", name, quoted(c.Name))
+			return fmt.Errorf("%s is validated over HTTP: Edka issues its certificate once the hostname reaches the cluster; check it with `%s`", name, followUp(cmd, "domains", "get", c.Name))
 		}
 		body := map[string]any{}
 		if len(namespaces) > 0 {
@@ -401,7 +466,7 @@ func (a *App) addDomains(root *cobra.Command) {
 		}
 		certificate := report(view)
 		dns, _ := view["dns"].(map[string]any)
-		if delegation, _ := view["delegation"].(map[string]any); text(dns, "state") != "ready" && text(delegation, "record_value") != "" {
+		if delegation, _ := view["delegation"].(map[string]any); text(dns, "state") != "ready" && text(delegation, "record_value") != "" && !viaCloudflare(c.Record) {
 			a.message("Create this record at your DNS provider: %s %s %s", ui.Clean(text(delegation, "record_name")), ui.Clean(first(text(delegation, "record_type"), "CNAME")), ui.Clean(text(delegation, "record_value")))
 		}
 		if wait {
@@ -412,7 +477,7 @@ func (a *App) addDomains(root *cobra.Command) {
 				if waitCtx.Err() == nil {
 					return err
 				}
-				return fmt.Errorf("the certificate for %s is not ready yet: %w; Edka keeps checking, follow it with `edka domains get %s`", name, waitCtx.Err(), quoted(c.Name))
+				return fmt.Errorf("the certificate for %s is not ready yet: %w; Edka keeps checking, follow it with `%s`", name, waitCtx.Err(), followUp(cmd, "domains", "get", c.Name))
 			}
 			for text(certificate, "state") != "ready" {
 				if text(certificate, "state") == "error" {
@@ -438,7 +503,7 @@ func (a *App) addDomains(root *cobra.Command) {
 			}
 			a.message("✓ The certificate for %s is ready%s", name, valid)
 		} else {
-			a.message("Edka keeps checking. Follow it with `edka domains get %s`, or run verify with --wait", quoted(c.Name))
+			a.message("Edka keeps checking. Follow it with `%s`, or run verify with --wait", followUp(cmd, "domains", "get", c.Name))
 		}
 		if a.output != "table" {
 			return ui.Render(a.Out, jsonBody(map[string]any{"data": view}), a.output, false)
@@ -449,27 +514,59 @@ func (a *App) addDomains(root *cobra.Command) {
 	verify.Flags().BoolVar(&wait, "wait", false, "Wait until the certificate is ready")
 	verify.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Maximum wait for the certificate")
 
-	var includeApex bool
-	update := &cobra.Command{Use: "update <domain>", Short: "Include or leave out the apex of a wildcard", Long: "Change whether the certificate of a wildcard covers the hostname it is under:\nexample.com for *.example.com. --apex includes it, and --apex=false leaves it\nout. An included apex needs its own DNS records, which `edka domains get` lists.", Args: cobra.ExactArgs(1), Example: "  edka domains update '*.example.com' --apex\n  edka domains update '*.example.com' --apex=false", RunE: func(cmd *cobra.Command, args []string) error {
-		if !cmd.Flags().Changed("apex") {
-			return fmt.Errorf("pass --apex to include the apex, or --apex=false to leave it out")
+	var includeApex, replaceToken bool
+	update := &cobra.Command{Use: "update <domain>", Short: "Change a wildcard's apex or a domain's Cloudflare token", Long: "Change whether the certificate of a wildcard covers the hostname it is under:\nexample.com for *.example.com. --apex includes it, and --apex=false leaves it\nout. An included apex needs its own DNS records, which `edka domains get` lists.\n\n--replace-token replaces the Cloudflare API token of a domain added with\n--dns-provider cloudflare. The command reads the new token from\nEDKA_CLOUDFLARE_API_TOKEN, from stdin when stdin is not a terminal, or at a\nhidden prompt, never from an argument. Edka checks it against the zone before\nit stores it, and the certificate renews with it from then on.", Args: cobra.ExactArgs(1), Example: "  edka domains update '*.example.com' --apex\n  edka domains update '*.example.com' --apex=false\n  printf %s \"$TOKEN\" | edka domains update '*.example.org' --replace-token", RunE: func(cmd *cobra.Command, args []string) error {
+		changeApex := cmd.Flags().Changed("apex")
+		if !changeApex && !replaceToken {
+			return fmt.Errorf("pass --apex to include the apex, --apex=false to leave it out, or --replace-token to replace the Cloudflare API token")
 		}
-		c, path, err := a.resolveDomain(cmd.Context(), args[0])
+		ctx := cmd.Context()
+		c, path, err := a.resolveDomain(ctx, args[0])
 		if err != nil {
 			return err
 		}
 		name := ui.Clean(c.Name)
-		if !isWildcard(c.Record) {
+		switch {
+		case changeApex && !isWildcard(c.Record):
 			return fmt.Errorf("%s is a hostname; only a wildcard has an apex", name)
+		case replaceToken && !viaCloudflare(c.Record):
+			return fmt.Errorf("%s has no Cloudflare API token; only a domain added with --dns-provider cloudflare has one", name)
 		}
-		response, err := a.request(cmd.Context(), "PATCH", path, nil, jsonBody(map[string]bool{"include_apex": includeApex}))
-		if err != nil {
-			return err
+		// The token and the apex go in separate requests, so each change is
+		// reported once Edka confirms it.
+		var response *api.Response
+		if replaceToken {
+			token, err := a.cloudflareToken(ctx, c.Name, invocation(cmd, args))
+			if err != nil {
+				return err
+			}
+			if response, err = a.request(ctx, "PATCH", path, nil, jsonBody(map[string]string{"cloudflare_api_token": token})); err != nil {
+				return err
+			}
+			updated, _ := record(response.Body, "data")
+			done := "✓ Replaced the Cloudflare API token of " + name
+			if zone := first(text(updated, "dns_zone_name"), text(c.Record, "dns_zone_name")); zone != "" {
+				done += ", for zone " + ui.Clean(zone)
+			}
+			a.message("%s", done)
 		}
-		if includeApex {
-			a.message("✓ %s includes %s\n  Its DNS records: edka domains get %s", name, ui.Clean(apexOf(c.Record)), quoted(c.Name))
-		} else {
-			a.message("✓ %s leaves out %s", name, ui.Clean(apexOf(c.Record)))
+		if changeApex {
+			apexResponse, err := a.request(ctx, "PATCH", path, nil, jsonBody(map[string]bool{"include_apex": includeApex}))
+			if err != nil {
+				// The new token stands: a script still gets the domain Edka confirmed with it.
+				if response != nil && a.output != "table" {
+					if renderErr := a.render(response); renderErr != nil {
+						return renderErr
+					}
+				}
+				return err
+			}
+			response = apexResponse
+			if includeApex {
+				a.message("✓ %s includes %s\n  Its DNS records: %s", name, ui.Clean(apexOf(c.Record)), followUp(cmd, "domains", "get", c.Name))
+			} else {
+				a.message("✓ %s leaves out %s", name, ui.Clean(apexOf(c.Record)))
+			}
 		}
 		if a.output != "table" {
 			return a.render(response)
@@ -477,6 +574,7 @@ func (a *App) addDomains(root *cobra.Command) {
 		return nil
 	}}
 	update.Flags().BoolVar(&includeApex, "apex", false, "Cover the hostname the wildcard is under")
+	update.Flags().BoolVar(&replaceToken, "replace-token", false, "Replace the Cloudflare API token, read from EDKA_CLOUDFLARE_API_TOKEN, stdin or a prompt")
 
 	remove := &cobra.Command{Use: "delete <domain>", Short: "Delete a domain and its certificate", Long: "Delete a domain from its cluster, with its certificate and its HTTPS listener.\nHostnames under it stop being served over HTTPS. Edka refuses while a Codex\nagent or environment uses the domain.", Args: cobra.ExactArgs(1), Example: "  edka domains delete app.example.com\n  edka domains delete '*.example.com' --yes", RunE: func(cmd *cobra.Command, args []string) error {
 		c, path, err := a.resolveDomain(cmd.Context(), args[0])

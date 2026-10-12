@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -56,6 +57,13 @@ func (s *stepAPI) body(route string) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.bodies[route]
+}
+
+// bodiesOf is the body of each request to route, in the order they came.
+func (s *stepAPI) bodiesOf(route string) []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.sent[route])
 }
 
 func TestDomainsListAndGet(t *testing.T) {
@@ -148,7 +156,7 @@ func TestDomainAdd(t *testing.T) {
 	if got := api.body("POST /api/clusters/c1/domains"); got != `{"domain":"*.shop.example.com","include_apex":true,"ingress_class":"eg"}` {
 		t.Fatal(got)
 	}
-	inOrder(t, errOut, "✓ Added *.shop.example.com to cluster sinaia\n", "  Note: _acme-challenge.shop.example.com points at another cluster.\n", "Next: create the records, then run `edka domains verify '*.shop.example.com'`\n")
+	inOrder(t, errOut, "✓ Added *.shop.example.com to cluster sinaia\n", "  Note: _acme-challenge.shop.example.com points at another cluster.\n", "Next: create the records, then run `edka domains verify '*.shop.example.com' --cluster sinaia`\n")
 	if !strings.Contains(squeeze(out), "_acme-challenge.shop.example.com CNAME new789.acme.edka.net certificate *.shop.example.com A 203.0.113.7 traffic") || !strings.Contains(squeeze(out), "shop.example.com AAAA 2a01:db8::1 traffic") {
 		t.Fatal(out)
 	}
@@ -165,7 +173,7 @@ func TestDomainAdd(t *testing.T) {
 	web := `{"id":"n3","cluster_id":"c1","domain":"www.example.org","ingress_class":"eg","is_wildcard":false,"validation_method":"http-01"}`
 	_, base = domainAPI(t, map[string][]string{"POST /api/clusters/c1/domains": {`{"success":true,"data":` + web + `}`}})
 	_, errOut, err = execute(t, base, "domains", "add", "www.example.org", "--cluster", "sinaia")
-	if err != nil || !strings.Contains(errOut, "Next: create the records. Edka issues the certificate once the hostname reaches the cluster; check it with `edka domains get www.example.org`") {
+	if err != nil || !strings.Contains(errOut, "Next: create the records. Edka issues the certificate once the hostname reaches the cluster; check it with `edka domains get www.example.org --cluster sinaia`") {
 		t.Fatal(errOut, err)
 	}
 
@@ -188,8 +196,11 @@ func TestDomainCommandsRefuseBeforeSending(t *testing.T) {
 		{"add app.example.org --class nginx", `cluster sinaia has no traffic class "nginx"; choose one of eg, eg-ts`},
 		{"verify app.example.org", "app.example.org is validated over HTTP"},
 		{"verify *.example.com --wait --wait-timeout 0s", "wait-timeout must be positive"},
-		{"update *.example.com", "pass --apex to include the apex, or --apex=false to leave it out"},
+		{"add *.example.org --dns-provider route53", "--dns-provider is cloudflare"},
+		{"add app.example.org --dns-provider cloudflare --validation http-01", "--dns-provider validates over DNS; leave --validation out"},
+		{"update *.example.com", "pass --apex to include the apex, --apex=false to leave it out, or --replace-token to replace the Cloudflare API token"},
 		{"update app.example.org --apex", "app.example.org is a hostname; only a wildcard has an apex"},
+		{"update *.example.com --replace-token", "*.example.com has no Cloudflare API token; only a domain added with --dns-provider cloudflare has one"},
 		{"delete *.example.com", "Delete domain *.example.com from cluster sinaia with its certificate requires confirmation; rerun with --yes"},
 		{"delete nope.example.com", `domain "nope.example.com" was not found in cluster sinaia`},
 	} {
@@ -294,6 +305,7 @@ func TestDomainCompletion(t *testing.T) {
 		{"domains delete app", []string{"app.example.org\teg · pending · sinaia"}},
 		{"domains add x.example.com --cluster sinaia --class ", []string{"eg\tPublic · public", "eg-ts\tts · private"}},
 		{"domains add x.example.com --validation ", []string{"http-01", "dns-01"}},
+		{"domains add x.example.com --dns-provider ", []string{"cloudflare"}},
 	} {
 		got, directive := completions(t, base, strings.Split(test.line, " ")...)
 		if strings.Join(got, "\n") != strings.Join(test.want, "\n") || directive != shellNoFiles {
@@ -324,5 +336,185 @@ func TestDomainAddAsksAboutTheApex(t *testing.T) {
 	a = &App{In: strings.NewReader("\n"), Err: io.Discard}
 	if include, err := a.askApex("example.com"); err != nil || include {
 		t.Fatal(include, err)
+	}
+}
+
+// cloudflareDomain validates through its Cloudflare zone, with no CNAME record.
+const cloudflareDomain = `{"id":"f1","cluster_id":"c1","domain":"*.cf.example.com","ingress_class":"eg","is_wildcard":true,"include_apex":false,"validation_method":"dns-01","dns_provider":"cloudflare","dns_zone_id":"zone123","dns_zone_name":"example.com","acme_delegation_id":null,"tls_status":{"status":{"state":"ready","message":"Certificate is up to date and has not expired","not_after":"2026-11-06T10:44:11Z"},"dns":{"state":"ready","message":"DNS verified."}}}`
+
+// cloudflareDomainAPI serves the cluster sinaia with a wildcard that validates
+// through Cloudflare. Each route in extra replaces its answers.
+func cloudflareDomainAPI(t *testing.T, extra map[string][]string) (*stepAPI, string) {
+	t.Helper()
+	steps := map[string][]string{
+		"GET /api/clusters/c1/domains":                 {fmt.Sprintf(`{"success":true,"data":[%s,%s]}`, wildcardDomain, cloudflareDomain)},
+		"GET /api/clusters/c1/domains/f1/wildcard-tls": {tlsView(cloudflareDomain, "null", readyStatus, readyDNS)},
+	}
+	for route, responses := range extra {
+		steps[route] = responses
+	}
+	return domainAPI(t, steps)
+}
+
+func TestDomainGetShowsTheCloudflareZone(t *testing.T) {
+	_, base := cloudflareDomainAPI(t, nil)
+	out, errOut, err := execute(t, base, "domains", "get", "*.cf.example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The zone and the challenge record take the place of the CNAME record.
+	if !strings.Contains(squeeze(out), "Validation dns-01 Cloudflare zone example.com Challenge record _acme-challenge.cf.example.com TXT Certificate ready") || !strings.Contains(squeeze(out), "RECORD TYPE VALUE FOR *.cf.example.com A 203.0.113.7 traffic, optional") || strings.Contains(out, "CNAME") {
+		t.Fatal(out)
+	}
+	if !strings.Contains(errOut, "cert-manager writes the TXT record at _acme-challenge.cf.example.com with the Cloudflare API token, for each issuance and renewal. A CNAME record at that name blocks it.") {
+		t.Fatal(errOut)
+	}
+	out, _, err = execute(t, base, "domains", "get", "*.cf.example.com", "--json")
+	var view struct {
+		Data struct {
+			Challenge map[string]any   `json:"challenge"`
+			Records   []map[string]any `json:"dns_records"`
+		} `json:"data"`
+	}
+	if err != nil || json.Unmarshal([]byte(out), &view) != nil {
+		t.Fatal(out, err)
+	}
+	if fmt.Sprint(view.Data.Challenge) != "map[provider:cloudflare record_name:_acme-challenge.cf.example.com record_type:TXT zone_name:example.com]" || len(view.Data.Records) != 2 || view.Data.Records[0]["purpose"] != "traffic, optional" {
+		t.Fatal(view.Data)
+	}
+	// A domain with a CNAME record has no challenge record in its view.
+	out, _, err = execute(t, base, "domains", "get", "*.example.com")
+	if err != nil || strings.Contains(out, "Cloudflare") || strings.Contains(out, "Challenge record") {
+		t.Fatal(out, err)
+	}
+
+	// The zone Edka recorded is shown while the cluster is unreachable.
+	_, base = cloudflareDomainAPI(t, map[string][]string{"GET /api/clusters/c1/domains/f1/wildcard-tls": {`500 {"error":"connect ETIMEDOUT 10.0.0.1:6443"}`}})
+	out, _, err = execute(t, base, "domains", "get", "*.cf.example.com")
+	if err != nil || !strings.Contains(squeeze(out), "Cloudflare zone example.com Challenge record _acme-challenge.cf.example.com TXT") {
+		t.Fatal(out, err)
+	}
+
+	// A CNAME at the challenge name would block the TXT record, so neither get
+	// nor verify asks for one, even when Edka still has a delegation.
+	delegation := `{"record_name":"_acme-challenge.cf.example.com","record_type":"CNAME","record_value":"old456.acme.edka.net"}`
+	pending := tlsView(cloudflareDomain, delegation, missingStatus, `{"state":"pending","message":"Checking the challenge name in the Cloudflare zone."}`)
+	_, base = cloudflareDomainAPI(t, map[string][]string{
+		"GET /api/clusters/c1/domains/f1/wildcard-tls":  {pending},
+		"POST /api/clusters/c1/domains/f1/wildcard-tls": {pending},
+	})
+	out, _, err = execute(t, base, "domains", "get", "*.cf.example.com")
+	if err != nil || strings.Contains(out, "CNAME") || strings.Contains(out, "old456") {
+		t.Fatal(out, err)
+	}
+	_, errOut, err = execute(t, base, "domains", "verify", "*.cf.example.com")
+	if err != nil || strings.Contains(errOut, "Create this record") || !strings.Contains(errOut, "Edka keeps checking") {
+		t.Fatal(errOut, err)
+	}
+}
+
+func TestDomainAddWithACloudflareToken(t *testing.T) {
+	// CLOUDFLARE_API_TOKEN belongs to wrangler and Terraform, and is never read.
+	t.Setenv("EDKA_CLOUDFLARE_API_TOKEN", "")
+	t.Setenv("CLOUDFLARE_API_TOKEN", "wrangler-token")
+	created := `{"id":"n4","cluster_id":"c1","domain":"*.shop.example.com","ingress_class":"eg","is_wildcard":true,"include_apex":false,"validation_method":"dns-01","dns_provider":"cloudflare","dns_zone_id":"zone123","dns_zone_name":"example.com"}`
+	api, base := domainAPI(t, map[string][]string{
+		"POST /api/clusters/c1/domains":                {`{"success":true,"data":` + created + `}`},
+		"GET /api/clusters/c1/domains/n4/wildcard-tls": {tlsView(created, "null", `{"state":"pending","message":"Issuing the certificate"}`, `{"state":"record_ready","message":"Issue the certificate. cert-manager writes the challenge record with the Cloudflare API token."}`)},
+	})
+	// The token comes from stdin, without its final newline.
+	out, errOut, err := executeInput(t, base, "cf-token\n", "domains", "add", "*.shop.example.com", "--dns-provider", "cloudflare", "--cluster", "sinaia")
+	if err != nil {
+		t.Fatal(errOut, err)
+	}
+	if got := api.body("POST /api/clusters/c1/domains"); got != `{"cloudflare_api_token":"cf-token","dns_provider":"cloudflare","domain":"*.shop.example.com","include_apex":false,"ingress_class":"eg"}` {
+		t.Fatal(got)
+	}
+	inOrder(t, errOut, "✓ Added *.shop.example.com to cluster sinaia\n", "Next: create the records. Edka issues the certificate through the Cloudflare zone; follow it with `edka domains verify '*.shop.example.com' --wait --cluster sinaia`\n")
+	if !strings.Contains(squeeze(out), "Cloudflare zone example.com Challenge record _acme-challenge.shop.example.com TXT") || strings.Contains(out, "CNAME") || strings.Contains(out+errOut, "cf-token") || strings.Contains(errOut, "Using the Cloudflare API token") {
+		t.Fatal(out, errOut)
+	}
+
+	// EDKA_CLOUDFLARE_API_TOKEN comes before stdin, a hostname is validated over
+	// DNS, and the provider's name is not case-sensitive.
+	t.Setenv("EDKA_CLOUDFLARE_API_TOKEN", " env-token\n")
+	hostname := `{"id":"n5","cluster_id":"c1","domain":"internal.example.com","ingress_class":"eg-ts","is_wildcard":false,"validation_method":"dns-01","dns_provider":"cloudflare","dns_zone_id":"zone123","dns_zone_name":"example.com"}`
+	api, base = domainAPI(t, map[string][]string{
+		"POST /api/clusters/c1/domains":                {`{"success":true,"data":` + hostname + `}`},
+		"GET /api/clusters/c1/domains/n5/wildcard-tls": {tlsView(hostname, "null", missingStatus, readyDNS)},
+	})
+	out, errOut, err = executeInput(t, base, "stdin-token\n", "domains", "add", "internal.example.com", "--class", "eg-ts", "--dns-provider", "Cloudflare", "--cluster", "sinaia")
+	if err != nil || !strings.Contains(errOut, "Using the Cloudflare API token in EDKA_CLOUDFLARE_API_TOKEN\n") || !strings.Contains(squeeze(out), "Challenge record _acme-challenge.internal.example.com TXT") {
+		t.Fatal(out, errOut, err)
+	}
+	if got := api.body("POST /api/clusters/c1/domains"); got != `{"cloudflare_api_token":"env-token","dns_provider":"cloudflare","domain":"internal.example.com","include_apex":false,"ingress_class":"eg-ts","validation_method":"dns-01"}` {
+		t.Fatal(got)
+	}
+
+	// An Edka API without the option adds a domain with a CNAME record, and the
+	// command says so.
+	t.Setenv("EDKA_CLOUDFLARE_API_TOKEN", "")
+	ignored := `{"id":"n6","cluster_id":"c1","domain":"*.shop.example.com","ingress_class":"eg","is_wildcard":true,"include_apex":false,"validation_method":"dns-01","acme_delegation_id":"new789"}`
+	_, base = domainAPI(t, map[string][]string{
+		"POST /api/clusters/c1/domains":                {`{"success":true,"data":` + ignored + `}`},
+		"GET /api/clusters/c1/domains/n6/wildcard-tls": {tlsView(ignored, `{"record_name":"_acme-challenge.shop.example.com","record_type":"CNAME","record_value":"new789.acme.edka.net"}`, missingStatus, missingDNS)},
+	})
+	out, errOut, err = executeInput(t, base, "cf-token", "domains", "add", "*.shop.example.com", "--dns-provider", "cloudflare", "--cluster", "sinaia")
+	if err != nil {
+		t.Fatal(errOut, err)
+	}
+	inOrder(t, errOut, "✓ Added *.shop.example.com to cluster sinaia\n", "  Note: Edka added the domain without the Cloudflare API token. It validates with the CNAME record below.\n", "Next: create the records, then run `edka domains verify '*.shop.example.com' --cluster sinaia`\n")
+	if !strings.Contains(squeeze(out), "_acme-challenge.shop.example.com CNAME new789.acme.edka.net certificate") || strings.Contains(out, "Cloudflare zone") {
+		t.Fatal(out)
+	}
+
+	// With no token, nothing is sent.
+	api, base = domainAPI(t, nil)
+	if _, _, err := executeInput(t, base, "", "domains", "add", "*.shop.example.com", "--dns-provider", "cloudflare", "--cluster", "sinaia"); err == nil || !strings.Contains(err.Error(), "no value for the Cloudflare API token on stdin; pipe it, or set EDKA_CLOUDFLARE_API_TOKEN") || api.writes() != 0 {
+		t.Fatal(err, api.requests)
+	}
+	// A token that was piped gets no advice to pipe it.
+	if _, _, err := executeInput(t, base, strings.Repeat("x", maxSecretValue+1), "domains", "add", "*.shop.example.com", "--dns-provider", "cloudflare", "--cluster", "sinaia"); err == nil || err.Error() != "secret value exceeds 1 MiB" || api.writes() != 0 {
+		t.Fatal(err, api.requests)
+	}
+
+	// Edka's check of the token reaches the user as it is.
+	_, base = domainAPI(t, map[string][]string{"POST /api/clusters/c1/domains": {`400 {"error":"The API token cannot edit the DNS records of example.com. Give it Zone Read and DNS Edit on that zone."}`}})
+	if _, _, err := executeInput(t, base, "cf-token", "domains", "add", "*.shop.example.com", "--dns-provider", "cloudflare", "--cluster", "sinaia"); err == nil || !strings.Contains(err.Error(), "The API token cannot edit the DNS records of example.com. Give it Zone Read and DNS Edit on that zone.") {
+		t.Fatal(err)
+	}
+}
+
+func TestDomainUpdateReplacesTheCloudflareToken(t *testing.T) {
+	t.Setenv("EDKA_CLOUDFLARE_API_TOKEN", "")
+	replaced := `{"success":true,"data":` + cloudflareDomain + `}`
+	route := "PATCH /api/clusters/c1/domains/f1"
+	api, base := cloudflareDomainAPI(t, map[string][]string{route: {replaced}})
+	out, errOut, err := executeInput(t, base, "new-token\n", "domains", "update", "*.cf.example.com", "--replace-token", "--json")
+	if err != nil || api.body(route) != `{"cloudflare_api_token":"new-token"}` || !strings.Contains(errOut, "✓ Replaced the Cloudflare API token of *.cf.example.com, for zone example.com\n") || !strings.Contains(out, `"dns_zone_name": "example.com"`) {
+		t.Fatal(out, errOut, err, api.body(route))
+	}
+
+	// With --apex, the token goes first, in a request of its own.
+	api, base = cloudflareDomainAPI(t, map[string][]string{route: {replaced, `{"success":true,"data":{"id":"f1","include_apex":true}}`}})
+	_, errOut, err = executeInput(t, base, "new-token\n", "domains", "update", "*.cf.example.com", "--replace-token", "--apex")
+	if got := api.bodiesOf(route); err != nil || !slices.Equal(got, []string{`{"cloudflare_api_token":"new-token"}`, `{"include_apex":true}`}) {
+		t.Fatal(errOut, err, got)
+	}
+	inOrder(t, errOut, "✓ Replaced the Cloudflare API token of *.cf.example.com", "✓ *.cf.example.com includes cf.example.com\n")
+
+	// A refused apex leaves the new token in place, and --json still prints the
+	// domain Edka confirmed with it.
+	api, base = cloudflareDomainAPI(t, map[string][]string{route: {replaced, `409 {"error":"The apex hostname cf.example.com is already configured for this cluster"}`}})
+	out, errOut, err = executeInput(t, base, "new-token\n", "domains", "update", "*.cf.example.com", "--replace-token", "--apex", "--json")
+	if err == nil || !strings.Contains(err.Error(), "The apex hostname cf.example.com is already configured for this cluster") || api.count(route) != 2 || !strings.Contains(errOut, "✓ Replaced the Cloudflare API token") || strings.Contains(errOut, "includes") || !strings.Contains(out, `"dns_provider": "cloudflare"`) {
+		t.Fatal(out, errOut, err)
+	}
+
+	// A refused token leaves the apex alone.
+	api, base = cloudflareDomainAPI(t, map[string][]string{route: {`400 {"error":"Cloudflare refused the API token (Invalid API Token). Check that the token is active and has Zone Read and DNS Edit on the zone."}`}})
+	out, errOut, err = executeInput(t, base, "bad-token", "domains", "update", "*.cf.example.com", "--replace-token", "--apex", "--json")
+	if err == nil || !strings.Contains(err.Error(), "Cloudflare refused the API token") || api.count(route) != 1 || strings.Contains(errOut, "✓") || out != "" {
+		t.Fatal(out, errOut, err, api.requests)
 	}
 }
