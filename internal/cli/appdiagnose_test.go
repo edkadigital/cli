@@ -66,11 +66,12 @@ func TestAppDiagnoseExplainsACrashLoopWithThePreviousLog(t *testing.T) {
 	if err == nil || err.Error() != "blog has a problem; see the finding above" {
 		t.Fatal(out, err)
 	}
+	suggestsCommands(t, out)
 	inOrder(t, out,
 		"✗ Pod blog-x2k starts and exits, 5 times so far.\n",
 		"  back-off 2m40s restarting failed container\n",
 		"  Next: Read what it printed last, under Logs.\n",
-		"  Next: edka apps logs blog --pod blog-x2k --container migrate --previous --tail 200\n",
+		"  Next: edka apps logs blog --pod blog-x2k --container migrate --previous --tail 200 --cluster sinaia\n",
 		"blog-x2k", "failed", "CrashLoopBackOff",
 		"WARNING", "BackOff", "Pod blog-x2k",
 		"Logs of blog-x2k, from the container before its last restart\n",
@@ -97,9 +98,9 @@ func TestAppDiagnoseExplainsPodsThatNeverStart(t *testing.T) {
 		// The scheduler's reason is on the pod and in its event, and is one finding.
 		{"no node", `{"name":"blog-x2k","namespace":"strapi","status":"pending","ready":false,"restartCount":0,"reason":"Unschedulable","message":"0/3 nodes are available: 3 Insufficient memory."}`,
 			`{"events":[{"type":"Warning","reason":"FailedScheduling","message":"0/3 nodes are available: 3 Insufficient memory.","count":4,"object":{"kind":"Pod","name":"blog-x2k","namespace":"strapi"}}]}`,
-			[]string{"✗ No node can run Pod blog-x2k.\n", "  0/3 nodes are available: 3 Insufficient memory.\n", "  Next: edka nodepools list\n", "  Next: Add servers with `edka nodepools scale <pool>`.\n", "Unschedulable"}, "✗ No node can run Pod blog-x2k.\n  0/3 nodes are available: 3 Insufficient memory.\n  Next: edka nodepools list\n  Next: Add servers with `edka nodepools scale <pool>`.\n✗"},
+			[]string{"✗ No node can run Pod blog-x2k.\n", "  0/3 nodes are available: 3 Insufficient memory.\n", "  Next: edka nodepools list --cluster sinaia\n", "  Next: Add servers with `edka nodepools scale <pool> --cluster sinaia`.\n", "Unschedulable"}, "✗ No node can run Pod blog-x2k.\n  0/3 nodes are available: 3 Insufficient memory.\n  Next: edka nodepools list\n  Next: Add servers with `edka nodepools scale <pool>`.\n✗"},
 		{"image pull", `{"name":"blog-x2k","namespace":"strapi","status":"failed","ready":false,"restartCount":0,"container":"strapi","reason":"ImagePullBackOff","message":"manifest unknown"}`, `{"events":[]}`,
-			[]string{"✗ Pod blog-x2k can't pull its image.\n", "  manifest unknown\n", "  Next: edka registries list\n"}, "image ."},
+			[]string{"✗ Pod blog-x2k can't pull its image.\n", "  manifest unknown\n", "  Next: edka registries list --cluster sinaia\n"}, "image ."},
 		{"volume", `{"name":"blog-x2k","namespace":"strapi","status":"pending","ready":false,"restartCount":0,"container":"strapi","reason":"ContainerCreating"}`,
 			`{"events":[{"type":"Warning","reason":"FailedMount","message":"MountVolume.SetUp failed for volume \"data\": persistentvolumeclaim \"blog-data\" not found","count":6,"object":{"kind":"Pod","name":"blog-x2k","namespace":"strapi"}}]}`,
 			[]string{"✗ Pod blog-x2k can't mount a volume.\n", "  MountVolume.SetUp failed for volume \"data\": persistentvolumeclaim \"blog-data\" not found\n", "ContainerCreating"}, "Next:"},
@@ -113,6 +114,7 @@ func TestAppDiagnoseExplainsPodsThatNeverStart(t *testing.T) {
 			if err == nil || err.Error() != "blog has a problem; see the finding above" {
 				t.Fatal(out, err)
 			}
+			suggestsCommands(t, out)
 			inOrder(t, out, tc.want...)
 			if strings.Contains(out, tc.unwanted) {
 				t.Fatalf("the report has %q:\n%s", tc.unwanted, out)
@@ -138,7 +140,7 @@ func TestAppDiagnoseNotesAnAppThatIsStillInstalled(t *testing.T) {
 	if err != nil {
 		t.Fatal(out, err)
 	}
-	inOrder(t, out, "• Edka is still installing or updating the app.\n", "  Waiting for the pods to become ready\n", "• 0 of 1 pods are ready.\n", "  Next: edka apps logs blog\n", "Name", "Team Blog", "Status", "deploying: Waiting for the pods to become ready")
+	inOrder(t, out, "• Edka is still installing or updating the app.\n", "  Waiting for the pods to become ready\n", "• 0 of 1 pods are ready.\n", "  Next: edka apps logs blog --cluster sinaia\n", "Name", "Team Blog", "Status", "deploying: Waiting for the pods to become ready")
 	if strings.Contains(out, "✗") || strings.Contains(out, "No problem found") {
 		t.Fatalf("an app that is being installed reads as failed or as healthy:\n%s", out)
 	}
@@ -152,7 +154,7 @@ func TestAppDiagnoseNotesAnAppThatIsStillInstalled(t *testing.T) {
 	if err == nil || err.Error() != "blog has a problem; see the finding above" {
 		t.Fatal(out, err)
 	}
-	inOrder(t, out, "✗ Edka's last install or update of the app failed.\n", "  Helm install failed: timed out waiting for the condition\n", "  Next: edka apps logs blog\n")
+	inOrder(t, out, "✗ Edka's last install or update of the app failed.\n", "  Helm install failed: timed out waiting for the condition\n", "  Next: edka apps logs blog --cluster sinaia\n")
 }
 
 func TestAppDiagnoseReportsAnInstalledAppWithNoPods(t *testing.T) {
@@ -163,7 +165,7 @@ func TestAppDiagnoseReportsAnInstalledAppWithNoPods(t *testing.T) {
 	if err != nil {
 		t.Fatal(out, err)
 	}
-	inOrder(t, out, "• Edka found no pods of the app in the cluster.\n", "  Next: edka apps get blog\n")
+	inOrder(t, out, "• Edka found no pods of the app in the cluster.\n", "  Next: edka apps get blog --cluster sinaia\n")
 	if strings.Contains(out, "No problem found") {
 		t.Fatalf("an app with no pods reads as healthy:\n%s", out)
 	}
@@ -195,4 +197,17 @@ func TestAppDiagnoseReportsWhatItCouldNotRead(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &report); err != nil || report.Healthy || report.Pods == nil || len(report.Unread) != 1 || report.Unread[0].Source != "pods" {
 		t.Fatal(out, err)
 	}
+}
+
+// The commands an app diagnosis names give the app's cluster by its name once,
+// beside the other flags the user set.
+func TestAppDiagnoseNextStepsCarryTheContextFlags(t *testing.T) {
+	server, _ := fakeAPI(t, appDiagnoseFixtures(map[string]string{
+		"GET /api/clusters/c1/apps/a1/pods": `{"success":true,"data":{"pods":[]}}`,
+	}))
+	out, _, err := execute(t, server.URL, "apps", "diagnose", "blog", "--cluster", "c1", "--organization", "o1")
+	if err != nil {
+		t.Fatal(out, err)
+	}
+	inOrder(t, out, "• Edka found no pods of the app in the cluster.\n", "  Next: edka apps get blog --cluster sinaia --organization o1\n")
 }

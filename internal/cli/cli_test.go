@@ -1198,6 +1198,51 @@ func TestFollowUpNamesTheDeploymentOnce(t *testing.T) {
 	}
 }
 
+// A command that takes the deployment only as a flag gets --deployment once:
+// with the value the user gave when they chose that deployment, else with its
+// name.
+func TestFollowUpPassesTheDeploymentFlagOnce(t *testing.T) {
+	for _, tc := range []struct {
+		line       string
+		deployment deploymentFlag
+		want       string
+	}{
+		{"env set A=1 --deployment d1", deploymentFlag{"d1", "api"}, "edka env --deployment d1"},
+		{"env set A=1 --deployment api", deploymentFlag{"d1", "api"}, "edka env --deployment api"},
+		{"env set A=1 --cluster prod", deploymentFlag{"d1", "api"}, "edka env --deployment api --cluster prod"},
+		// The argument chose another deployment than the one the flag names.
+		{"up web --deployment api", deploymentFlag{"d2", "web"}, "edka env --deployment web"},
+	} {
+		root := New("test", strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
+		cmd, rest, err := root.Find(strings.Fields(tc.line))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := cmd.ParseFlags(rest); err != nil {
+			t.Fatal(err)
+		}
+		if got := followUp(cmd, "env", tc.deployment); got != tc.want {
+			t.Errorf("%s: got %s", tc.line, got)
+		}
+	}
+}
+
+// A literal the caller writes keeps its placeholder unquoted. The same text as
+// a value is quoted, as one from a user or from Edka would be.
+func TestFollowUpPrintsALiteralAsItIs(t *testing.T) {
+	root := New("test", strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
+	cmd, _, err := root.Find([]string{"diagnose"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := followUp(cmd, "up", "api", "--field", literal("config.memory_limit=<limit>"), "--wait"); got != "edka up api --field config.memory_limit=<limit> --wait" {
+		t.Fatal(got)
+	}
+	if got := followUp(cmd, "up", "api", "--field", "config.memory_limit=<limit>"); got != "edka up api --field 'config.memory_limit=<limit>'" {
+		t.Fatal(got)
+	}
+}
+
 // An `edka api` command takes IDs through its own flags and refuses
 // --deployment, so a hint that names one leaves out --cluster and --deployment.
 func TestFollowUpLeavesTheResourceFlagsOutOfEndpointCommands(t *testing.T) {

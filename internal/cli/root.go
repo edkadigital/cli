@@ -315,33 +315,52 @@ type placeholder string
 // take the place of the ID the flag may hold.
 type deploymentArg struct{ id, name string }
 
+// deploymentFlag names the deployment a hint acts on with --deployment, for a
+// command that takes it only as a flag. When the user chose that deployment
+// with --deployment, the flag keeps their value, as with a deploymentArg.
+type deploymentFlag struct{ id, name string }
+
+// literal is text the caller writes, such as config.memory_limit=<limit>, which
+// a hint prints as it is. It holds nothing from a user or from Edka.
+type literal string
+
 // followUp is an edka command to run next, with each of the global flags that
 // choose where a command acts that the user set on cmd, so it reaches the same
 // resources. A flag set to "" chooses nothing, and some commands refuse even an
 // empty --deployment, so the command leaves it out. args are strings,
-// placeholders and deploymentArgs. A flag that args pass already keeps their
-// value. An `edka api` command takes IDs through its own flags and refuses
-// --deployment, so it gets neither --cluster nor --deployment. Its arguments
-// may come from Edka, so it is cleaned for display.
+// placeholders, literals, deploymentArgs and deploymentFlags. A flag that args
+// pass already keeps their value. An `edka api` command takes IDs through its
+// own flags and refuses --deployment, so it gets neither --cluster nor
+// --deployment. Its arguments may come from Edka, so it is cleaned for display.
 func followUp(cmd *cobra.Command, args ...any) string {
 	words := []string{cmd.Root().Name()}
 	chosen := setFlag(cmd, "deployment")
+	chose := func(id, name string) bool { return chosen != "" && (chosen == id || chosen == name) }
+	named := false
 	for _, arg := range args {
 		switch arg := arg.(type) {
 		case placeholder:
 			words = append(words, "<"+string(arg)+">")
+		case literal:
+			words = append(words, string(arg))
 		case deploymentArg:
-			if chosen != "" && (chosen == arg.id || chosen == arg.name) {
-				continue
+			if !chose(arg.id, arg.name) {
+				words = append(words, shellJoin([]string{arg.name}))
 			}
-			words = append(words, shellJoin([]string{arg.name}))
+		case deploymentFlag:
+			value := arg.name
+			if chose(arg.id, arg.name) {
+				value = chosen
+			}
+			words = append(words, "--deployment", shellJoin([]string{value}))
+			named = true
 		default:
 			words = append(words, shellJoin([]string{fmt.Sprint(arg)}))
 		}
 	}
 	endpoint := len(args) > 0 && args[0] == "api"
 	for _, name := range contextFlags {
-		if slices.Contains(args, any("--"+name)) || endpoint && (name == "cluster" || name == "deployment") {
+		if slices.Contains(args, any("--"+name)) || name == "deployment" && named || endpoint && (name == "cluster" || name == "deployment") {
 			continue
 		}
 		if value := setFlag(cmd, name); value != "" {
