@@ -143,6 +143,7 @@ func TestClusterDiagnoseReportsNodePoolsDeploymentsAndPods(t *testing.T) {
 	if err == nil || err.Error() != "sinaia has 10 problems; see the findings above" {
 		t.Fatal(out, err)
 	}
+	suggestsCommands(t, out)
 	inOrder(t, out,
 		"✗ Node sinaia-pool-workers-worker2 is not ready.\n",
 		"  Next: edka nodepools list --cluster sinaia\n",
@@ -221,4 +222,24 @@ func TestClusterDiagnoseQualifiesAReportWithUnreadSources(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &report); err != nil || !report.Healthy || report.Drift != nil || len(report.Unread) != 1 || report.Unread[0].Source != "check of the node pools" {
 		t.Fatal(out, err)
 	}
+}
+
+// The commands a cluster diagnosis names repeat the flags that chose where it
+// acts. They name the cluster by its name, and an `edka api` command gets no
+// --cluster.
+func TestClusterDiagnoseNextStepsCarryTheContextFlags(t *testing.T) {
+	server, _ := fakeAPI(t, clusterDiagnoseFixtures(map[string]string{
+		"GET /api/clusters/c1/drift":              `{"data":{"summary":{"status":"drifted","unresolved":1},"records":[{"drift_type":"node_not_ready","severity":"warning","pool_name":"workers","details":{"nodeName":"sinaia-pool-workers-worker2","poolName":"workers"},"resolved_at":null}]}}`,
+		"GET /api/clusters/c1/deployments/status": `{"data":[{"deployment_id":"d1","name":"api","namespace":"prod","status":"failed","message":"CrashLoopBackOff: back-off 5m0s restarting failed container"}]}`,
+	}))
+	out, _, err := execute(t, server.URL, "diagnose", "--cluster", "c1", "--organization", "o1")
+	if err == nil {
+		t.Fatal("a cluster with problems exits successfully", out)
+	}
+	suggestsCommands(t, out)
+	inOrder(t, out,
+		"  Next: edka nodepools list --cluster sinaia --organization o1\n",
+		"  Next: edka api clusters drift repair-plan get sinaia --organization o1\n",
+		"  Next: edka diagnose api --cluster sinaia --organization o1\n",
+	)
 }

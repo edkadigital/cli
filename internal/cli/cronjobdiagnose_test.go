@@ -63,11 +63,12 @@ func TestCronjobDiagnoseExplainsARunThatFailed(t *testing.T) {
 	if err == nil || err.Error() != "nightly-report has a problem; see the finding above" {
 		t.Fatal(out, err)
 	}
+	suggestsCommands(t, out)
 	inOrder(t, out,
 		"✗ The last run, nightly-report-29312, failed.\n",
 		"  BackoffLimitExceeded: Job has reached the specified backoff limit\n",
 		"  Next: Read what it printed last, under Logs.\n",
-		"  Next: edka cronjobs logs nightly-report --run nightly-report-29312\n",
+		"  Next: edka cronjobs logs nightly-report --run nightly-report-29312 --cluster sinaia\n",
 		"RUN", "nightly-report-manual-7", "Running",
 		"WARNING", "BackoffLimitExceeded", "Job nightly-report-29312",
 		"Logs of nightly-report-29312-x7k\n",
@@ -119,15 +120,15 @@ func TestCronjobDiagnoseReportsAScheduleThatStartsNoRun(t *testing.T) {
 		want                 []string
 	}{
 		{"suspended", record("deployed", true), `{"events":[]}`, false,
-			[]string{"• The schedule is suspended, so no run starts.\n", "  Next: edka cronjobs resume nightly-report\n", "Status", "suspended"}},
+			[]string{"• The schedule is suspended, so no run starts.\n", "  Next: edka cronjobs resume nightly-report --cluster sinaia\n", "Status", "suspended"}},
 		{"never ran", record("deployed", false), `{"events":[]}`, false,
-			[]string{"• No run has started yet.\n", "  Next: edka cronjobs trigger nightly-report\n"}},
+			[]string{"• No run has started yet.\n", "  Next: edka cronjobs trigger nightly-report --cluster sinaia\n"}},
 		{"can't start", record("deployed", false), `{"events":[{"type":"Warning","reason":"FailedCreate","message":"Error creating job: exceeded quota","count":2,"object":{"kind":"CronJob","name":"nightly-report","namespace":"reports"}}]}`, true,
 			[]string{"✗ Kubernetes could not start a run.\n", "  FailedCreate: Error creating job: exceeded quota\n"}},
 		{"missed runs", record("deployed", false), `{"events":[{"type":"Warning","reason":"TooManyMissedTimes","message":"too many missed start times","count":1,"object":{"kind":"CronJob","name":"nightly-report","namespace":"reports"}}]}`, false,
 			[]string{"• Kubernetes warns about the cronjob's schedule.\n", "  TooManyMissedTimes: too many missed start times\n"}},
 		{"failed change", record("failed", false), `{"events":[]}`, true,
-			[]string{"✗ Edka's last change to the cronjob failed.\n", "  Next: edka cronjobs get nightly-report\n"}},
+			[]string{"✗ Edka's last change to the cronjob failed.\n", "  Next: edka cronjobs get nightly-report --cluster sinaia\n"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			server, _ := fakeAPI(t, cronjobDiagnoseFixtures(map[string]string{
@@ -140,6 +141,7 @@ func TestCronjobDiagnoseReportsAScheduleThatStartsNoRun(t *testing.T) {
 			if (err != nil) != tc.problem {
 				t.Fatal(out, err)
 			}
+			suggestsCommands(t, out)
 			inOrder(t, out, tc.want...)
 			if strings.Contains(out, "No problem found") {
 				t.Fatalf("the report reads as healthy:\n%s", out)

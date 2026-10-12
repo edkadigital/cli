@@ -69,6 +69,7 @@ func TestPreviewDiagnoseExplainsACrashLoopFromTheClustersFailingPods(t *testing.
 	if err == nil || err.Error() != "preview #12 has a problem; see the finding above" {
 		t.Fatal(out, err)
 	}
+	suggestsCommands(t, out)
 	inOrder(t, out,
 		"✗ Pod api-pr-12-x2k starts and exits, 4 times so far.\n",
 		"  back-off 40s restarting failed container\n",
@@ -111,7 +112,7 @@ func TestPreviewDiagnoseExplainsAPodFromItsEvents(t *testing.T) {
 	if err == nil {
 		t.Fatal("a preview that no node can run exits successfully", out)
 	}
-	inOrder(t, out, "✗ No node can run Pod api-pr-12-x2k.\n", "  0/3 nodes are available: 3 Insufficient memory.\n", "  Next: edka nodepools list\n", "  Next: Add servers with `edka nodepools scale <pool>`.\n", "Rollout", "pending")
+	inOrder(t, out, "✗ No node can run Pod api-pr-12-x2k.\n", "  0/3 nodes are available: 3 Insufficient memory.\n", "  Next: edka nodepools list --cluster sinaia --deployment api\n", "  Next: Add servers with `edka nodepools scale <pool> --cluster sinaia --deployment api`.\n", "Rollout", "pending")
 	if !strings.Contains(errOut, "Could not read the logs of api-pr-12-x2k: ") {
 		t.Fatalf("the log that could not be read is not named: %s", errOut)
 	}
@@ -201,5 +202,5 @@ func TestPreviewDiagnoseReportsAClusterItCouldNotRead(t *testing.T) {
 	if err == nil {
 		t.Fatal("an unreachable cluster exits successfully", out)
 	}
-	inOrder(t, out, "✗ Edka could not read the preview from its cluster.\n", "  The cluster did not answer (HTTP 503)\n", "  Next: edka clusters diagnose sinaia\n", "Preview", "#12 Fix login")
+	inOrder(t, out, "✗ Edka could not read the preview from its cluster.\n", "  The cluster did not answer (HTTP 503)\n", "  Next: edka clusters diagnose sinaia --deployment api\n", "Preview", "#12 Fix login")
 }

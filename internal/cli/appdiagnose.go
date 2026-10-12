@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"slices"
 	"strings"
@@ -33,7 +32,7 @@ func (a *App) appDiagnoseCommand() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		d, err := a.diagnoseApp(cmd.Context(), c, tail)
+		d, err := a.diagnoseApp(cmd, c, tail)
 		if err != nil {
 			return err
 		}
@@ -51,8 +50,10 @@ func runningPods(pods []map[string]any) []map[string]any {
 
 // diagnoseApp reads what Edka and the cluster know about an installed app.
 // Only the app itself has to be readable: every other source that fails is
-// named in Unread, since a diagnosis is for an app that does not work.
-func (a *App) diagnoseApp(ctx context.Context, c *candidate, tail int) (*appDiagnosis, error) {
+// named in Unread, since a diagnosis is for an app that does not work. Its
+// findings name commands with the flags the user set on cmd.
+func (a *App) diagnoseApp(cmd *cobra.Command, c *candidate, tail int) (*appDiagnosis, error) {
+	ctx := cmd.Context()
 	path, err := clusterItemPath(c, "apps")
 	if err != nil {
 		return nil, err
@@ -93,21 +94,28 @@ func (a *App) diagnoseApp(ctx context.Context, c *candidate, tail int) (*appDiag
 			}
 		}
 	}
-	d.Findings = appFindings(d, c, podsErr)
+	d.Findings = appFindings(cmd, d, c, podsErr)
 	d.Healthy = problems(d.Findings) == 0
 	return d, nil
 }
 
 // appFindings concludes from what an app diagnosis read, with the rules of a
-// deployment's pods and events.
-func appFindings(d *appDiagnosis, c *candidate, podsErr error) []finding {
+// deployment's pods and events. Its commands name the app's cluster, with the
+// flags the user set on cmd.
+func appFindings(cmd *cobra.Command, d *appDiagnosis, c *candidate, podsErr error) []finding {
 	found := []finding{}
 	add := func(problem bool, summary, detail string, next ...string) {
 		found = append(found, finding{Problem: problem, Summary: summary, Detail: ui.Clean(detail), Next: next})
 	}
-	// The name the console shows may have spaces.
-	logs := "edka apps logs " + shellJoin([]string{ui.Clean(c.Name)})
-	w := workload{logs: logs, capacity: []string{"edka nodepools list", "Add servers with `edka nodepools scale <pool>`."}}
+	cluster := first(text(c.Record, "cluster_name"), text(c.Record, "cluster_id"))
+	w := workload{
+		logs: func(args ...any) string {
+			return followUp(cmd, slices.Concat([]any{"apps", "logs", c.Name}, args, []any{"--cluster", cluster})...)
+		},
+		pull:     pullAdvice(cmd, cluster),
+		capacity: capacityAdvice(cmd, cluster, ""),
+	}
+	logs := w.logs()
 
 	progress, _ := d.App["progress"].(map[string]any)
 	status, message := text(d.App, "status"), text(progress, "message")
@@ -126,7 +134,7 @@ func appFindings(d *appDiagnosis, c *candidate, podsErr error) []finding {
 
 	if podsErr != nil {
 		reason, _, _ := strings.Cut(podsErr.Error(), "\n")
-		add(true, "Edka could not read the app's pods from its cluster.", reason, "edka clusters diagnose "+ui.Clean(text(c.Record, "cluster_name")))
+		add(true, "Edka could not read the app's pods from its cluster.", reason, followUp(cmd, "clusters", "diagnose", cluster))
 		return found
 	}
 
@@ -155,7 +163,7 @@ func appFindings(d *appDiagnosis, c *candidate, podsErr error) []finding {
 
 	switch {
 	case len(pods) == 0 && status == "installed":
-		add(false, "Edka found no pods of the app in the cluster.", "", "edka apps get "+shellJoin([]string{ui.Clean(c.Name)}))
+		add(false, "Edka found no pods of the app in the cluster.", "", followUp(cmd, "apps", "get", c.Name, "--cluster", cluster))
 	case ready < len(pods) && problems(found) == 0:
 		add(false, fmt.Sprintf("%d of %d pods are ready.", ready, len(pods)), "", logs)
 	}

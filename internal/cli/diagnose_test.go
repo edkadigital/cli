@@ -6,6 +6,23 @@ import (
 	"testing"
 )
 
+// suggestsCommands checks each command a diagnosis names next, in the line
+// and between backticks: it must name a visible command that accepts its flags.
+func suggestsCommands(t *testing.T, out string) {
+	t.Helper()
+	for _, line := range strings.Split(out, "\n") {
+		next, ok := strings.CutPrefix(line, "  Next: ")
+		if !ok {
+			continue
+		}
+		for _, match := range suggestedCommand.FindAllStringSubmatch(next, -1) {
+			if err := checkSuggestion(strings.Fields(match[1]), suggestedPlaceholder); err != nil {
+				t.Errorf("a diagnosis suggests `edka %s`: %v", strings.TrimSpace(match[1]), err)
+			}
+		}
+	}
+}
+
 const diagnoseEvents = "GET /api/clusters/c1/explorer/resources/deployments/api/events"
 
 // diagnoseFixtures is a deployment that runs as configured, with the routes a
@@ -74,6 +91,7 @@ func TestDiagnoseExplainsACrashLoopWithThePreviousLog(t *testing.T) {
 	if err == nil || err.Error() != "api has a problem; see the finding above" {
 		t.Fatal(out, err)
 	}
+	suggestsCommands(t, out)
 	inOrder(t, out,
 		"✗ Pod api-x2k starts and exits, 4 times so far.\n",
 		"  back-off 5m0s restarting failed container\n",
@@ -101,13 +119,13 @@ func TestDiagnoseExplainsPodsThatNeverStart(t *testing.T) {
 		want              []string
 	}{
 		{"image pull", `{"name":"api-x2k","status":"failed","ready":false,"restartCount":0,"reason":"ImagePullBackOff","message":"manifest unknown"}`, `{"events":[]}`,
-			[]string{"✗ Pod api-x2k can't pull its image ghcr.io/acme/api:v3.\n", "  manifest unknown\n", "  Next: edka registries list\n", "  Next: edka registries apply <registry>\n"}},
+			[]string{"✗ Pod api-x2k can't pull its image ghcr.io/acme/api:v3.\n", "  manifest unknown\n", "  Next: edka registries list --cluster sinaia\n", "  Next: edka registries apply <registry> --cluster sinaia\n"}},
 		{"memory limit", `{"name":"api-x2k","status":"failed","ready":false,"restartCount":2,"reason":"OOMKilled"}`, `{"events":[]}`,
 			[]string{"✗ Pod api-x2k was killed for using more memory than its limit of 256Mi.\n", "  Next: edka up api --field config.memory_limit=<limit> --wait\n", "  Next: edka rollback api --generation 4\n"}},
 		{"missing secret", `{"name":"api-x2k","status":"failed","ready":false,"restartCount":0,"reason":"CreateContainerConfigError","message":"secret \"api-env\" not found"}`, `{"events":[]}`,
 			[]string{"✗ Pod api-x2k can't start, because its configuration names something the cluster lacks.\n", "  secret \"api-env\" not found\n", "  Next: edka env --deployment api\n", "  Next: edka env set --secret <NAME> --deployment api\n"}},
 		{"no node", `{"name":"api-x2k","status":"pending","ready":false,"restartCount":0}`, `{"events":[{"type":"Warning","reason":"FailedScheduling","message":"0/3 nodes are available: 3 Insufficient memory.","count":4,"lastSeen":"2026-10-02T10:00:00Z","object":{"kind":"Pod","name":"api-x2k","namespace":"prod"}}]}`,
-			[]string{"✗ No node can run Pod api-x2k.\n", "  0/3 nodes are available: 3 Insufficient memory.\n", "  Next: edka nodepools list\n"}},
+			[]string{"✗ No node can run Pod api-x2k.\n", "  0/3 nodes are available: 3 Insufficient memory.\n", "  Next: edka nodepools list --cluster sinaia\n"}},
 		{"failed probe", `{"name":"api-x2k","status":"pending","ready":false,"restartCount":0}`, `{"events":[{"type":"Warning","reason":"Unhealthy","message":"Readiness probe failed: HTTP probe failed with statuscode: 503","count":40,"lastSeen":"2026-10-02T10:00:00Z","object":{"kind":"Pod","name":"api-x2k","namespace":"prod"}}]}`,
 			[]string{"✗ Pod api-x2k fails its health check.\n", "  Readiness probe failed: HTTP probe failed with statuscode: 503\n", "  Next: Check `config.health_checks` and `port`: edka deployments get api --json\n"}},
 	} {
@@ -122,6 +140,7 @@ func TestDiagnoseExplainsPodsThatNeverStart(t *testing.T) {
 			if err == nil {
 				t.Fatal("a failing deployment exits successfully", out)
 			}
+			suggestsCommands(t, out)
 			inOrder(t, out, tc.want...)
 			// A container that never started has no log to read.
 			read := strings.Contains(strings.Join(*requests, "\n"), "/logs")
@@ -279,5 +298,48 @@ func TestDiagnoseReadsTheLastBuildOfAGitDeployment(t *testing.T) {
 	inOrder(t, out, "✗ The last build failed.\n", "  Dockerfile not found\n", "  Next: edka build api --wait\n", "Last build", "failed def5678")
 	if !strings.Contains(strings.Join(*requests, "\n"), "GET /api/deployments/d1/builds?limit=1") {
 		t.Fatalf("the last build was not read: %v", *requests)
+	}
+}
+
+// The commands a diagnosis names repeat the flags that chose where it acts. A
+// deployment the user chose with --deployment keeps the value they gave, and
+// the commands that take the deployment as an argument leave it out.
+func TestDiagnoseNextStepsCarryTheContextFlags(t *testing.T) {
+	crash := map[string]string{
+		"GET /api/deployments/d1":        failingRecord,
+		"GET /api/deployments/d1/status": failingStatus("the rollout failed", `{"name":"api-x2k","status":"failed","ready":false,"restartCount":4,"reason":"CrashLoopBackOff","message":"back-off 5m0s restarting failed container"}`),
+		"GET /api/deployments/d1/logs":   `{"logs":"panic: DATABASE_URL is not set\n","podName":"api-x2k"}`,
+	}
+	secret := map[string]string{
+		"GET /api/deployments/d1":        failingRecord,
+		"GET /api/deployments/d1/status": failingStatus("the rollout failed", `{"name":"api-x2k","status":"failed","ready":false,"restartCount":0,"reason":"CreateContainerConfigError","message":"secret \"api-env\" not found"}`),
+	}
+	for _, tc := range []struct {
+		line   string
+		routes map[string]string
+		want   []string
+	}{
+		{"diagnose --deployment d1 --organization o1", crash, []string{
+			"  Next: edka logs --pod api-x2k --previous --tail 200 --organization o1 --deployment d1\n",
+			"  Next: edka rollback --generation 4 --organization o1 --deployment d1\n",
+		}},
+		{"diagnose api --organization o1", secret, []string{
+			"  Next: edka env --deployment api --organization o1\n",
+			"  Next: edka env set --secret <NAME> --deployment api --organization o1\n",
+		}},
+		{"diagnose --deployment d1", secret, []string{
+			"  Next: edka env --deployment d1\n",
+			"  Next: edka env set --secret <NAME> --deployment d1\n",
+		}},
+	} {
+		t.Run(tc.line, func(t *testing.T) {
+			server, _ := fakeAPI(t, diagnoseFixtures(tc.routes))
+			out, _, err := execute(t, server.URL, strings.Fields(tc.line)...)
+			if err == nil {
+				t.Fatal("a failing deployment exits successfully", out)
+			}
+			suggestsCommands(t, out)
+			inOrder(t, out, tc.want...)
+		})
 	}
 }

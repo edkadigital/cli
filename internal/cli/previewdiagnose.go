@@ -36,7 +36,7 @@ func (a *App) previewDiagnoseCommand() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		d, pods := a.diagnosePreview(cmd.Context(), c, preview, path, tail)
+		d, pods := a.diagnosePreview(cmd, c, preview, path, tail)
 		return a.finishDiagnosis("preview #"+previewNumber(preview), d, d.Findings, func() error { return a.renderPreviewDiagnosis(d, c, pods) })
 	}}
 	cmd.Flags().IntVarP(&tail, "tail", "n", 30, "Number of log lines of the failing pod (at most 2000)")
@@ -46,7 +46,9 @@ func (a *App) previewDiagnoseCommand() *cobra.Command {
 // diagnosePreview reads what Edka and the cluster know about a preview of the
 // deployment c, which is at path. Every source that fails is named in Unread.
 // It also returns the preview's pods with the reasons its findings are from.
-func (a *App) diagnosePreview(ctx context.Context, c *candidate, preview map[string]any, path string, tail int) (*previewDiagnosis, []map[string]any) {
+// The findings name commands with the flags the user set on cmd.
+func (a *App) diagnosePreview(cmd *cobra.Command, c *candidate, preview map[string]any, path string, tail int) (*previewDiagnosis, []map[string]any) {
+	ctx := cmd.Context()
 	d := &previewDiagnosis{Preview: preview, Findings: []finding{}, Pods: []map[string]any{}, Events: []map[string]any{}, Unread: []unread{}}
 	cluster := first(text(c.Record, "cluster_id"), a.cluster)
 
@@ -89,7 +91,7 @@ func (a *App) diagnosePreview(ctx context.Context, c *candidate, preview map[str
 			d.Logs = logs
 		}
 	}
-	d.Findings = previewFindings(d, pods, c, runtimeErr)
+	d.Findings = previewFindings(cmd, d, pods, c, runtimeErr)
 	d.Healthy = problems(d.Findings) == 0
 	return d, pods
 }
@@ -167,17 +169,22 @@ func previewRollout(runtime map[string]any, pods []map[string]any) string {
 }
 
 // previewFindings concludes from what a preview diagnosis read, with the
-// rules of a deployment's pods and events.
-func previewFindings(d *previewDiagnosis, pods []map[string]any, c *candidate, runtimeErr error) []finding {
-	pr, deployment := previewNumber(d.Preview), ui.Clean(c.Name)
+// rules of a deployment's pods and events, and lists commands with the flags
+// the user set on cmd.
+func previewFindings(cmd *cobra.Command, d *previewDiagnosis, pods []map[string]any, c *candidate, runtimeErr error) []finding {
+	pr, deployment := previewNumber(d.Preview), deploymentFlag{c.ID, c.Name}
+	cluster := first(text(c.Record, "cluster_name"), text(c.Record, "cluster_id"))
 	found := []finding{}
 	add := func(problem bool, summary, detail string, next ...string) {
 		found = append(found, finding{Problem: problem, Summary: summary, Detail: ui.Clean(detail), Next: next})
 	}
 	w := workload{
-		image:    ui.Clean(first(text(d.Runtime, "running_image"), text(d.Runtime, "configured_image"))),
-		logs:     fmt.Sprintf("edka previews logs %s --deployment %s", pr, deployment),
-		capacity: []string{"edka nodepools list", "Add servers with `edka nodepools scale <pool>`."},
+		image: ui.Clean(first(text(d.Runtime, "running_image"), text(d.Runtime, "configured_image"))),
+		logs: func(args ...any) string {
+			return followUp(cmd, slices.Concat([]any{"previews", "logs", pr, deployment}, args)...)
+		},
+		pull:     pullAdvice(cmd, cluster),
+		capacity: capacityAdvice(cmd, cluster, ""),
 	}
 
 	// A preview that is still built, that failed or that is deleted may run
@@ -200,8 +207,7 @@ func previewFindings(d *previewDiagnosis, pods []map[string]any, c *candidate, r
 	}
 	if runtimeErr != nil && !idle {
 		reason, _, _ := strings.Cut(runtimeErr.Error(), "\n")
-		add(true, "Edka could not read the preview from its cluster.", reason,
-			"edka clusters diagnose "+ui.Clean(first(text(c.Record, "cluster_name"), text(c.Record, "cluster_id"))))
+		add(true, "Edka could not read the preview from its cluster.", reason, followUp(cmd, "clusters", "diagnose", cluster))
 	}
 	if d.Runtime == nil {
 		return found
@@ -226,9 +232,9 @@ func previewFindings(d *previewDiagnosis, pods []map[string]any, c *candidate, r
 	}
 	switch {
 	case rollout == "failed" && problems(found) == 0:
-		add(true, "The rollout failed.", "", w.logs)
+		add(true, "The rollout failed.", "", w.logs())
 	case rollout == "pending" && problems(found) == 0:
-		add(false, "The rollout is still running.", "", fmt.Sprintf("edka previews status %s --deployment %s", pr, deployment))
+		add(false, "The rollout is still running.", "", followUp(cmd, "previews", "status", pr, deployment))
 	}
 	if len(found) == 0 {
 		replicas, _ := d.Runtime["replicas"].(map[string]any)

@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -34,17 +33,17 @@ const podFindings = 5
 // clusterDiagnoseCommand reports what is wrong with a cluster.
 func (a *App) clusterDiagnoseCommand() *cobra.Command {
 	return &cobra.Command{Use: "diagnose [cluster]", Short: "Find out what is wrong with a cluster", Long: "Read whether Edka reaches a cluster, what its last check of the node pools\nfound, the status of its deployments, the pods that fail and the warnings\nKubernetes recorded, and report what is wrong with the commands to run next.\nThe command changes nothing.\n\nThe findings come first, then what they were read from. A source that can't be\nread is named and the rest is still reported. The command exits unsuccessfully\nwhen it finds a problem. With --json, stdout has `healthy`, `findings` and\neverything that was read.", Args: cobra.MaximumNArgs(1), Example: "  edka clusters diagnose\n  edka clusters diagnose production\n  edka clusters diagnose production --json", RunE: func(cmd *cobra.Command, args []string) error {
-		return a.runClusterDiagnosis(cmd.Context(), argument(args))
+		return a.runClusterDiagnosis(cmd, argument(args))
 	}}
 }
 
 // runClusterDiagnosis diagnoses the cluster target names, or the one in context.
-func (a *App) runClusterDiagnosis(ctx context.Context, target string) error {
-	c, err := a.resolveCluster(ctx, target)
+func (a *App) runClusterDiagnosis(cmd *cobra.Command, target string) error {
+	c, err := a.resolveCluster(cmd.Context(), target)
 	if err != nil {
 		return err
 	}
-	d, err := a.diagnoseCluster(ctx, c)
+	d, err := a.diagnoseCluster(cmd, c)
 	if err != nil {
 		return err
 	}
@@ -62,8 +61,10 @@ func objectsAt(body []byte, key string) ([]map[string]any, error) {
 
 // diagnoseCluster reads what Edka knows about a cluster and what runs in it.
 // Only the cluster itself has to be readable: every other source that fails is
-// named in Unread, since a diagnosis is for a cluster that does not work.
-func (a *App) diagnoseCluster(ctx context.Context, c *candidate) (*clusterDiagnosis, error) {
+// named in Unread, since a diagnosis is for a cluster that does not work. Its
+// findings name commands with the flags the user set on cmd.
+func (a *App) diagnoseCluster(cmd *cobra.Command, c *candidate) (*clusterDiagnosis, error) {
+	ctx := cmd.Context()
 	id, err := safeID(c.ID)
 	if err != nil {
 		return nil, err
@@ -113,7 +114,7 @@ func (a *App) diagnoseCluster(ctx context.Context, c *candidate) (*clusterDiagno
 		d.Events, err = objectsAt(body, "events")
 		return err
 	})
-	d.Findings = clusterFindings(d, first(text(cluster, "name"), c.Name))
+	d.Findings = clusterFindings(cmd, d, first(text(cluster, "name"), c.Name))
 	d.Healthy = problems(d.Findings) == 0
 	return d, nil
 }
@@ -130,8 +131,8 @@ var clusterChanges = map[string]string{
 
 // clusterFindings concludes from what a cluster diagnosis read. Each rule
 // names what was observed, quotes Edka or Kubernetes for the cause, and lists
-// commands.
-func clusterFindings(d *clusterDiagnosis, name string) []finding {
+// commands with the flags the user set on cmd.
+func clusterFindings(cmd *cobra.Command, d *clusterDiagnosis, name string) []finding {
 	name = ui.Clean(name)
 	found := []finding{}
 	add := func(problem bool, summary, detail string, next ...string) {
@@ -146,7 +147,7 @@ func clusterFindings(d *clusterDiagnosis, name string) []finding {
 	switch status := text(d.Cluster, "status"); status {
 	case "active", "running", "":
 	case "failed", "error":
-		add(true, "The cluster failed.", activity, "edka clusters get "+name)
+		add(true, "The cluster failed.", activity, followUp(cmd, "clusters", "get", name))
 	case "suspended", "archived", "deleted":
 		add(true, fmt.Sprintf("The cluster is %s.", status), activity)
 	default:
@@ -172,7 +173,7 @@ func clusterFindings(d *clusterDiagnosis, name string) []finding {
 		add(true, summary, first(text(investigation, "finding"), text(d.Connectivity, "connectivity_probe_error")), next...)
 	}
 
-	pools := []string{fmt.Sprintf("edka nodepools list --cluster %s", name), fmt.Sprintf("edka api clusters drift repair-plan get %s", name)}
+	pools := []string{followUp(cmd, "nodepools", "list", "--cluster", name), followUp(cmd, "api", "clusters", "drift", "repair-plan", "get", name)}
 	for _, drift := range objectsOf(d.Drift["records"]) {
 		if drift["resolved_at"] != nil {
 			continue
@@ -185,7 +186,7 @@ func clusterFindings(d *clusterDiagnosis, name string) []finding {
 	failing := map[string]bool{}
 	for _, deployment := range d.Deployments {
 		deploymentName := ui.Clean(text(deployment, "name"))
-		diagnose := fmt.Sprintf("edka diagnose %s --cluster %s", deploymentName, name)
+		diagnose := followUp(cmd, "diagnose", deploymentName, "--cluster", name)
 		switch text(deployment, "status") {
 		case "failed":
 			add(true, fmt.Sprintf("Deployment %s is failing.", deploymentName), text(deployment, "message"), diagnose)
@@ -223,7 +224,7 @@ func clusterFindings(d *clusterDiagnosis, name string) []finding {
 		}
 		next := []string{}
 		if owner != nil {
-			next = append(next, fmt.Sprintf("edka diagnose %s --cluster %s", ui.Clean(text(owner, "name")), name))
+			next = append(next, followUp(cmd, "diagnose", text(owner, "name"), "--cluster", name))
 		}
 		add(true, summary, text(pod, "message"), next...)
 	}

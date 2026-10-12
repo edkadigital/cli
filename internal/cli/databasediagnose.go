@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -35,7 +34,7 @@ func (a *App) databaseDiagnoseCommand() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		d, err := a.diagnoseDatabase(cmd.Context(), c, path, tail)
+		d, err := a.diagnoseDatabase(cmd, c, path, tail)
 		if err != nil {
 			return err
 		}
@@ -47,8 +46,10 @@ func (a *App) databaseDiagnoseCommand() *cobra.Command {
 
 // diagnoseDatabase reads what Edka and the cluster know about the database at
 // path. Only the database itself has to be readable: every other source that
-// fails is named in Unread.
-func (a *App) diagnoseDatabase(ctx context.Context, c *candidate, path string, tail int) (*databaseDiagnosis, error) {
+// fails is named in Unread. Its findings name commands with the flags the user
+// set on cmd.
+func (a *App) diagnoseDatabase(cmd *cobra.Command, c *candidate, path string, tail int) (*databaseDiagnosis, error) {
+	ctx := cmd.Context()
 	response, err := a.request(ctx, "GET", path, nil, nil)
 	if err != nil {
 		return nil, err
@@ -77,7 +78,7 @@ func (a *App) diagnoseDatabase(ctx context.Context, c *candidate, path string, t
 		}
 		break
 	}
-	d.Findings = databaseFindings(d, first(text(database, "database_name"), c.Name), text(c.Record, "cluster_name"), runtimeErr)
+	d.Findings = databaseFindings(cmd, d, first(text(database, "database_name"), c.Name), first(text(c.Record, "cluster_name"), text(c.Record, "cluster_id")), runtimeErr)
 	d.Healthy = problems(d.Findings) == 0
 	return d, nil
 }
@@ -119,14 +120,16 @@ func failedBackup(runtime map[string]any) map[string]any {
 
 // databaseFindings concludes from what a database diagnosis read. Each rule
 // names what was observed, quotes Edka or the database's operator for the
-// cause, and lists commands.
-func databaseFindings(d *databaseDiagnosis, name, cluster string, runtimeErr error) []finding {
+// cause, and lists commands that name the database's cluster, with the flags
+// the user set on cmd.
+func databaseFindings(cmd *cobra.Command, d *databaseDiagnosis, name, cluster string, runtimeErr error) []finding {
 	name = ui.Clean(name)
 	found := []finding{}
 	add := func(problem bool, summary, detail string, next ...string) {
 		found = append(found, finding{Problem: problem, Summary: summary, Detail: ui.Clean(detail), Next: next})
 	}
-	logs := "edka databases logs " + name
+	logs := followUp(cmd, "databases", "logs", name, "--cluster", cluster)
+	backups := followUp(cmd, "databases", "backups", name, "--cluster", cluster)
 
 	// While Edka still creates or deletes a database, what the cluster reports
 	// about it is a note.
@@ -145,7 +148,7 @@ func databaseFindings(d *databaseDiagnosis, name, cluster string, runtimeErr err
 
 	if runtimeErr != nil {
 		reason, _, _ := strings.Cut(runtimeErr.Error(), "\n")
-		add(true, "Edka could not read the database from its cluster.", reason, "edka clusters diagnose "+ui.Clean(cluster))
+		add(true, "Edka could not read the database from its cluster.", reason, followUp(cmd, "clusters", "diagnose", cluster))
 	}
 	runtime := d.Runtime
 	if runtime == nil {
@@ -168,7 +171,7 @@ func databaseFindings(d *databaseDiagnosis, name, cluster string, runtimeErr err
 		if restarts := number(instance["restartCount"]); restarts > 0 {
 			summary = fmt.Sprintf("Instance %s is not ready, and restarted %d times.", instanceName, restarts)
 		}
-		add(settled, summary, phase, "Read what it printed last, under Logs.", logs+" --pod "+instanceName)
+		add(settled, summary, phase, "Read what it printed last, under Logs.", followUp(cmd, "databases", "logs", name, "--pod", instanceName, "--cluster", cluster))
 	}
 	instances, ready := number(runtime["instances"]), number(runtime["readyInstances"])
 	available, _ := runtime["available"].(bool)
@@ -191,10 +194,10 @@ func databaseFindings(d *databaseDiagnosis, name, cluster string, runtimeErr err
 		detail := strings.Trim(text(condition, "reason")+": "+text(condition, "message"), ": ")
 		switch text(condition, "type") {
 		case "ContinuousArchiving":
-			add(settled, "The database is not archiving its write-ahead log.", detail, fmt.Sprintf("edka databases backups %s", name))
+			add(settled, "The database is not archiving its write-ahead log.", detail, backups)
 		case "LastBackupSucceeded":
 			backup = true
-			add(settled, "The last backup failed.", detail, fmt.Sprintf("edka databases backups %s", name))
+			add(settled, "The last backup failed.", detail, backups)
 		}
 	}
 	// PostgreSQL's operator names the time of its last failed backup. The other
@@ -212,10 +215,10 @@ func databaseFindings(d *databaseDiagnosis, name, cluster string, runtimeErr err
 				reason, started = text(row, "error"), row["startedAt"]
 			}
 		}
-		add(settled, "The last backup failed.", reason, fmt.Sprintf("edka databases backups %s", name))
+		add(settled, "The last backup failed.", reason, backups)
 	default:
 		if last := failedBackup(runtime); last != nil {
-			add(settled, "The last backup failed.", text(last, "error"), fmt.Sprintf("edka databases backups %s", name))
+			add(settled, "The last backup failed.", text(last, "error"), backups)
 		}
 	}
 

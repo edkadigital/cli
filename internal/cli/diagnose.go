@@ -50,6 +50,8 @@ type diagnosis struct {
 	// cluster names the deployment's cluster. Edka's record of a deployment
 	// names it by ID, and the list of deployments by name.
 	cluster string
+	// id is the deployment's ID, which a --deployment the user passed may hold.
+	id string
 }
 
 // A container in one of these states has not started, so it has no log.
@@ -77,13 +79,13 @@ func (a *App) diagnoseCommand(fallback bool) *cobra.Command {
 			return fmt.Errorf("tail must be between 1 and 2000")
 		}
 		if fallback && len(args) == 0 && a.deployment == "" {
-			return a.runClusterDiagnosis(cmd.Context(), "")
+			return a.runClusterDiagnosis(cmd, "")
 		}
 		c, err := a.resolveDeployment(cmd.Context(), argument(args))
 		if err != nil {
 			return err
 		}
-		d, err := a.diagnose(cmd.Context(), c, tail)
+		d, err := a.diagnose(cmd, c, tail)
 		if err != nil {
 			return err
 		}
@@ -134,8 +136,10 @@ func (a *App) finishDiagnosis(name string, report any, found []finding, render f
 
 // diagnose reads what Edka and the cluster know about a deployment. Only the
 // deployment itself has to be readable: every other source that fails is named
-// in Unread, since a diagnosis is for a deployment that does not work.
-func (a *App) diagnose(ctx context.Context, c *candidate, tail int) (*diagnosis, error) {
+// in Unread, since a diagnosis is for a deployment that does not work. Its
+// findings name commands with the flags the user set on cmd.
+func (a *App) diagnose(cmd *cobra.Command, c *candidate, tail int) (*diagnosis, error) {
+	ctx := cmd.Context()
 	id, err := safeID(c.ID)
 	if err != nil {
 		return nil, err
@@ -148,7 +152,7 @@ func (a *App) diagnose(ctx context.Context, c *candidate, tail int) (*diagnosis,
 	if err != nil {
 		return nil, err
 	}
-	d := &diagnosis{Deployment: record, Findings: []finding{}, Revisions: []map[string]any{}, Events: []map[string]any{}, Unread: []unread{}, cluster: first(text(record, "cluster_name"), text(c.Record, "cluster_name"), text(record, "cluster_id"))}
+	d := &diagnosis{Deployment: record, Findings: []finding{}, Revisions: []map[string]any{}, Events: []map[string]any{}, Unread: []unread{}, cluster: first(text(record, "cluster_name"), text(c.Record, "cluster_name"), text(record, "cluster_id")), id: first(text(record, "id"), c.ID)}
 	name := first(text(record, "name"), c.Name)
 
 	var runtimeErr error
@@ -184,7 +188,7 @@ func (a *App) diagnose(ctx context.Context, c *candidate, tail int) (*diagnosis,
 		}
 	}
 
-	d.Findings = findings(d, name, runtimeErr)
+	d.Findings = findings(cmd, d, name, runtimeErr)
 	d.Healthy = problems(d.Findings) == 0
 	return d, nil
 }
@@ -293,46 +297,71 @@ func (a *App) podLogs(ctx context.Context, path string, pod map[string]any, tail
 type workload struct {
 	// image is safe to print, and empty when Edka names none.
 	image string
-	// logs is the command that reads its logs; a finding adds the pod to it.
-	logs string
+	// logs is the command that reads its logs, with args after the workload,
+	// such as the pod a finding is about.
+	logs func(args ...any) string
 	// memoryLimit is the limit a killed pod exceeded, when Edka names it.
 	memoryLimit string
-	// Advice by cause: an image name Kubernetes refuses, a pod killed for its
-	// memory, a Secret or ConfigMap the cluster lacks, a container that can't
-	// start, a failed health check, a pod no node can run, a volume that can't
-	// be mounted, and the way back from a change.
-	rename, memory, missing, start, health, capacity, volumes, rollback []string
+	// Advice by cause: an image the cluster can't pull, an image name
+	// Kubernetes refuses, a pod killed for its memory, a Secret or ConfigMap the
+	// cluster lacks, a container that can't start, a failed health check, a pod
+	// no node can run, a volume that can't be mounted, and the way back from a
+	// change.
+	pull, rename, memory, missing, start, health, capacity, volumes, rollback []string
 }
 
-// deploymentWorkload is a deployment with the commands that change it.
-func deploymentWorkload(name string, record map[string]any) workload {
+// pullAdvice is what to check when cluster can't pull an image.
+func pullAdvice(cmd *cobra.Command, cluster string) []string {
+	return []string{
+		"Check that the image and its tag exist in the registry.",
+		followUp(cmd, "registries", "list", "--cluster", cluster),
+		followUp(cmd, "registries", "apply", placeholder("registry"), "--cluster", cluster),
+	}
+}
+
+// capacityAdvice is what to do when no node of cluster can run a pod. more
+// ends the second line.
+func capacityAdvice(cmd *cobra.Command, cluster, more string) []string {
+	return []string{
+		followUp(cmd, "nodepools", "list", "--cluster", cluster),
+		"Add servers with `" + followUp(cmd, "nodepools", "scale", placeholder("pool"), "--cluster", cluster) + "`" + more + ".",
+	}
+}
+
+// deploymentWorkload is the deployment of d with the commands that change it.
+func deploymentWorkload(cmd *cobra.Command, d *diagnosis, name string) workload {
+	record := d.Deployment
+	deployment := deploymentArg{d.id, name}
 	config, _ := record["config"].(map[string]any)
-	inspect := "edka deployments get " + name + " --json"
-	rollback := []string{"edka deployments revisions " + name}
+	inspect := followUp(cmd, "deployments", "get", deployment, "--json")
+	rollback := []string{followUp(cmd, "deployments", "revisions", deployment)}
 	if healthy := number(record["healthy_generation"]); healthy > 0 && healthy < number(record["spec_generation"]) {
-		rollback = []string{"edka rollback " + name + " --generation " + fmt.Sprint(healthy)}
+		rollback = []string{followUp(cmd, "rollback", deployment, "--generation", healthy)}
 	}
 	return workload{
 		image:       ui.Clean(imageOf(record)),
-		logs:        "edka logs " + name,
+		logs:        func(args ...any) string { return followUp(cmd, slices.Concat([]any{"logs", deployment}, args)...) },
 		memoryLimit: ui.Clean(first(text(config, "memory_limit"), "512Mi")),
-		rename:      []string{"edka up " + name + " --field config.image_repository=<repository> --field config.image_tag=<tag> --wait"},
-		memory:      []string{"edka up " + name + " --field config.memory_limit=<limit> --wait"},
-		missing:     []string{fmt.Sprintf("edka env --deployment %s", name), fmt.Sprintf("edka env set --secret <NAME> --deployment %s", name)},
+		pull:        pullAdvice(cmd, d.cluster),
+		rename:      []string{followUp(cmd, "up", deployment, "--field", literal("config.image_repository=<repository>"), "--field", literal("config.image_tag=<tag>"), "--wait")},
+		memory:      []string{followUp(cmd, "up", deployment, "--field", literal("config.memory_limit=<limit>"), "--wait")},
+		missing:     []string{followUp(cmd, "env", deploymentFlag{d.id, name}), followUp(cmd, "env", "set", "--secret", placeholder("NAME"), deploymentFlag{d.id, name})},
 		start:       []string{"Check `config.command` and `config.args`: " + inspect},
 		health:      []string{"Check `config.health_checks` and `port`: " + inspect},
-		capacity:    []string{"edka nodepools list", "Add servers with `edka nodepools scale <pool>`, or lower `config.cpu_request` and `config.memory_request`."},
+		capacity:    capacityAdvice(cmd, d.cluster, ", or lower `config.cpu_request` and `config.memory_request`"),
 		volumes:     []string{"Check `config.volumes`: " + inspect},
 		rollback:    rollback,
 	}
 }
 
 // findings concludes from what a diagnosis read. Each rule names what was
-// observed, quotes Kubernetes or Edka for the cause, and lists commands.
-func findings(d *diagnosis, name string, runtimeErr error) []finding {
+// observed, quotes Kubernetes or Edka for the cause, and lists commands with
+// the flags the user set on cmd.
+func findings(cmd *cobra.Command, d *diagnosis, name string, runtimeErr error) []finding {
 	name = ui.Clean(name)
 	record := d.Deployment
-	w := deploymentWorkload(name, record)
+	deployment := deploymentArg{d.id, name}
+	w := deploymentWorkload(cmd, d, name)
 	generation := number(record["spec_generation"])
 	found := []finding{}
 	add := func(problem bool, summary, detail string, next ...string) {
@@ -352,7 +381,7 @@ func findings(d *diagnosis, name string, runtimeErr error) []finding {
 					reason = text(revision, "status_message")
 				}
 			}
-			next := []string{"edka deployments revisions " + name, "Fix the cause, then deploy the change again."}
+			next := []string{followUp(cmd, "deployments", "revisions", deployment), "Fix the cause, then deploy the change again."}
 			// The rollback is a revision too: it rolls out, and can fail as the change did.
 			switch text(latest, "status") {
 			case "failed":
@@ -374,7 +403,7 @@ func findings(d *diagnosis, name string, runtimeErr error) []finding {
 	if runtimeErr != nil {
 		reason, _, _ := strings.Cut(runtimeErr.Error(), "\n")
 		add(true, "Edka could not read the deployment from its cluster.", reason,
-			"edka clusters diagnose "+ui.Clean(d.cluster))
+			followUp(cmd, "clusters", "diagnose", d.cluster))
 	} else {
 		for _, pod := range podsOf(d.Runtime) {
 			if ready, _ := pod["ready"].(bool); ready {
@@ -399,11 +428,11 @@ func findings(d *diagnosis, name string, runtimeErr error) []finding {
 		status := text(d.Runtime, "status")
 		switch {
 		case number(replicas["desired"]) == 0 && replicas != nil:
-			add(false, "The deployment is scaled to zero replicas.", "", "edka scale "+name+" --replicas 1")
+			add(false, "The deployment is scaled to zero replicas.", "", followUp(cmd, "scale", deployment, "--replicas", "1"))
 		case status == "failed" && len(found) == 0:
-			add(true, "The rollout failed.", text(d.Runtime, "message"), "edka logs "+name)
+			add(true, "The rollout failed.", text(d.Runtime, "message"), w.logs())
 		case status == "pending" && !slices.ContainsFunc(found, func(f finding) bool { return f.Problem }):
-			add(false, "The rollout is still running.", text(d.Runtime, "message"), "edka deployments status "+name)
+			add(false, "The rollout is still running.", text(d.Runtime, "message"), followUp(cmd, "deployments", "status", deployment))
 		}
 		if mismatch, _ := d.Runtime["version_mismatch"].(bool); mismatch && status == "deployed" {
 			add(false, fmt.Sprintf("The pods run %s, and the deployment is configured with %s.", text(d.Runtime, "running_image"), text(d.Runtime, "configured_image")), "")
@@ -415,7 +444,7 @@ func findings(d *diagnosis, name string, runtimeErr error) []finding {
 
 	if status := text(d.Build, "status"); status == "failed" || status == "cancelled" {
 		add(true, fmt.Sprintf("The last build %s.", map[string]string{"failed": "failed", "cancelled": "was cancelled"}[status]), text(d.Build, "error_message"),
-			"edka build "+name+" --wait")
+			followUp(cmd, "build", deployment, "--wait"))
 	}
 
 	if len(found) == 0 {
@@ -434,10 +463,11 @@ func podFinding(add func(bool, string, string, ...string), w workload, pod map[s
 	restarts := number(pod["restartCount"])
 	// The pod's log is the one of the container Edka names for its state, when
 	// it names one.
-	logs := w.logs + " --pod " + podName
+	of := []any{"--pod", podName}
 	if container := ui.Clean(text(pod, "container")); container != "" {
-		logs += " --container " + shellJoin([]string{container})
+		of = append(of, "--container", container)
 	}
+	logs := func(args ...any) string { return w.logs(slices.Concat(of, args)...) }
 	// named ends a summary with a value Edka may not name.
 	named := func(summary, separator, value string) string {
 		if value == "" {
@@ -447,10 +477,7 @@ func podFinding(add func(bool, string, string, ...string), w workload, pod map[s
 	}
 	switch reason {
 	case "ImagePullBackOff", "ErrImagePull", "ErrImageNeverPull":
-		add(true, named(fmt.Sprintf("Pod %s can't pull its image", podName), " ", w.image), message,
-			"Check that the image and its tag exist in the registry.",
-			"edka registries list",
-			"edka registries apply <registry>")
+		add(true, named(fmt.Sprintf("Pod %s can't pull its image", podName), " ", w.image), message, w.pull...)
 	case "InvalidImageName":
 		add(true, named(fmt.Sprintf("Pod %s has an image name that Kubernetes refuses", podName), ": ", w.image), message, w.rename...)
 	case "OOMKilled":
@@ -468,10 +495,10 @@ func podFinding(add func(bool, string, string, ...string), w workload, pod map[s
 			summary = fmt.Sprintf("Pod %s starts and exits, %d times so far.", podName, restarts)
 		}
 		add(true, summary, first(message, reason),
-			slices.Concat([]string{"Read what it printed last, under Logs.", logs + " --previous --tail 200"}, w.rollback)...)
+			slices.Concat([]string{"Read what it printed last, under Logs.", logs("--previous", "--tail", "200")}, w.rollback)...)
 	default:
 		if text(pod, "status") == "failed" {
-			add(true, fmt.Sprintf("Pod %s failed: %s.", podName, ui.Clean(reason)), message, logs)
+			add(true, fmt.Sprintf("Pod %s failed: %s.", podName, ui.Clean(reason)), message, logs())
 		}
 	}
 }
@@ -518,7 +545,7 @@ func eventFindings(add func(bool, string, string, ...string), w workload, events
 			if explained["CrashLoopBackOff"] || explained["Error"] {
 				continue
 			}
-			add(failed, fmt.Sprintf("%s fails its health check.", subject), message, slices.Concat(w.health, []string{w.logs})...)
+			add(failed, fmt.Sprintf("%s fails its health check.", subject), message, slices.Concat(w.health, []string{w.logs()})...)
 		case "FailedMount", "FailedAttachVolume":
 			add(true, fmt.Sprintf("%s can't mount a volume.", subject), message, w.volumes...)
 		case "FailedCreate":

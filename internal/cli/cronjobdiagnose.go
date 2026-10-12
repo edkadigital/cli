@@ -35,7 +35,7 @@ func (a *App) cronjobDiagnoseCommand() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		d, err := a.diagnoseCronjob(cmd.Context(), c, path, tail)
+		d, err := a.diagnoseCronjob(cmd, c, path, tail)
 		if err != nil {
 			return err
 		}
@@ -57,8 +57,10 @@ func lastFinished(runs []map[string]any) map[string]any {
 
 // diagnoseCronjob reads what Edka and the cluster know about the cronjob at
 // path. Only the cronjob itself has to be readable: every other source that
-// fails is named in Unread.
-func (a *App) diagnoseCronjob(ctx context.Context, c *candidate, path string, tail int) (*cronjobDiagnosis, error) {
+// fails is named in Unread. Its findings name commands with the flags the user
+// set on cmd.
+func (a *App) diagnoseCronjob(cmd *cobra.Command, c *candidate, path string, tail int) (*cronjobDiagnosis, error) {
+	ctx := cmd.Context()
 	response, err := a.request(ctx, "GET", path, nil, nil)
 	if err != nil {
 		return nil, err
@@ -92,7 +94,7 @@ func (a *App) diagnoseCronjob(ctx context.Context, c *candidate, path string, ta
 			d.Logs = logs
 		}
 	}
-	d.Findings = cronjobFindings(d, name, runsErr == nil)
+	d.Findings = cronjobFindings(cmd, d, name, first(text(c.Record, "cluster_name"), text(c.Record, "cluster_id")), runsErr == nil)
 	d.Healthy = problems(d.Findings) == 0
 	return d, nil
 }
@@ -128,9 +130,10 @@ func runWarning(events []map[string]any, run string, reasons ...string) map[stri
 }
 
 // cronjobFindings concludes from what a cronjob diagnosis read. Each rule
-// names what was observed, quotes Kubernetes for the cause, and lists commands.
-// listed is false when the runs could not be read.
-func cronjobFindings(d *cronjobDiagnosis, name string, listed bool) []finding {
+// names what was observed, quotes Kubernetes for the cause, and lists commands
+// that name the cronjob's cluster, with the flags the user set on cmd. listed
+// is false when the runs could not be read.
+func cronjobFindings(cmd *cobra.Command, d *cronjobDiagnosis, name, cluster string, listed bool) []finding {
 	name = ui.Clean(name)
 	found := []finding{}
 	add := func(problem bool, summary, detail string, next ...string) {
@@ -143,7 +146,7 @@ func cronjobFindings(d *cronjobDiagnosis, name string, listed bool) []finding {
 	status := cronjobStatus(d.Cronjob)
 	switch status {
 	case "failed":
-		add(true, "Edka's last change to the cronjob failed.", "", "edka cronjobs get "+name)
+		add(true, "Edka's last change to the cronjob failed.", "", followUp(cmd, "cronjobs", "get", name, "--cluster", cluster))
 	case "pending", "creating", "updating", "suspending":
 		add(false, fmt.Sprintf("Edka is still applying the cronjob; its status is %s.", status), "")
 	case "deleting":
@@ -151,7 +154,7 @@ func cronjobFindings(d *cronjobDiagnosis, name string, listed bool) []finding {
 	case "deleted":
 		add(false, "Edka deleted the cronjob.", "")
 	case "suspended":
-		add(false, "The schedule is suspended, so no run starts.", "", fmt.Sprintf("edka cronjobs resume %s", name))
+		add(false, "The schedule is suspended, so no run starts.", "", followUp(cmd, "cronjobs", "resume", name, "--cluster", cluster))
 	}
 
 	// The newest warning about the schedule itself. Kubernetes gives these two
@@ -174,7 +177,7 @@ func cronjobFindings(d *cronjobDiagnosis, name string, listed bool) []finding {
 		run := ui.Clean(text(last, "name"))
 		add(true, fmt.Sprintf("The last run, %s, failed.", run), quote(runWarning(d.Events, text(last, "name"))),
 			"Read what it printed last, under Logs.",
-			fmt.Sprintf("edka cronjobs logs %s --run %s", name, run))
+			followUp(cmd, "cronjobs", "logs", name, "--run", run, "--cluster", cluster))
 	}
 	// A run that waits has not failed yet. Edka reports a run as Unknown while
 	// its Job has no pod, which lasts when Kubernetes can't create the pod, and
@@ -188,7 +191,7 @@ func cronjobFindings(d *cronjobDiagnosis, name string, listed bool) []finding {
 			}
 		case "Running":
 			if event := runWarning(d.Events, text(run, "name")); text(event, "reason") == "FailedScheduling" {
-				add(true, fmt.Sprintf("No node can run %s.", waiting), text(event, "message"), "edka nodepools list", "Add servers with `edka nodepools scale <pool>`.")
+				add(true, fmt.Sprintf("No node can run %s.", waiting), text(event, "message"), capacityAdvice(cmd, cluster, "")...)
 			}
 		default:
 			continue
@@ -196,7 +199,7 @@ func cronjobFindings(d *cronjobDiagnosis, name string, listed bool) []finding {
 		break
 	}
 	if listed && len(d.Runs) == 0 && status == "deployed" {
-		add(false, "No run has started yet.", "", fmt.Sprintf("edka cronjobs trigger %s", name))
+		add(false, "No run has started yet.", "", followUp(cmd, "cronjobs", "trigger", name, "--cluster", cluster))
 	}
 
 	if len(found) == 0 {

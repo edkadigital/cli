@@ -14,6 +14,12 @@ import (
 	"testing"
 )
 
+// A command ends at a line break, backtick, pipe, redirect or comment.
+var suggestedCommand = regexp.MustCompile("\\bedka ((?:[^\n`&|<>#]|<[^>\\s]+>)+)")
+
+// Format verbs and <names> stand for values filled in at run time.
+var suggestedPlaceholder = regexp.MustCompile(`^(%[a-z]\w*|<[^>]+>)$`)
+
 // TestSuggestedCommandsExist checks every `edka …` command that help, examples,
 // messages and documentation suggest: it must name a visible command that
 // accepts its flags.
@@ -23,19 +29,15 @@ func TestSuggestedCommandsExist(t *testing.T) {
 		t.Fatal(err)
 	}
 	main, _ := filepath.Glob("../../cmd/*/*.go")
-	// A command ends at a line break, backtick, pipe, redirect or comment.
-	suggestion := regexp.MustCompile("\\bedka ((?:[^\n`&|<>#]|<[^>\\s]+>)+)")
-	// Format verbs and <names> stand for values filled in at run time.
-	placeholder := regexp.MustCompile(`^(%[a-z]\w*|<[^>]+>)$`)
 	checked := 0
 	check := func(file, text string) {
-		for _, match := range suggestion.FindAllStringSubmatch(text, -1) {
+		for _, match := range suggestedCommand.FindAllStringSubmatch(text, -1) {
 			words := strings.Fields(match[1])
-			if len(words) == 0 || placeholder.MatchString(words[0]) {
+			if len(words) == 0 || suggestedPlaceholder.MatchString(words[0]) {
 				continue
 			}
 			checked++
-			if err := checkSuggestion(words, placeholder); err != nil {
+			if err := checkSuggestion(words, suggestedPlaceholder); err != nil {
 				t.Errorf("%s suggests `edka %s`: %v", filepath.Base(file), strings.Join(words, " "), err)
 			}
 		}

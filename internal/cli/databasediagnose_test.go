@@ -57,11 +57,12 @@ func TestDatabaseDiagnoseExplainsAnInstanceThatIsNotReady(t *testing.T) {
 	if err == nil || err.Error() != "orders has a problem; see the finding above" {
 		t.Fatal(out, err)
 	}
+	suggestsCommands(t, out)
 	inOrder(t, out,
 		"✗ Instance orders-2 is not ready, and restarted 6 times.\n",
 		"  Waiting for the instances to become active: Some instances are not yet active. Please wait.\n",
 		"  Next: Read what it printed last, under Logs.\n",
-		"  Next: edka databases logs orders --pod orders-2\n",
+		"  Next: edka databases logs orders --pod orders-2 --cluster sinaia\n",
 		"Ready", "2/3",
 		"orders-2", "replica", "Not ready",
 		"Logs of orders-2, from the container before its last restart\n",
@@ -83,9 +84,10 @@ func TestDatabaseDiagnoseReportsArchivingBackupsAndWarnings(t *testing.T) {
 	if err == nil || err.Error() != "orders has 3 problems; see the findings above" {
 		t.Fatal(out, err)
 	}
+	suggestsCommands(t, out)
 	inOrder(t, out,
-		"✗ The database is not archiving its write-ahead log.\n", "  ContinuousArchivingFailing: exit status 4: bucket not found\n", "  Next: edka databases backups orders\n",
-		"✗ The last backup failed.\n", "  can't upload the backup: access denied\n", "  Next: edka databases backups orders\n",
+		"✗ The database is not archiving its write-ahead log.\n", "  ContinuousArchivingFailing: exit status 4: bucket not found\n", "  Next: edka databases backups orders --cluster sinaia\n",
+		"✗ The last backup failed.\n", "  can't upload the backup: access denied\n", "  Next: edka databases backups orders --cluster sinaia\n",
 		"✗ Volume is almost full.\n", "  orders-1 uses 96% of its volume\n",
 		"Last failed backup")
 
@@ -113,7 +115,7 @@ func TestDatabaseDiagnoseReportsAFailedBackupFromItsRecords(t *testing.T) {
 	if err == nil || err.Error() != "orders has a problem; see the finding above" {
 		t.Fatal(out, err)
 	}
-	inOrder(t, out, "✗ The last backup failed.\n", "  S3 upload failed: access denied\n", "  Next: edka databases backups orders\n", "Last failed backup", "2026-10-02")
+	inOrder(t, out, "✗ The last backup failed.\n", "  S3 upload failed: access denied\n", "  Next: edka databases backups orders --cluster sinaia\n", "Last failed backup", "2026-10-02")
 	out, _, _ = execute(t, server.URL, "databases", "diagnose", "orders", "--json")
 	var report struct{ Healthy bool }
 	if err := json.Unmarshal([]byte(out), &report); err != nil || report.Healthy {
@@ -161,7 +163,7 @@ func TestDatabaseDiagnoseNotesADatabaseThatIsStillProvisioned(t *testing.T) {
 	if err == nil {
 		t.Fatal("a failed database exits successfully", out)
 	}
-	inOrder(t, out, "✗ The database failed.\n", "  helm install failed: timed out waiting for the condition\n", "  Next: edka databases logs orders\n", "• Edka reads no runtime status for the database.\n")
+	inOrder(t, out, "✗ The database failed.\n", "  helm install failed: timed out waiting for the condition\n", "  Next: edka databases logs orders --cluster sinaia\n", "• Edka reads no runtime status for the database.\n")
 }
 
 func TestDatabaseDiagnoseReportsWhatItCouldNotRead(t *testing.T) {
