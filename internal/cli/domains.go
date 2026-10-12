@@ -401,11 +401,11 @@ func (a *App) addDomains(root *cobra.Command) {
 		domain := text(created, "domain")
 		switch {
 		case viaCloudflare(created):
-			a.message("Next: create the records. Edka issues the certificate through the Cloudflare zone; follow it with `%s`", followUp(cmd, "domains", "verify", domain, "--wait"))
+			a.message("Next: create the records. Edka issues the certificate through the Cloudflare zone; follow it with `%s`", followUp(cmd, "domains", "verify", domain, "--wait", "--cluster", cluster.Name))
 		case validationOf(created) == "dns-01":
-			a.message("Next: create the records, then run `%s`", followUp(cmd, "domains", "verify", domain))
+			a.message("Next: create the records, then run `%s`", followUp(cmd, "domains", "verify", domain, "--cluster", cluster.Name))
 		default:
-			a.message("Next: create the records. Edka issues the certificate once the hostname reaches the cluster; check it with `%s`", followUp(cmd, "domains", "get", domain))
+			a.message("Next: create the records. Edka issues the certificate once the hostname reaches the cluster; check it with `%s`", followUp(cmd, "domains", "get", domain, "--cluster", cluster.Name))
 		}
 		return nil
 	}}
@@ -440,9 +440,9 @@ func (a *App) addDomains(root *cobra.Command) {
 		if err != nil {
 			return err
 		}
-		name := ui.Clean(c.Name)
+		name, cluster := ui.Clean(c.Name), text(c.Record, "cluster_name")
 		if validationOf(c.Record) != "dns-01" {
-			return fmt.Errorf("%s is validated over HTTP: Edka issues its certificate once the hostname reaches the cluster; check it with `%s`", name, followUp(cmd, "domains", "get", c.Name))
+			return fmt.Errorf("%s is validated over HTTP: Edka issues its certificate once the hostname reaches the cluster; check it with `%s`", name, followUp(cmd, "domains", "get", c.Name, "--cluster", cluster))
 		}
 		body := map[string]any{}
 		if len(namespaces) > 0 {
@@ -477,7 +477,7 @@ func (a *App) addDomains(root *cobra.Command) {
 				if waitCtx.Err() == nil {
 					return err
 				}
-				return fmt.Errorf("the certificate for %s is not ready yet: %w; Edka keeps checking, follow it with `%s`", name, waitCtx.Err(), followUp(cmd, "domains", "get", c.Name))
+				return fmt.Errorf("the certificate for %s is not ready yet: %w; Edka keeps checking, follow it with `%s`", name, waitCtx.Err(), followUp(cmd, "domains", "get", c.Name, "--cluster", cluster))
 			}
 			for text(certificate, "state") != "ready" {
 				if text(certificate, "state") == "error" {
@@ -503,7 +503,7 @@ func (a *App) addDomains(root *cobra.Command) {
 			}
 			a.message("✓ The certificate for %s is ready%s", name, valid)
 		} else {
-			a.message("Edka keeps checking. Follow it with `%s`, or run verify with --wait", followUp(cmd, "domains", "get", c.Name))
+			a.message("Edka keeps checking. Follow it with `%s`, or run verify with --wait", followUp(cmd, "domains", "get", c.Name, "--cluster", cluster))
 		}
 		if a.output != "table" {
 			return ui.Render(a.Out, jsonBody(map[string]any{"data": view}), a.output, false)
@@ -563,7 +563,7 @@ func (a *App) addDomains(root *cobra.Command) {
 			}
 			response = apexResponse
 			if includeApex {
-				a.message("✓ %s includes %s\n  Its DNS records: %s", name, ui.Clean(apexOf(c.Record)), followUp(cmd, "domains", "get", c.Name))
+				a.message("✓ %s includes %s\n  Its DNS records: %s", name, ui.Clean(apexOf(c.Record)), followUp(cmd, "domains", "get", c.Name, "--cluster", text(c.Record, "cluster_name")))
 			} else {
 				a.message("✓ %s leaves out %s", name, ui.Clean(apexOf(c.Record)))
 			}
