@@ -81,7 +81,7 @@ func TestEnvSetKeepsTheOtherVariables(t *testing.T) {
 	if len(*bodies) != 1 || (*bodies)[0] != want {
 		t.Fatal(*bodies)
 	}
-	if out != "" || errOut != "✓ Set LOG_LEVEL, NEW on api. Generation 4 is rolling out.\n  Next: edka deployments status api\n" {
+	if out != "" || errOut != "✓ Set LOG_LEVEL, NEW on api. Generation 4 is rolling out.\n  Next: edka deployments status --deployment api\n" {
 		t.Fatalf("%q %q", out, errOut)
 	}
 	out, _, err = execute(t, server.URL, "env", "set", "PORT=9090", "--deployment", "api", "--json")

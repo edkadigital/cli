@@ -240,7 +240,7 @@ func (a *App) addRegistries(root *cobra.Command) {
 		if exists {
 			a.message("✓ Stored new credentials for registry %s\n  The clusters that use it get them.", ui.Clean(name))
 		} else {
-			a.message("✓ Stored registry %s\n  Next: edka registries apply %s", ui.Clean(name), shellJoin([]string{name}))
+			a.message("✓ Stored registry %s\n  Next: %s", ui.Clean(name), followUp(cmd, "registries", "apply", name))
 		}
 		if a.output != "table" {
 			return a.render(saved)
@@ -269,7 +269,7 @@ func (a *App) addRegistries(root *cobra.Command) {
 			return err
 		}
 		if len(clusters) > 0 {
-			return fmt.Errorf("registry %s is used by %s; take it from each cluster first with `edka registries remove %s --cluster <cluster>`", name, plural(len(clusters), "cluster ", "clusters ")+ui.Clean(strings.Join(clusters, ", ")), shellJoin([]string{name}))
+			return fmt.Errorf("registry %s is used by %s; take it from each cluster first with `%s`", name, plural(len(clusters), "cluster ", "clusters ")+ui.Clean(strings.Join(clusters, ", ")), followUp(cmd, "registries", "remove", name, "--cluster", placeholder("cluster")))
 		}
 		if err := a.confirm("Delete registry " + name + " and its credentials"); err != nil {
 			return err
@@ -313,7 +313,7 @@ func (a *App) addRegistries(root *cobra.Command) {
 				return err
 			}
 			if apply {
-				a.message("✓ Applying registry %s to cluster %s\n  Edka creates its pull secret in every namespace. Check it with `edka registries list --cluster %s`", ui.Clean(name), ui.Clean(cluster.Name), ui.Clean(cluster.Name))
+				a.message("✓ Applying registry %s to cluster %s\n  Edka creates its pull secret in every namespace. Check it with `%s`", ui.Clean(name), ui.Clean(cluster.Name), followUp(cmd, "registries", "list", "--cluster", cluster.Name))
 			} else {
 				a.message("✓ Removing registry %s from cluster %s", ui.Clean(name), ui.Clean(cluster.Name))
 			}

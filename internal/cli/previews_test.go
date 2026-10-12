@@ -121,8 +121,8 @@ func TestPreviewsAreNamedByPullRequestNumber(t *testing.T) {
 		want string
 	}{
 		{[]string{"previews", "status", "fix-login", "--deployment", "api"}, "a preview is named by its pull request number, such as 12"},
-		{[]string{"previews", "status", "99", "--deployment", "api"}, "api has no preview of pull request #99; list them with `edka previews list`"},
-		{[]string{"previews", "status", "--deployment", "api"}, "api has 3 previews; name a pull request from `edka previews list`"},
+		{[]string{"previews", "status", "99", "--deployment", "api"}, "api has no preview of pull request #99; list them with `edka previews list --deployment api`"},
+		{[]string{"previews", "status", "--deployment", "api"}, "api has 3 previews; name a pull request from `edka previews list --deployment api`"},
 		{[]string{"previews", "logs", "12"}, "choose a deployment with --deployment"},
 		{[]string{"previews", "remove", "12"}, `unknown command "remove" for "edka previews"`},
 	} {

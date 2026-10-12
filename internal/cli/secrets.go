@@ -83,11 +83,11 @@ func (a *App) secretTarget(ctx context.Context, name, namespace string) (secretT
 // readSecret reads the metadata of a secret: its keys and never its values.
 // It returns nil when the namespace has no such secret that Edka manages. The
 // error then says which namespace has one of that name, when one does.
-func (a *App) readSecret(ctx context.Context, t secretTarget) (map[string]any, error) {
+func (a *App) readSecret(ctx context.Context, cmd *cobra.Command, t secretTarget) (map[string]any, error) {
 	response, err := a.request(ctx, "GET", t.path(), t.query(), nil)
 	var apiError *api.Error
 	if errors.As(err, &apiError) && apiError.Status == 404 {
-		return nil, a.secretMissing(ctx, t)
+		return nil, a.secretMissing(ctx, cmd, t)
 	}
 	if err != nil {
 		return nil, err
@@ -96,7 +96,7 @@ func (a *App) readSecret(ctx context.Context, t secretTarget) (map[string]any, e
 }
 
 // secretMissing explains that a namespace has no secret of a name.
-func (a *App) secretMissing(ctx context.Context, t secretTarget) error {
+func (a *App) secretMissing(ctx context.Context, cmd *cobra.Command, t secretTarget) error {
 	elsewhere := []string{}
 	if rows, err := a.objects(ctx, "/api/clusters/"+t.clusterID+"/secrets"); err == nil {
 		for _, row := range rows {
@@ -109,7 +109,7 @@ func (a *App) secretMissing(ctx context.Context, t secretTarget) error {
 		slices.Sort(elsewhere)
 		return fmt.Errorf("secret %s is not in %s, but in namespace %s; pass --namespace %s", t.name, t.in(), ui.Clean(strings.Join(elsewhere, ", ")), ui.Clean(elsewhere[0]))
 	}
-	return fmt.Errorf("secret %s was not found in %s; list them with `edka secrets list`", t.name, t.in())
+	return fmt.Errorf("secret %s was not found in %s; list them with `%s`", t.name, t.in(), followUp(cmd, "secrets", "list"))
 }
 
 // secretInput reads the value of each key: from the file a --from-file names
@@ -199,7 +199,7 @@ func (a *App) addSecrets(root *cobra.Command) {
 		if err != nil {
 			return err
 		}
-		m, err := a.readSecret(ctx, t)
+		m, err := a.readSecret(ctx, cmd, t)
 		if err != nil {
 			return err
 		}
@@ -293,7 +293,7 @@ func (a *App) addSecrets(root *cobra.Command) {
 		if err != nil {
 			return err
 		}
-		m, err := a.readSecret(ctx, t)
+		m, err := a.readSecret(ctx, cmd, t)
 		if err != nil {
 			return err
 		}
@@ -324,7 +324,7 @@ func (a *App) addSecrets(root *cobra.Command) {
 		if err != nil {
 			return err
 		}
-		if _, err := a.readSecret(ctx, t); err != nil {
+		if _, err := a.readSecret(ctx, cmd, t); err != nil {
 			return err
 		}
 		if err := a.confirm(fmt.Sprintf("Delete secret %s from namespace %s of cluster %s", t.name, t.namespace, t.cluster.Name)); err != nil {
@@ -365,7 +365,7 @@ func (a *App) addSecrets(root *cobra.Command) {
 			if err != nil {
 				return nil, err
 			}
-			m, err := a.readSecret(ctx, t)
+			m, err := a.readSecret(ctx, cmd, t)
 			choices := []candidate{}
 			for _, key := range secretKeys(m) {
 				if !slices.Contains(args[1:], key) {

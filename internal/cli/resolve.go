@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/edkadigital/cli/internal/ui"
+	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -313,15 +314,22 @@ func (a *App) clusterScopedLists(ctx context.Context, all bool, suffix string, r
 
 // resolveScoped selects one clusterScopedRows record by ID or exact name.
 // names lists the names that select a record; the first is shown.
-func (a *App) resolveScoped(ctx context.Context, label, suffix, target, empty string, names func(map[string]any) []string, detail func(map[string]any) string) (*candidate, error) {
+func (a *App) resolveScoped(ctx context.Context, cmd *cobra.Command, label, suffix, target, empty string, names func(map[string]any) []string, detail func(map[string]any) string) (*candidate, error) {
 	if target == "" && a.noInput {
-		return nil, fmt.Errorf("name the %s; list them with `edka %ss list`", label, label)
+		return nil, fmt.Errorf("name the %s; list them with `%s`", label, followUp(cmd, label+"s", "list"))
 	}
 	rows, err := a.clusterScopedRows(ctx, false, suffix)
 	if err != nil {
 		return nil, err
 	}
 	return a.pickScoped(ctx, label, rows, target, empty, names, detail)
+}
+
+// clusterOf is the cluster of a record that clusterScopedRows read. A hint
+// about the record names it, since a command run without a cluster looks in
+// every cluster, where another record can have the same name.
+func clusterOf(c *candidate) *candidate {
+	return &candidate{ID: text(c.Record, "cluster_id"), Name: text(c.Record, "cluster_name")}
 }
 
 // scopedCandidates lists rows to pick from. names lists the names that select

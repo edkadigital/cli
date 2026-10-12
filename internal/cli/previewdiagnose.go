@@ -32,7 +32,7 @@ func (a *App) previewDiagnoseCommand() *cobra.Command {
 		if tail < 1 || tail > 2000 {
 			return fmt.Errorf("tail must be between 1 and 2000")
 		}
-		c, preview, path, err := a.resolvePreview(cmd.Context(), argument(args))
+		c, preview, path, err := a.resolvePreview(cmd.Context(), cmd, argument(args))
 		if err != nil {
 			return err
 		}

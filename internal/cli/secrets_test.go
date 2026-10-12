@@ -164,7 +164,7 @@ func TestSecretNotFoundNamesItsNamespace(t *testing.T) {
 			t.Errorf("edka secrets %s: %v", line, err)
 		}
 	}
-	if _, _, err := execute(t, base, "secrets", "--cluster", "sinaia", "get", "nope"); err == nil || !strings.Contains(err.Error(), "secret nope was not found in namespace default of cluster sinaia; list them with `edka secrets list`") {
+	if _, _, err := execute(t, base, "secrets", "--cluster", "sinaia", "get", "nope"); err == nil || !strings.Contains(err.Error(), "secret nope was not found in namespace default of cluster sinaia; list them with `edka secrets list --cluster sinaia`") {
 		t.Fatal(err)
 	}
 }

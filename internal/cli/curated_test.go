@@ -119,6 +119,9 @@ func TestAppsResolveByNameAndUninstall(t *testing.T) {
 	if _, _, err := execute(t, server.URL, "apps", "get", "Whiteboard", "--cluster", "sinaia"); err == nil || !strings.Contains(err.Error(), "not found in cluster sinaia; choose another with --cluster") {
 		t.Fatal(err)
 	}
+	if _, _, err := execute(t, server.URL, "apps", "get", "--cluster", "sinaia"); err == nil || err.Error() != "name the app; list them with `edka apps list --cluster sinaia`" {
+		t.Fatal(err)
+	}
 }
 
 func TestAmbiguousNamesListMatches(t *testing.T) {
@@ -344,7 +347,8 @@ func TestCronjobActionsNeedNames(t *testing.T) {
 	}
 	*requests = nil
 	_, errOut, err := execute(t, server.URL, "cronjobs", "trigger", "nightly-report")
-	if err != nil || !strings.Contains(errOut, "Queued a run of nightly-report") || (*requests)[len(*requests)-1] != "POST /api/cronjobs/j1/trigger" {
+	// With no cluster set, the hint names the one the cronjob is in.
+	if err != nil || !strings.Contains(errOut, "Queued a run of nightly-report\n  Next: edka cronjobs runs nightly-report --cluster sinaia\n") || (*requests)[len(*requests)-1] != "POST /api/cronjobs/j1/trigger" {
 		t.Fatal(errOut, *requests, err)
 	}
 	for action, want := range map[string]string{"suspend": `{"suspend":true}`, "resume": `{"suspend":false}`} {

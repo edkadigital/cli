@@ -72,12 +72,12 @@ func findField(fields []appField, name string) (appField, bool) {
 }
 
 // catalogCommand is the command that lists an app's settings.
-func catalogCommand(app *candidate) string {
-	return "edka apps catalog " + shellJoin([]string{first(text(app.Record, "slug"), app.ID)})
+func catalogCommand(cmd *cobra.Command, app *candidate) string {
+	return followUp(cmd, "apps", "catalog", first(text(app.Record, "slug"), app.ID))
 }
 
-func noSetting(app *candidate, key string) error {
-	return fmt.Errorf("%s has no setting %q; list them with `%s`", ui.Clean(app.Name), key, catalogCommand(app))
+func noSetting(cmd *cobra.Command, app *candidate, key string) error {
+	return fmt.Errorf("%s has no setting %q; list them with `%s`", ui.Clean(app.Name), key, catalogCommand(cmd, app))
 }
 
 // catalogRow describes a setting for `apps catalog <app>`.
@@ -128,7 +128,7 @@ var catalogFieldColumns = []ui.Column{
 }
 
 // resolveCatalogApp selects an app from a cluster's catalog by ID, slug or name.
-func (a *App) resolveCatalogApp(ctx context.Context, cluster, target string) (*candidate, error) {
+func (a *App) resolveCatalogApp(ctx context.Context, cmd *cobra.Command, cluster, target string) (*candidate, error) {
 	rows, err := a.objects(ctx, "/api/clusters/"+cluster+"/apps/catalog")
 	if err != nil {
 		return nil, err
@@ -141,7 +141,7 @@ func (a *App) resolveCatalogApp(ctx context.Context, cluster, target string) (*c
 	}
 	c, err := a.pick(ctx, "catalog app", candidates, target)
 	if err != nil && errors.Is(err, errNotFound) {
-		return nil, fmt.Errorf("%w; list them with `edka apps catalog`", err)
+		return nil, fmt.Errorf("%w; list them with `%s`", err, followUp(cmd, "apps", "catalog"))
 	}
 	return c, err
 }
@@ -321,7 +321,7 @@ func typedValue(f appField, raw string) (any, error) {
 // installConfiguration builds a configuration from --data and --set. Settings
 // with option lists accept an option's name, which becomes its value; labels
 // keeps that option's label to show.
-func (a *App) installConfiguration(ctx context.Context, cluster string, app *candidate, fields []appField, data string, sets []string) (configuration map[string]any, labels map[string]string, err error) {
+func (a *App) installConfiguration(ctx context.Context, cmd *cobra.Command, cluster string, app *candidate, fields []appField, data string, sets []string) (configuration map[string]any, labels map[string]string, err error) {
 	configuration, labels = map[string]any{}, map[string]string{}
 	if data != "" {
 		raw, err := a.body(data, nil)
@@ -344,7 +344,7 @@ func (a *App) installConfiguration(ctx context.Context, cluster string, app *can
 		key, typed := strings.CutSuffix(key, ":")
 		f, ok := findField(fields, key)
 		if !ok {
-			return nil, nil, noSetting(app, key)
+			return nil, nil, noSetting(cmd, app, key)
 		}
 		if f.secret() {
 			return nil, nil, fmt.Errorf("%s is a secret; enter it at the prompt, or put it in a file for --data @file, so shell history does not keep it", key)
@@ -422,7 +422,7 @@ type FieldsError struct {
 func (e *FieldsError) Error() string { return e.message }
 func (e *FieldsError) Unwrap() error { return e.api }
 
-func (a *App) missingSettings(ctx context.Context, cluster string, app *candidate, fields []appField, configuration map[string]any, apiError *api.Error) error {
+func (a *App) missingSettings(ctx context.Context, cmd *cobra.Command, cluster string, app *candidate, fields []appField, configuration map[string]any, apiError *api.Error) error {
 	settings := []SettingError{}
 	lines, unknown := []string{}, []string{}
 	secret, missing := false, true
@@ -461,7 +461,7 @@ func (a *App) missingSettings(ctx context.Context, cluster string, app *candidat
 	lines = append([]string{fmt.Sprintf(title, ui.Clean(app.Name))}, lines...)
 	hint := "Set them with --set key=value"
 	if len(unknown) > 0 {
-		lines = append(lines, fmt.Sprintf("Remove %s from --data; list the app's settings with `%s`.", ui.Clean(strings.Join(unknown, ", ")), catalogCommand(app)))
+		lines = append(lines, fmt.Sprintf("Remove %s from --data; list the app's settings with `%s`.", ui.Clean(strings.Join(unknown, ", ")), catalogCommand(cmd, app)))
 		hint = "Set the others with --set key=value"
 	}
 	if len(unknown) < len(apiError.Fields) {
@@ -569,16 +569,16 @@ func (a *App) optionsCommand() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		app, err := a.resolveCatalogApp(ctx, cluster, args[0])
+		app, err := a.resolveCatalogApp(ctx, cmd, cluster, args[0])
 		if err != nil {
 			return err
 		}
 		fields := appFields(app.Record)
 		f, ok := findField(fields, args[1])
 		if !ok {
-			return noSetting(app, args[1])
+			return noSetting(cmd, app, args[1])
 		}
-		configuration, _, err := a.installConfiguration(ctx, cluster, app, fields, "", sets)
+		configuration, _, err := a.installConfiguration(ctx, cmd, cluster, app, fields, "", sets)
 		if err != nil {
 			return err
 		}
@@ -625,7 +625,7 @@ func (a *App) installCommand() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		app, err := a.resolveCatalogApp(ctx, clusterID, args[0])
+		app, err := a.resolveCatalogApp(ctx, cmd, clusterID, args[0])
 		if err != nil {
 			return err
 		}
@@ -634,14 +634,14 @@ func (a *App) installCommand() *cobra.Command {
 			return err
 		}
 		fields := appFields(app.Record)
-		configuration, labels, err := a.installConfiguration(ctx, clusterID, app, fields, data, sets)
+		configuration, labels, err := a.installConfiguration(ctx, cmd, clusterID, app, fields, data, sets)
 		if err != nil {
 			return err
 		}
 		// Prompts need a terminal on stderr too, where they appear.
 		prompts := !a.noInput && ui.IsTerminal(a.Err)
 		if prompts {
-			if err := a.guideInstall(ctx, cluster, clusterID, app, fields, configuration, labels, &name); err != nil {
+			if err := a.guideInstall(ctx, cmd, cluster, clusterID, app, fields, configuration, labels, &name); err != nil {
 				return err
 			}
 		}
@@ -661,7 +661,7 @@ func (a *App) installCommand() *cobra.Command {
 				break
 			}
 			if !prompts {
-				return a.missingSettings(ctx, clusterID, app, fields, configuration, apiError)
+				return a.missingSettings(ctx, cmd, clusterID, app, fields, configuration, apiError)
 			}
 			asked, askErr := a.askSettings(ctx, clusterID, fields, configuration, apiError.Fields)
 			if askErr != nil {
@@ -670,7 +670,7 @@ func (a *App) installCommand() *cobra.Command {
 			// An answer taken without asking, such as a list's only option, can
 			// repeat the rejected request.
 			if again, _ := json.Marshal(body); !asked || bytes.Equal(again, sent) {
-				return a.missingSettings(ctx, clusterID, app, fields, configuration, apiError)
+				return a.missingSettings(ctx, cmd, clusterID, app, fields, configuration, apiError)
 			}
 		}
 		if err != nil {
@@ -682,18 +682,18 @@ func (a *App) installCommand() *cobra.Command {
 		}
 		appID, err := safeID(text(record, "app_id"))
 		if err != nil {
-			return fmt.Errorf("installation started but no app ID returned; inspect `edka apps list`")
+			return fmt.Errorf("installation started but no app ID returned; inspect `%s`", followUp(cmd, "apps", "list", "--cluster", cluster.Name))
 		}
 		instance := first(name, text(record, "instance_slug"), app.Name)
 		if !wait {
-			a.message("✓ Installing %s in cluster %s as %s.\n  Next: edka apps get %s", ui.Clean(app.Name), ui.Clean(cluster.Name), ui.Clean(instance), shellJoin([]string{instance}))
+			a.message("✓ Installing %s in cluster %s as %s.\n  Next: %s", ui.Clean(app.Name), ui.Clean(cluster.Name), ui.Clean(instance), followUp(cmd, "apps", "get", instance, "--cluster", cluster.Name))
 			if a.output != "table" {
 				return a.render(response)
 			}
 			return nil
 		}
 		a.message("Installing %s in cluster %s as %s…", ui.Clean(app.Name), ui.Clean(cluster.Name), ui.Clean(instance))
-		installed, m, err := a.waitApp(ctx, "/api/clusters/"+clusterID+"/apps/"+appID, instance, waitTimeout)
+		installed, m, err := a.waitApp(ctx, cmd, cluster, "/api/clusters/"+clusterID+"/apps/"+appID, instance, waitTimeout)
 		if err != nil {
 			return err
 		}

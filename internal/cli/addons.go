@@ -34,9 +34,9 @@ var addonUpdateNotes = map[string]string{
 }
 
 // managedElsewhere refuses a change to an add-on that another console view manages.
-func managedElsewhere(name string) error {
+func managedElsewhere(cmd *cobra.Command, name string) error {
 	if area, ok := managedAddons[name]; ok {
-		return fmt.Errorf("%s is managed from Cluster > %s in the console; open the cluster with `edka open`", ui.Clean(name), area)
+		return fmt.Errorf("%s is managed from Cluster > %s in the console; open the cluster with `%s`", ui.Clean(name), area, followUp(cmd, "open"))
 	}
 	return nil
 }
@@ -185,9 +185,9 @@ func (a *App) addonRows(ctx context.Context, all bool) ([]map[string]any, error)
 }
 
 // resolveAddon selects an installed add-on by ID or name.
-func (a *App) resolveAddon(ctx context.Context, target string) (*candidate, error) {
+func (a *App) resolveAddon(ctx context.Context, cmd *cobra.Command, target string) (*candidate, error) {
 	if target == "" && a.noInput {
-		return nil, fmt.Errorf("name the add-on; list them with `edka addons list`")
+		return nil, fmt.Errorf("name the add-on; list them with `%s`", followUp(cmd, "addons", "list"))
 	}
 	rows, err := a.addonRows(ctx, false)
 	if err != nil {
@@ -280,23 +280,23 @@ func (a *App) showAddon(m map[string]any) error {
 }
 
 // showInstalled reads an add-on again from its cluster and prints it.
-func (a *App) showInstalled(ctx context.Context, clusterID, name string) error {
-	a.cluster = clusterID
+func (a *App) showInstalled(ctx context.Context, cmd *cobra.Command, cluster *candidate, name string) error {
+	a.cluster = cluster.ID
 	rows, err := a.addonRows(ctx, false)
 	if err != nil {
 		return err
 	}
 	row := recordWith(rows, "addon_name", name)
 	if row == nil {
-		return fmt.Errorf("add-on %q was %w; inspect `edka addons list`", name, errNotFound)
+		return fmt.Errorf("add-on %q was %w; inspect `%s`", name, errNotFound, followUp(cmd, "addons", "list", "--cluster", cluster.Name))
 	}
 	return a.showAddon(row)
 }
 
 // waitAddon prints an add-on operation's progress to stderr until the add-on
 // is installed, or until it is gone when removing.
-func (a *App) waitAddon(parent context.Context, clusterID, name string, removing bool, timeout time.Duration) error {
-	cluster, err := safeID(clusterID)
+func (a *App) waitAddon(parent context.Context, cmd *cobra.Command, cluster *candidate, name string, removing bool, timeout time.Duration) error {
+	id, err := safeID(cluster.ID)
 	if err != nil {
 		return err
 	}
@@ -313,9 +313,9 @@ func (a *App) waitAddon(parent context.Context, clusterID, name string, removing
 		if status != "" {
 			state = "is still " + ui.Clean(status)
 		}
-		return fmt.Errorf("%s %s: %w; the operation continues, follow it with `edka addons list`", shown, state, ctx.Err())
+		return fmt.Errorf("%s %s: %w; the operation continues, follow it with `%s`", shown, state, ctx.Err(), followUp(cmd, "addons", "list", "--cluster", cluster.Name))
 	}
-	path := "/api/clusters/" + cluster + "/addons"
+	path := "/api/clusters/" + id + "/addons"
 	for {
 		response, err := a.poll(ctx, p, path, nil)
 		if err != nil {
@@ -330,7 +330,7 @@ func (a *App) waitAddon(parent context.Context, clusterID, name string, removing
 		case row == nil && removing:
 			return nil
 		case row == nil:
-			return fmt.Errorf("add-on %q was %w; inspect `edka addons list`", name, errNotFound)
+			return fmt.Errorf("add-on %q was %w; inspect `%s`", name, errNotFound, followUp(cmd, "addons", "list", "--cluster", cluster.Name))
 		}
 		status = text(row, "status")
 		reason := addonError(row)
@@ -343,9 +343,9 @@ func (a *App) waitAddon(parent context.Context, clusterID, name string, removing
 				reason = ": " + ui.Clean(reason)
 			}
 			if removing {
-				return fmt.Errorf("uninstalling %s failed%s\nRetry with `edka addons uninstall %s`", shown, reason, shown)
+				return fmt.Errorf("uninstalling %s failed%s\nRetry with `%s`", shown, reason, followUp(cmd, "addons", "uninstall", name, "--cluster", cluster.Name))
 			}
-			return fmt.Errorf("%s failed%s\nRetry with `edka addons install %s`, or remove it with `edka addons uninstall %s`", shown, reason, shown, shown)
+			return fmt.Errorf("%s failed%s\nRetry with `%s`, or remove it with `%s`", shown, reason, followUp(cmd, "addons", "install", name, "--cluster", cluster.Name), followUp(cmd, "addons", "uninstall", name, "--cluster", cluster.Name))
 		case status == "failed":
 			reread = true
 		default:
@@ -375,7 +375,7 @@ func (a *App) startUpdate(ctx context.Context, cluster, name, target string) (*a
 // updateAddons updates every add-on of the context cluster that has a newer
 // catalog version, each after the add-ons it depends on. With wait, an update
 // finishes before the next starts.
-func (a *App) updateAddons(ctx context.Context, wait bool, timeout time.Duration) error {
+func (a *App) updateAddons(ctx context.Context, cmd *cobra.Command, wait bool, timeout time.Duration) error {
 	cluster, err := a.resolveCluster(ctx, "")
 	if err != nil {
 		return err
@@ -417,7 +417,7 @@ func (a *App) updateAddons(ctx context.Context, wait bool, timeout time.Duration
 		name, status := ui.Clean(text(row, "addon_name")), text(row, "status")
 		switch {
 		case status == "failed":
-			skipped = append(skipped, fmt.Sprintf("  %s failed; retry with `edka addons install %s`", name, name))
+			skipped = append(skipped, fmt.Sprintf("  %s failed; retry with `%s`", name, followUp(cmd, "addons", "install", text(row, "addon_name"), "--cluster", cluster.Name)))
 		case status != "installed":
 			skipped = append(skipped, fmt.Sprintf("  %s is %s", name, ui.Clean(status)))
 		case row["managed_from"] != nil && text(row, "catalog_version") != "" && newerVersion(text(row, "catalog_version"), text(row, "version")):
@@ -480,13 +480,13 @@ func (a *App) updateAddons(ctx context.Context, wait bool, timeout time.Duration
 			continue
 		}
 		a.message("Updating %s to %s…", ui.Clean(name), ui.Clean(target))
-		if err := a.waitAddon(ctx, cluster.ID, name, false, timeout); err != nil {
+		if err := a.waitAddon(ctx, cmd, cluster, name, false, timeout); err != nil {
 			return notStarted(err, updates[i+1:])
 		}
 		a.message("✓ Updated %s to %s", ui.Clean(name), ui.Clean(target))
 	}
 	if !wait {
-		a.message("  Check progress: edka addons list")
+		a.message("  Check progress: %s", followUp(cmd, "addons", "list", "--cluster", cluster.Name))
 		if a.output != "table" {
 			return ui.Render(a.Out, jsonBody(map[string]any{"data": started}), a.output, false)
 		}
@@ -518,7 +518,7 @@ func (a *App) addAddons(root *cobra.Command) {
 	list.Flags().BoolVar(&all, "all", false, "List add-ons in every cluster, not only the linked one")
 	list.Flags().BoolVar(&outdated, "outdated", false, "Only add-ons with a newer version in the catalog")
 	get := &cobra.Command{Use: "get [add-on]", Short: "Show an installed add-on", Args: cobra.MaximumNArgs(1), Example: "  edka addons get cert-manager\n  edka addons get cert-manager --cluster production --json", RunE: func(cmd *cobra.Command, args []string) error {
-		c, err := a.resolveAddon(cmd.Context(), argument(args))
+		c, err := a.resolveAddon(cmd.Context(), cmd, argument(args))
 		if err != nil {
 			return err
 		}
@@ -559,7 +559,7 @@ func (a *App) addAddons(root *cobra.Command) {
 			return fmt.Errorf("wait-timeout must be positive")
 		}
 		ctx, name := cmd.Context(), args[0]
-		if err := managedElsewhere(name); err != nil {
+		if err := managedElsewhere(cmd, name); err != nil {
 			return err
 		}
 		entries, err := a.objects(ctx, "/api/addons/catalog")
@@ -568,7 +568,7 @@ func (a *App) addAddons(root *cobra.Command) {
 		}
 		entry := recordWith(entries, "name", name)
 		if entry == nil {
-			return fmt.Errorf("add-on %q is not in the catalog; list them with `edka addons catalog`", name)
+			return fmt.Errorf("add-on %q is not in the catalog; list them with `%s`", name, followUp(cmd, "addons", "catalog"))
 		}
 		cluster, err := a.resolveCluster(ctx, "")
 		if err != nil {
@@ -585,7 +585,7 @@ func (a *App) addAddons(root *cobra.Command) {
 		response, err := a.request(ctx, "POST", "/api/clusters/"+id+"/addons", nil, jsonBody(body))
 		var apiError *api.Error
 		if errors.As(err, &apiError) && apiError.Status == 409 && apiError.Reason == "Addon already installed" {
-			return fmt.Errorf("%w\nUpdate it with `edka addons update %s`", err, name)
+			return fmt.Errorf("%w\nUpdate it with `%s`", err, followUp(cmd, "addons", "update", name, "--cluster", cluster.Name))
 		}
 		if err != nil {
 			return err
@@ -600,18 +600,18 @@ func (a *App) addAddons(root *cobra.Command) {
 			dependencies = "\n  It depends on " + ui.Clean(strings.Join(required, ", ")) + ". Edka installs the missing ones first."
 		}
 		if !wait {
-			a.message("✓ Installing %s%s\n  Next: edka addons get %s", what, dependencies, name)
+			a.message("✓ Installing %s%s\n  Next: %s", what, dependencies, followUp(cmd, "addons", "get", name, "--cluster", cluster.Name))
 			if a.output != "table" {
 				return a.render(response)
 			}
 			return nil
 		}
 		a.message("Installing %s…%s", what, dependencies)
-		if err := a.waitAddon(ctx, cluster.ID, name, false, waitTimeout); err != nil {
+		if err := a.waitAddon(ctx, cmd, cluster, name, false, waitTimeout); err != nil {
 			return err
 		}
 		a.message("✓ Installed %s in cluster %s", name, ui.Clean(cluster.Name))
-		return a.showInstalled(ctx, cluster.ID, name)
+		return a.showInstalled(ctx, cmd, cluster, name)
 	}}
 	install.Flags().StringVar(&version, "version", "", "Chart version to install (default: the catalog version)")
 	waitFlags(install, "installed")
@@ -626,18 +626,19 @@ func (a *App) addAddons(root *cobra.Command) {
 		case updateAll && version != "":
 			return fmt.Errorf("--version needs one add-on; --all updates each add-on to its catalog version")
 		case updateAll:
-			return a.updateAddons(ctx, wait, waitTimeout)
+			return a.updateAddons(ctx, cmd, wait, waitTimeout)
 		case len(args) == 0:
 			return fmt.Errorf("name the add-on, or pass --all for every add-on with an update")
 		}
-		c, err := a.resolveAddon(ctx, args[0])
+		c, err := a.resolveAddon(ctx, cmd, args[0])
 		if err != nil {
 			return err
 		}
-		if err := managedElsewhere(c.Name); err != nil {
+		if err := managedElsewhere(cmd, c.Name); err != nil {
 			return err
 		}
 		name, cluster, current := ui.Clean(c.Name), ui.Clean(text(c.Record, "cluster_name")), text(c.Record, "version")
+		where := clusterOf(c)
 		switch status := text(c.Record, "status"); status {
 		case "installed":
 		case "failed":
@@ -645,9 +646,9 @@ func (a *App) addAddons(root *cobra.Command) {
 			if problem := addonError(c.Record); problem != "" {
 				reason = ": " + ui.Clean(problem)
 			}
-			return fmt.Errorf("%s failed in cluster %s%s\nRetry with `edka addons install %s`, or remove it with `edka addons uninstall %s`", name, cluster, reason, name, name)
+			return fmt.Errorf("%s failed in cluster %s%s\nRetry with `%s`, or remove it with `%s`", name, cluster, reason, followUp(cmd, "addons", "install", c.Name, "--cluster", where.Name), followUp(cmd, "addons", "uninstall", c.Name, "--cluster", where.Name))
 		default:
-			return fmt.Errorf("%s is %s in cluster %s; follow it with `edka addons get %s`", name, ui.Clean(status), cluster, name)
+			return fmt.Errorf("%s is %s in cluster %s; follow it with `%s`", name, ui.Clean(status), cluster, followUp(cmd, "addons", "get", c.Name, "--cluster", where.Name))
 		}
 		target := first(version, text(c.Record, "catalog_version"))
 		switch {
@@ -675,18 +676,18 @@ func (a *App) addAddons(root *cobra.Command) {
 			return err
 		}
 		if !wait {
-			a.message("✓ Updating %s to %s in cluster %s\n  Check progress: edka addons get %s", name, ui.Clean(target), cluster, name)
+			a.message("✓ Updating %s to %s in cluster %s\n  Check progress: %s", name, ui.Clean(target), cluster, followUp(cmd, "addons", "get", c.Name, "--cluster", where.Name))
 			if a.output != "table" {
 				return a.render(response)
 			}
 			return nil
 		}
 		a.message("Updating %s to %s in cluster %s…", name, ui.Clean(target), cluster)
-		if err := a.waitAddon(ctx, text(c.Record, "cluster_id"), c.Name, false, waitTimeout); err != nil {
+		if err := a.waitAddon(ctx, cmd, where, c.Name, false, waitTimeout); err != nil {
 			return err
 		}
 		a.message("✓ Updated %s to %s in cluster %s", name, ui.Clean(target), cluster)
-		return a.showInstalled(ctx, text(c.Record, "cluster_id"), c.Name)
+		return a.showInstalled(ctx, cmd, where, c.Name)
 	}}
 	update.Flags().StringVar(&version, "version", "", "Chart version to update to (default: the catalog version)")
 	update.Flags().BoolVar(&updateAll, "all", false, "Update every add-on in the cluster that has a newer catalog version")
@@ -696,17 +697,17 @@ func (a *App) addAddons(root *cobra.Command) {
 			return fmt.Errorf("wait-timeout must be positive")
 		}
 		ctx := cmd.Context()
-		c, err := a.resolveAddon(ctx, args[0])
+		c, err := a.resolveAddon(ctx, cmd, args[0])
 		if err != nil {
 			return err
 		}
-		if err := managedElsewhere(c.Name); err != nil {
+		if err := managedElsewhere(cmd, c.Name); err != nil {
 			return err
 		}
-		name, cluster := ui.Clean(c.Name), ui.Clean(text(c.Record, "cluster_name"))
+		name, cluster, where := ui.Clean(c.Name), ui.Clean(text(c.Record, "cluster_name")), clusterOf(c)
 		// Edka queues an uninstall beside an operation that is still running.
 		if status := text(c.Record, "status"); addonSteps[status] != "" {
-			return fmt.Errorf("%s is %s in cluster %s; follow it with `edka addons get %s`", name, ui.Clean(status), cluster, name)
+			return fmt.Errorf("%s is %s in cluster %s; follow it with `%s`", name, ui.Clean(status), cluster, followUp(cmd, "addons", "get", c.Name, "--cluster", where.Name))
 		}
 		if c.Record["required"] == true {
 			return fmt.Errorf("%s is a required add-on and can't be uninstalled", name)
@@ -727,12 +728,12 @@ func (a *App) addAddons(root *cobra.Command) {
 		}
 		if wait {
 			a.message("Uninstalling %s from cluster %s…", name, cluster)
-			if err := a.waitAddon(ctx, text(c.Record, "cluster_id"), c.Name, true, waitTimeout); err != nil {
+			if err := a.waitAddon(ctx, cmd, where, c.Name, true, waitTimeout); err != nil {
 				return err
 			}
 			a.message("✓ Uninstalled %s from cluster %s", name, cluster)
 		} else {
-			a.message("✓ Uninstalling %s from cluster %s\n  Check progress: edka addons list", name, cluster)
+			a.message("✓ Uninstalling %s from cluster %s\n  Check progress: %s", name, cluster, followUp(cmd, "addons", "list", "--cluster", where.Name))
 		}
 		if a.output != "table" {
 			return a.render(response)

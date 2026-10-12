@@ -37,7 +37,7 @@ func (a *App) addUp(root *cobra.Command) {
 				return fmt.Errorf("%s is for a settings change; pass --data or --field", flag)
 			}
 			if creates {
-				return fmt.Errorf("%s is for a change to an existing deployment; name one, or see a new one with `edka deployments create --dry-run`", flag)
+				return fmt.Errorf("%s is for a change to an existing deployment; name one, or see a new one with `%s`", flag, followUp(cmd, "deployments", "create", "--dry-run"))
 			}
 			if expected < 1 && !diff {
 				return fmt.Errorf("expected-generation must be positive")
@@ -105,16 +105,16 @@ func (a *App) addUp(root *cobra.Command) {
 		}
 		if id == "" {
 			if id, err = safeID(text(record, "id")); err != nil {
-				return fmt.Errorf("deployment submitted but no ID returned; inspect `edka deployments list`")
+				return fmt.Errorf("deployment submitted but no ID returned; inspect `%s`", followUp(cmd, "deployments", "list"))
 			}
 		}
 		name = first(name, text(record, "name"), id)
 		generation := submittedGeneration(record)
 		if generation <= 0 {
-			return fmt.Errorf("deployment submitted but no revision generation returned; inspect `edka status`")
+			return fmt.Errorf("deployment submitted but no revision generation returned; inspect `%s`", followUp(cmd, "deployments", "status", deploymentArg{id, name}))
 		}
 		a.message("Deployment submitted. Waiting for generation %d…", generation)
-		return a.awaitGeneration(cmd.Context(), id, name, generation, waitTimeout)
+		return a.awaitGeneration(cmd.Context(), cmd, id, name, generation, waitTimeout)
 	}}
 	up.Flags().StringVarP(&data, "data", "d", "", "Deployment JSON, @file.json, or @-")
 	up.Flags().StringArrayVarP(&fields, "field", "f", nil, "Body field: key=value or key:=JSON")
@@ -193,8 +193,7 @@ func (a *App) buildCommand() *cobra.Command {
 			return err
 		}
 		if git, known := gitSource(deployment); known && !git {
-			name := ui.Clean(c.Name)
-			return fmt.Errorf("%s is an image deployment with no GitHub repository to build; deploy image changes with `edka up %s --wait`", name, name)
+			return fmt.Errorf("%s is an image deployment with no GitHub repository to build; deploy image changes with `%s`", ui.Clean(c.Name), followUp(cmd, "up", deploymentArg{c.ID, c.Name}, "--wait"))
 		}
 		// A rollout the build starts has a later generation than the current one.
 		before := number(deployment["spec_generation"])
@@ -218,12 +217,12 @@ func (a *App) buildCommand() *cobra.Command {
 		}
 		buildID, err := safeID(text(record, "id"))
 		if err != nil {
-			return fmt.Errorf("build submitted but no ID returned; inspect `edka api deployments builds list --id %s`", id)
+			return fmt.Errorf("build submitted but no ID returned; inspect `%s`", followUp(cmd, "api", "deployments", "builds", "list", "--id", id))
 		}
 		ctx, cancel := context.WithTimeout(cmd.Context(), buildTimeout)
 		defer cancel()
 		a.message("Build submitted. Waiting for it to finish…")
-		return a.followBuild(ctx, id, c.Name, buildID, before)
+		return a.followBuild(ctx, cmd, id, c.Name, buildID, before)
 	}}
 	build.Flags().StringVar(&ref, "ref", "", "GitHub ref override")
 	build.Flags().StringVar(&commit, "commit", "", "Commit SHA override")
@@ -236,7 +235,7 @@ func (a *App) buildCommand() *cobra.Command {
 // followBuild streams a submitted build until it finishes, follows the rollout
 // auto-deploy starts for it, and prints the build. before is the deployment's
 // generation when the build started.
-func (a *App) followBuild(ctx context.Context, id, name, buildID string, before int) error {
+func (a *App) followBuild(ctx context.Context, cmd *cobra.Command, id, name, buildID string, before int) error {
 	detail, build, err := a.waitBuild(ctx, id, buildID)
 	if err != nil {
 		return err
@@ -266,14 +265,14 @@ func (a *App) followBuild(ctx context.Context, id, name, buildID string, before 
 			return err
 		}
 		if generation == 0 {
-			return fmt.Errorf("the build succeeded, but no rollout of it started; deploy it with `edka up %s --wait`", ui.Clean(name))
+			return fmt.Errorf("the build succeeded, but no rollout of it started; deploy it with `%s`", followUp(cmd, "up", deploymentArg{id, name}, "--wait"))
 		}
 		a.message("Auto-deploy started generation %d…", generation)
-		if _, err := a.waitDeployment(ctx, id, name, generation); err != nil {
+		if _, err := a.waitDeployment(ctx, cmd, id, name, generation); err != nil {
 			return err
 		}
 	} else {
-		a.message("  Auto-deploy is off. Next: edka up %s --wait", ui.Clean(name))
+		a.message("  Auto-deploy is off. Next: %s", followUp(cmd, "up", deploymentArg{id, name}, "--wait"))
 	}
 	if a.output != "table" {
 		return a.render(detail)
@@ -304,10 +303,10 @@ func submittedGeneration(record map[string]any) int {
 }
 
 // awaitGeneration waits until generation is healthy, then shows the runtime status.
-func (a *App) awaitGeneration(ctx context.Context, id, name string, generation int, timeout time.Duration) error {
+func (a *App) awaitGeneration(ctx context.Context, cmd *cobra.Command, id, name string, generation int, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	runtime, err := a.waitDeployment(ctx, id, name, generation)
+	runtime, err := a.waitDeployment(ctx, cmd, id, name, generation)
 	if err != nil {
 		return err
 	}

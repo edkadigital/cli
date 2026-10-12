@@ -39,8 +39,8 @@ func databaseDetail(m map[string]any) string {
 	return strings.Trim(engineOf(m)+" · "+text(m, "cluster_name"), " ·")
 }
 
-func (a *App) resolveDatabase(ctx context.Context, target string) (*candidate, string, error) {
-	c, err := a.resolveScoped(ctx, "database", "databases", target, "no databases; create one with `edka api clusters databases create --help`", databaseNames, databaseDetail)
+func (a *App) resolveDatabase(ctx context.Context, cmd *cobra.Command, target string) (*candidate, string, error) {
+	c, err := a.resolveScoped(ctx, cmd, "database", "databases", target, "no databases; create one with `edka api clusters databases create --help`", databaseNames, databaseDetail)
 	if err != nil {
 		return nil, "", err
 	}
@@ -74,7 +74,7 @@ func (a *App) addDatabases(root *cobra.Command) {
 	}}
 	list.Flags().BoolVar(&all, "all", false, "List databases in every cluster, not only the linked one")
 	get := &cobra.Command{Use: "get [database]", Short: "Show a database, its instances and recovery window", Args: cobra.MaximumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		c, path, err := a.resolveDatabase(cmd.Context(), argument(args))
+		c, path, err := a.resolveDatabase(cmd.Context(), cmd, argument(args))
 		if err != nil {
 			return err
 		}
@@ -129,7 +129,7 @@ func (a *App) addDatabases(root *cobra.Command) {
 		return ui.Fields(a.Out, fields, a.color)
 	}}
 	backups := &cobra.Command{Use: "backups [database]", Short: "List a database's backups, newest first", Long: "List a database's backups, newest first. PostgreSQL reports its ten most recent.", Args: cobra.MaximumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		_, path, err := a.resolveDatabase(cmd.Context(), argument(args))
+		_, path, err := a.resolveDatabase(cmd.Context(), cmd, argument(args))
 		if err != nil {
 			return err
 		}
@@ -161,7 +161,7 @@ func (a *App) addDatabases(root *cobra.Command) {
 		})
 	}}
 	backup := &cobra.Command{Use: "backup <database>", Short: "Start a backup now", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		c, path, err := a.resolveDatabase(cmd.Context(), args[0])
+		c, path, err := a.resolveDatabase(cmd.Context(), cmd, args[0])
 		if err != nil {
 			return err
 		}
@@ -169,19 +169,19 @@ func (a *App) addDatabases(root *cobra.Command) {
 		if err != nil {
 			return err
 		}
-		a.message("✓ Started a backup of %s\n  Next: edka databases backups %s", ui.Clean(c.Name), ui.Clean(c.Name))
+		a.message("✓ Started a backup of %s\n  Next: %s", ui.Clean(c.Name), followUp(cmd, "databases", "backups", c.Name, "--cluster", text(c.Record, "cluster_name")))
 		if a.output != "table" {
 			return a.render(response)
 		}
 		return nil
 	}}
-	logs := a.logsCommand("logs [database]", "Read a database's logs; follow with --follow", func(ctx context.Context, target string) (string, error) {
-		_, path, err := a.resolveDatabase(ctx, target)
+	logs := a.logsCommand("logs [database]", "Read a database's logs; follow with --follow", func(cmd *cobra.Command, target string) (string, error) {
+		_, path, err := a.resolveDatabase(cmd.Context(), cmd, target)
 		return path + "/logs", err
 	})
 	var force bool
 	remove := &cobra.Command{Use: "delete <database>", Short: "Delete a database and its data", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		c, path, err := a.resolveDatabase(cmd.Context(), args[0])
+		c, path, err := a.resolveDatabase(cmd.Context(), cmd, args[0])
 		if err != nil {
 			return err
 		}

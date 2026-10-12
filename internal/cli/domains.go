@@ -111,8 +111,8 @@ func domainDetail(m map[string]any) string {
 }
 
 // resolveDomain selects a domain by ID or name.
-func (a *App) resolveDomain(ctx context.Context, target string) (*candidate, string, error) {
-	c, err := a.resolveScoped(ctx, "domain", "domains", target, "no domains; add one with `edka domains add '*.example.com'`", domainNames, domainDetail)
+func (a *App) resolveDomain(ctx context.Context, cmd *cobra.Command, target string) (*candidate, string, error) {
+	c, err := a.resolveScoped(ctx, cmd, "domain", "domains", target, "no domains; add one with `edka domains add '*.example.com'`", domainNames, domainDetail)
 	if err != nil {
 		return nil, "", err
 	}
@@ -290,7 +290,7 @@ func (a *App) addDomains(root *cobra.Command) {
 	}}
 	list.Flags().BoolVar(&all, "all", false, "List domains in every cluster, not only the linked one")
 	get := &cobra.Command{Use: "get [domain]", Short: "Show a domain, its certificate and the DNS records it needs", Long: "Show a domain with the state of its certificate, read from the cluster, and\nthe DNS records it needs: the CNAME that validates a certificate over DNS, and\nthe records that point the domain at its traffic class. A domain added with\n--dns-provider cloudflare needs no CNAME. For it, get shows the Cloudflare zone\nand the challenge record cert-manager writes there.", Args: cobra.MaximumNArgs(1), Example: "  edka domains get '*.example.com'\n  edka domains get app.example.com --json", RunE: func(cmd *cobra.Command, args []string) error {
-		c, _, err := a.resolveDomain(cmd.Context(), argument(args))
+		c, _, err := a.resolveDomain(cmd.Context(), cmd, argument(args))
 		if err != nil {
 			return err
 		}
@@ -436,7 +436,7 @@ func (a *App) addDomains(root *cobra.Command) {
 			return fmt.Errorf("wait-timeout must be positive")
 		}
 		ctx := cmd.Context()
-		c, path, err := a.resolveDomain(ctx, args[0])
+		c, path, err := a.resolveDomain(ctx, cmd, args[0])
 		if err != nil {
 			return err
 		}
@@ -521,7 +521,7 @@ func (a *App) addDomains(root *cobra.Command) {
 			return fmt.Errorf("pass --apex to include the apex, --apex=false to leave it out, or --replace-token to replace the Cloudflare API token")
 		}
 		ctx := cmd.Context()
-		c, path, err := a.resolveDomain(ctx, args[0])
+		c, path, err := a.resolveDomain(ctx, cmd, args[0])
 		if err != nil {
 			return err
 		}
@@ -577,7 +577,7 @@ func (a *App) addDomains(root *cobra.Command) {
 	update.Flags().BoolVar(&replaceToken, "replace-token", false, "Replace the Cloudflare API token, read from EDKA_CLOUDFLARE_API_TOKEN, stdin or a prompt")
 
 	remove := &cobra.Command{Use: "delete <domain>", Short: "Delete a domain and its certificate", Long: "Delete a domain from its cluster, with its certificate and its HTTPS listener.\nHostnames under it stop being served over HTTPS. Edka refuses while a Codex\nagent or environment uses the domain.", Args: cobra.ExactArgs(1), Example: "  edka domains delete app.example.com\n  edka domains delete '*.example.com' --yes", RunE: func(cmd *cobra.Command, args []string) error {
-		c, path, err := a.resolveDomain(cmd.Context(), args[0])
+		c, path, err := a.resolveDomain(cmd.Context(), cmd, args[0])
 		if err != nil {
 			return err
 		}

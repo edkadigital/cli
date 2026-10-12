@@ -90,7 +90,7 @@ func (a *App) createCommand() *cobra.Command {
 		}
 		id, err := safeID(text(record, "id"))
 		if err != nil {
-			return fmt.Errorf("deployment submitted but no ID returned; inspect `edka deployments list`")
+			return fmt.Errorf("deployment submitted but no ID returned; inspect `%s`", followUp(cmd, "deployments", "list"))
 		}
 		name := first(text(record, "name"), id)
 		created := fmt.Sprintf("✓ Created deployment %s in cluster %s", ui.Clean(name), ui.Clean(c.Name))
@@ -99,24 +99,24 @@ func (a *App) createCommand() *cobra.Command {
 		if link {
 			_, summary, err := a.saveLink(cmd.Context(), c, &candidate{ID: text(record, "id"), Name: name})
 			if err != nil {
-				return fmt.Errorf("deployment %s was created, but this directory was not linked: %w; run `edka link --deployment %s`", ui.Clean(name), err, ui.Clean(name))
+				return fmt.Errorf("deployment %s was created, but this directory was not linked: %w; run `%s`", ui.Clean(name), err, followUp(cmd, "link", "--deployment", name))
 			}
 			created += "\n" + summary
 		}
 		if !wait {
-			a.message("%s\n  Next: edka deployments status %s", created, ui.Clean(name))
+			a.message("%s\n  Next: %s", created, followUp(cmd, "deployments", "status", name))
 			return a.render(response)
 		}
 		a.message("%s", created)
 		if git {
-			return a.awaitFirstBuild(cmd.Context(), id, name, record, waitTimeout)
+			return a.awaitFirstBuild(cmd.Context(), cmd, id, name, record, waitTimeout)
 		}
 		generation := submittedGeneration(record)
 		if generation <= 0 {
-			return fmt.Errorf("deployment created but no revision generation returned; inspect `edka deployments status %s`", ui.Clean(name))
+			return fmt.Errorf("deployment created but no revision generation returned; inspect `%s`", followUp(cmd, "deployments", "status", name))
 		}
 		a.message("Waiting for generation %d…", generation)
-		return a.awaitGeneration(cmd.Context(), id, name, generation, waitTimeout)
+		return a.awaitGeneration(cmd.Context(), cmd, id, name, generation, waitTimeout)
 	}}
 	create.Flags().StringVarP(&data, "data", "d", "", "Deployment JSON, @file.json, or @-")
 	create.Flags().StringArrayVarP(&fields, "field", "f", nil, "Body field: key=value or key:=JSON")
@@ -140,14 +140,14 @@ func commandLine(git bool) string {
 
 // awaitFirstBuild follows the build Edka starts for a new Git deployment, and
 // the rollout of its image.
-func (a *App) awaitFirstBuild(ctx context.Context, id, name string, record map[string]any, timeout time.Duration) error {
+func (a *App) awaitFirstBuild(ctx context.Context, cmd *cobra.Command, id, name string, record map[string]any, timeout time.Duration) error {
 	build, _ := record["initial_build"].(map[string]any)
 	buildID, err := safeID(text(build, "id"))
 	if err != nil {
-		return fmt.Errorf("deployment %s was created, but its first build did not start; start one with `edka build %s --wait`", ui.Clean(name), ui.Clean(name))
+		return fmt.Errorf("deployment %s was created, but its first build did not start; start one with `%s`", ui.Clean(name), followUp(cmd, "build", name, "--wait"))
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	a.message("Waiting for its first build…")
-	return a.followBuild(ctx, id, name, buildID, number(record["spec_generation"]))
+	return a.followBuild(ctx, cmd, id, name, buildID, number(record["spec_generation"]))
 }

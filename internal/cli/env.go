@@ -125,14 +125,14 @@ func (a *App) envCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			_, err = a.applyEnv(cmd.Context(), c, secretsPlan(keys, secretValues), wait, waitTimeout)
+			_, err = a.applyEnv(cmd.Context(), cmd, c, secretsPlan(keys, secretValues), wait, waitTimeout)
 			return err
 		}
 		plan := func(env *deploymentEnv) (map[string]any, string, error) {
 			changed := []string{}
 			for _, key := range keys {
 				if slices.Contains(env.secrets, key) {
-					return nil, "", fmt.Errorf("%s is a secret; change it with `edka env set --secret %s`, or unset it first", key, key)
+					return nil, "", fmt.Errorf("%s is a secret; change it with `%s`, or unset it first", key, followUp(cmd, "env", "set", "--secret", key))
 				}
 				found, updated := false, false
 				for _, v := range env.variables {
@@ -159,7 +159,7 @@ func (a *App) envCommand() *cobra.Command {
 		if diff {
 			return a.diffEnv(cmd.Context(), c, plan)
 		}
-		unchanged, err := a.applyEnv(cmd.Context(), c, plan, wait, waitTimeout)
+		unchanged, err := a.applyEnv(cmd.Context(), cmd, c, plan, wait, waitTimeout)
 		if err != nil || unchanged == nil {
 			return err
 		}
@@ -207,7 +207,7 @@ func (a *App) envCommand() *cobra.Command {
 		if diff {
 			return a.diffEnv(cmd.Context(), c, plan)
 		}
-		_, err = a.applyEnv(cmd.Context(), c, plan, wait, waitTimeout)
+		_, err = a.applyEnv(cmd.Context(), cmd, c, plan, wait, waitTimeout)
 		return err
 	}}
 	for _, c := range []*cobra.Command{set, unset} {
@@ -460,7 +460,7 @@ func (a *App) diffEnv(ctx context.Context, c *candidate, plan envPlan) error {
 // lists were read at, and Edka refuses it when another save landed since. Then
 // applyEnv reads the lists again and plans from those, so the other save's
 // keys stay. It returns the lists when plan finds nothing to change.
-func (a *App) applyEnv(ctx context.Context, c *candidate, plan envPlan, wait bool, timeout time.Duration) (*deploymentEnv, error) {
+func (a *App) applyEnv(ctx context.Context, cmd *cobra.Command, c *candidate, plan envPlan, wait bool, timeout time.Duration) (*deploymentEnv, error) {
 	for attempt := 1; ; attempt++ {
 		env, err := a.readEnv(ctx, c)
 		if err != nil {
@@ -488,13 +488,13 @@ func (a *App) applyEnv(ctx context.Context, c *candidate, plan envPlan, wait boo
 		if err != nil {
 			return nil, err
 		}
-		return nil, a.reportEnv(ctx, env, response, done, wait, timeout)
+		return nil, a.reportEnv(ctx, cmd, env, response, done, wait, timeout)
 	}
 }
 
 // reportEnv reports the rollout a settings change started, or with wait
 // follows it until it is healthy.
-func (a *App) reportEnv(ctx context.Context, env *deploymentEnv, response *api.Response, done string, wait bool, timeout time.Duration) error {
+func (a *App) reportEnv(ctx context.Context, cmd *cobra.Command, env *deploymentEnv, response *api.Response, done string, wait bool, timeout time.Duration) error {
 	record, err := identityData(response.Body)
 	if err != nil {
 		return err
@@ -502,7 +502,7 @@ func (a *App) reportEnv(ctx context.Context, env *deploymentEnv, response *api.R
 	generation := submittedGeneration(record)
 	if !wait {
 		if generation > 0 {
-			done += fmt.Sprintf(" Generation %d is rolling out.\n  Next: edka deployments status %s", generation, ui.Clean(env.name))
+			done += fmt.Sprintf(" Generation %d is rolling out.\n  Next: %s", generation, followUp(cmd, "deployments", "status", deploymentArg{env.id, env.name}))
 		}
 		a.message("%s", done)
 		if a.output != "table" {
@@ -511,8 +511,8 @@ func (a *App) reportEnv(ctx context.Context, env *deploymentEnv, response *api.R
 		return nil
 	}
 	if generation <= 0 {
-		return fmt.Errorf("change saved but no revision generation returned; inspect `edka deployments status %s`", ui.Clean(env.name))
+		return fmt.Errorf("change saved but no revision generation returned; inspect `%s`", followUp(cmd, "deployments", "status", deploymentArg{env.id, env.name}))
 	}
 	a.message("%s Waiting for generation %d…", done, generation)
-	return a.awaitGeneration(ctx, env.id, env.name, generation, timeout)
+	return a.awaitGeneration(ctx, cmd, env.id, env.name, generation, timeout)
 }

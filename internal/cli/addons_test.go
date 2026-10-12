@@ -228,8 +228,8 @@ func TestAddonsInstall(t *testing.T) {
 		want string
 	}{
 		{[]string{"addons", "install"}, "accepts 1 arg(s), received 0"},
-		{[]string{"addons", "install", "zot", "--cluster", "staging"}, "zot is managed from Cluster > Registries in the console; open the cluster with `edka open`"},
-		{[]string{"addons", "install", "nope", "--cluster", "staging"}, "add-on \"nope\" is not in the catalog; list them with `edka addons catalog`"},
+		{[]string{"addons", "install", "zot", "--cluster", "staging"}, "zot is managed from Cluster > Registries in the console; open the cluster with `edka open --cluster staging`"},
+		{[]string{"addons", "install", "nope", "--cluster", "staging"}, "add-on \"nope\" is not in the catalog; list them with `edka addons catalog --cluster staging`"},
 		{[]string{"addons", "install", "keel"}, "choose a cluster with --cluster or run `edka link`"},
 		{[]string{"addons", "install", "keel", "--cluster", "staging", "--wait", "--wait-timeout", "0s"}, "wait-timeout must be positive"},
 	} {
@@ -255,7 +255,7 @@ func TestAddonsInstall(t *testing.T) {
 	}
 
 	server, _ = addonAPI(t, map[string][]string{"POST /api/clusters/c1/addons": {`409 {"error":"Addon already installed","message":"Addon 'keel' is already installed in this cluster"}`}})
-	if _, _, err := execute(t, server.URL, "addons", "install", "keel", "--cluster", "sinaia"); err == nil || !strings.Contains(err.Error(), "Addon 'keel' is already installed in this cluster (HTTP 409)\nUpdate it with `edka addons update keel`") {
+	if _, _, err := execute(t, server.URL, "addons", "install", "keel", "--cluster", "sinaia"); err == nil || !strings.Contains(err.Error(), "Addon 'keel' is already installed in this cluster (HTTP 409)\nUpdate it with `edka addons update keel --cluster sinaia`") {
 		t.Fatal(err)
 	}
 }
@@ -313,8 +313,8 @@ func TestAddonsUpdateNamesBothVersionsBeforeChanging(t *testing.T) {
 		{[]string{"addons", "update", "trust-manager", "--cluster", "sinaia"}, "Update add-on trust-manager in cluster sinaia from 0.11.0 to 0.12.0 requires confirmation; rerun with --yes"},
 		{[]string{"addons", "update", "trust-manager", "--yes"}, "2 add-ons match; pass an ID"},
 		{[]string{"addons", "update", "zot", "--cluster", "sinaia", "--yes"}, "zot is managed from Cluster > Registries in the console"},
-		{[]string{"addons", "update", "keel", "--cluster", "sinaia", "--yes"}, "keel is upgrading in cluster sinaia; follow it with `edka addons get keel`"},
-		{[]string{"addons", "update", "metrics-server", "--cluster", "sinaia", "--yes"}, "metrics-server failed in cluster sinaia: helm timed out\nRetry with `edka addons install metrics-server`, or remove it with `edka addons uninstall metrics-server`"},
+		{[]string{"addons", "update", "keel", "--cluster", "sinaia", "--yes"}, "keel is upgrading in cluster sinaia; follow it with `edka addons get keel --cluster sinaia`"},
+		{[]string{"addons", "update", "metrics-server", "--cluster", "sinaia", "--yes"}, "metrics-server failed in cluster sinaia: helm timed out\nRetry with `edka addons install metrics-server --cluster sinaia`, or remove it with `edka addons uninstall metrics-server --cluster sinaia`"},
 	} {
 		if _, _, err := execute(t, server.URL, tc.args...); err == nil || !strings.Contains(err.Error(), tc.want) {
 			t.Errorf("%v: %v", tc.args, err)
@@ -340,6 +340,12 @@ func TestAddonsUpdateNamesBothVersionsBeforeChanging(t *testing.T) {
 	// An explicit version is sent even when the catalog's is not newer.
 	if _, _, err := execute(t, server.URL, "addons", "update", "cert-manager", "--cluster", "sinaia", "--version", "1.15.0", "--yes"); err != nil || api.bodies["PUT /api/clusters/c1/addons"] != `{"addonName":"cert-manager","version":"1.15.0"}` {
 		t.Fatal(err, api.bodies)
+	}
+	// trust-manager is in staging too, so a hint about the one chosen by ID
+	// names its cluster.
+	_, errOut, err = execute(t, server.URL, "addons", "update", "x2", "--yes")
+	if err != nil || !strings.Contains(errOut, "Check progress: edka addons get trust-manager --cluster sinaia\n") {
+		t.Fatal(errOut, err)
 	}
 }
 
@@ -432,7 +438,7 @@ func TestAddonsUpdateAllNamesWhatItSkips(t *testing.T) {
 	inOrder(t, errOut,
 		"Not updated in cluster sinaia:\n",
 		"  keel is upgrading\n",
-		"  metrics-server failed; retry with `edka addons install metrics-server`\n",
+		"  metrics-server failed; retry with `edka addons install metrics-server --cluster sinaia`\n",
 		"  zot is managed from Cluster > Registries in the console\n",
 		"Updates in cluster sinaia:\n",
 		"  trust-manager 0.11.0 to 0.12.0\n",
@@ -444,7 +450,7 @@ func TestAddonsUpdateAllNamesWhatItSkips(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	inOrder(t, errOut, "Not updated in cluster sinaia:\n  metrics-server failed; retry with `edka addons install metrics-server`\n", "The other add-ons in cluster sinaia are up to date.\n")
+	inOrder(t, errOut, "Not updated in cluster sinaia:\n  metrics-server failed; retry with `edka addons install metrics-server --cluster sinaia`\n", "The other add-ons in cluster sinaia are up to date.\n")
 	if api.writes() != 0 {
 		t.Fatalf("updated an add-on it should skip: %v", api.requests)
 	}
@@ -460,7 +466,7 @@ func TestAddonsUninstallChecksWhatUsesTheAddon(t *testing.T) {
 		{[]string{"addons", "uninstall", "cert-manager", "--cluster", "sinaia", "--yes"}, "cert-manager is a required add-on and can't be uninstalled"},
 		{[]string{"addons", "uninstall", "trust-manager", "--cluster", "sinaia", "--yes"}, "trust-manager is used by zot in cluster sinaia; uninstall those add-ons first"},
 		{[]string{"addons", "uninstall", "zot", "--cluster", "sinaia", "--yes"}, "zot is managed from Cluster > Registries in the console"},
-		{[]string{"addons", "uninstall", "keel", "--cluster", "sinaia", "--yes"}, "keel is upgrading in cluster sinaia; follow it with `edka addons get keel`"},
+		{[]string{"addons", "uninstall", "keel", "--cluster", "sinaia", "--yes"}, "keel is upgrading in cluster sinaia; follow it with `edka addons get keel --cluster sinaia`"},
 		// A failed add-on can still be cleaned up.
 		{[]string{"addons", "uninstall", "metrics-server", "--cluster", "sinaia"}, "Uninstall add-on metrics-server 3.12.0 from cluster sinaia requires confirmation; rerun with --yes"},
 		{[]string{"addons", "uninstall", "reflector"}, "Uninstall add-on reflector 9.1.0 from cluster staging requires confirmation; rerun with --yes"},
@@ -516,7 +522,7 @@ func TestAddonsWaitFollowsTheOperation(t *testing.T) {
 		"GET /api/clusters/c1/addons": {addonList(certManager, trustManager), updating(`"upgrading"`), updating(`"failed"`), updating(`"failed","addons":"{\"lastError\":\"chart not found\"}"`)},
 	})
 	_, errOut, err = execute(t, server.URL, "addons", "update", "trust-manager", "--cluster", "sinaia", "--yes", "--wait")
-	if err == nil || !strings.Contains(err.Error(), "trust-manager failed: chart not found\nRetry with `edka addons install trust-manager`, or remove it with `edka addons uninstall trust-manager`") {
+	if err == nil || !strings.Contains(err.Error(), "trust-manager failed: chart not found\nRetry with `edka addons install trust-manager --cluster sinaia`, or remove it with `edka addons uninstall trust-manager --cluster sinaia`") {
 		t.Fatal(err)
 	}
 	inOrder(t, errOut, "Updating trust-manager to 0.12.0 in cluster sinaia…", "Updating trust-manager: 40%")
@@ -525,7 +531,7 @@ func TestAddonsWaitFollowsTheOperation(t *testing.T) {
 		"PUT /api/clusters/c1/addons": {`{"message":"Addon upgrade initiated","version":"0.12.0"}`},
 		"GET /api/clusters/c1/addons": {addonList(certManager, trustManager), updating(`"upgrading"`)},
 	})
-	if _, _, err := execute(t, server.URL, "addons", "update", "trust-manager", "--cluster", "sinaia", "--yes", "--wait", "--wait-timeout", "50ms"); err == nil || !strings.Contains(err.Error(), "trust-manager is still upgrading: context deadline exceeded; the operation continues, follow it with `edka addons list`") {
+	if _, _, err := execute(t, server.URL, "addons", "update", "trust-manager", "--cluster", "sinaia", "--yes", "--wait", "--wait-timeout", "50ms"); err == nil || !strings.Contains(err.Error(), "trust-manager is still upgrading: context deadline exceeded; the operation continues, follow it with `edka addons list --cluster sinaia`") {
 		t.Fatal(err)
 	}
 
@@ -569,7 +575,7 @@ func TestAddonsWaitSurvivesFailedReads(t *testing.T) {
 	failing["GET /api/clusters/c1/addons"] = []string{addonList(certManager, trustManager), `503 {"message":"Service unavailable"}`}
 	server, _ = addonAPI(t, failing)
 	_, errOut, err = execute(t, server.URL, "addons", "update", "trust-manager", "--cluster", "sinaia", "--yes", "--wait", "--wait-timeout", "50ms")
-	if err == nil || !strings.Contains(err.Error(), "trust-manager has not finished: context deadline exceeded; the operation continues, follow it with `edka addons list`") || !strings.Contains(errOut, "trying again: Service unavailable (HTTP 503)") {
+	if err == nil || !strings.Contains(err.Error(), "trust-manager has not finished: context deadline exceeded; the operation continues, follow it with `edka addons list --cluster sinaia`") || !strings.Contains(errOut, "trying again: Service unavailable (HTTP 503)") {
 		t.Fatal(err, errOut)
 	}
 

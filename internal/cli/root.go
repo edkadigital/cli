@@ -304,17 +304,49 @@ func invocation(cmd *cobra.Command, args []string) string {
 // contextFlags are the global flags that choose where a command acts.
 var contextFlags = []string{"profile", "api-url", "credential-store", "organization", "cluster", "deployment"}
 
+// placeholder is an argument for the reader to replace: placeholder("cluster")
+// is <cluster>. A hint shows it unquoted, and quotes every other argument, as
+// one from a user or from Edka can hold < or >.
+type placeholder string
+
+// deploymentArg names the deployment a hint acts on. The hint leaves it out
+// when the user chose that deployment with --deployment, which followUp
+// repeats: the name, which a deployment in another cluster can have too, would
+// take the place of the ID the flag may hold.
+type deploymentArg struct{ id, name string }
+
 // followUp is an edka command to run next, with each of the global flags that
 // choose where a command acts that the user set on cmd, so it reaches the same
-// resources. Its arguments may come from Edka, so it is cleaned for display.
-func followUp(cmd *cobra.Command, args ...string) string {
-	words := append([]string{cmd.Root().Name()}, args...)
-	for _, name := range contextFlags {
-		if flag := cmd.Flags().Lookup(name); flag != nil && flag.Changed {
-			words = append(words, "--"+name, flag.Value.String())
+// resources. args are strings, placeholders and deploymentArgs. A flag that
+// args pass already keeps their value. An `edka api` command takes IDs through
+// its own flags and refuses --deployment, so it gets neither --cluster nor
+// --deployment. Its arguments may come from Edka, so it is cleaned for display.
+func followUp(cmd *cobra.Command, args ...any) string {
+	words := []string{cmd.Root().Name()}
+	chosen := cmd.Flags().Lookup("deployment")
+	for _, arg := range args {
+		switch arg := arg.(type) {
+		case placeholder:
+			words = append(words, "<"+string(arg)+">")
+		case deploymentArg:
+			if chosen != nil && chosen.Changed && (chosen.Value.String() == arg.id || chosen.Value.String() == arg.name) {
+				continue
+			}
+			words = append(words, shellJoin([]string{arg.name}))
+		default:
+			words = append(words, shellJoin([]string{fmt.Sprint(arg)}))
 		}
 	}
-	return ui.Clean(shellJoin(words))
+	endpoint := len(args) > 0 && args[0] == "api"
+	for _, name := range contextFlags {
+		if slices.Contains(args, any("--"+name)) || endpoint && (name == "cluster" || name == "deployment") {
+			continue
+		}
+		if flag := cmd.Flags().Lookup(name); flag != nil && flag.Changed {
+			words = append(words, "--"+name, shellJoin([]string{flag.Value.String()}))
+		}
+	}
+	return ui.Clean(strings.Join(words, " "))
 }
 
 // pipeHint is the shell line that pipes $variable to command on stdin.
@@ -447,9 +479,9 @@ func (a *App) resolveContext(cmd *cobra.Command) error {
 	current, exists := a.cfg.Profiles[a.profile]
 	if !exists && !local(cmd) {
 		if a.profileFlag == "" && os.Getenv("EDKA_PROFILE") == "" && a.profile == linkedProfile {
-			return fmt.Errorf("profile %q from %s does not exist; run `edka login --profile %s`, or `edka unlink` in %s", a.profile, a.linkPath, a.profile, filepath.Dir(a.linkPath))
+			return fmt.Errorf("profile %q from %s does not exist; run `%s`, or `edka unlink` in %s", a.profile, a.linkPath, followUp(cmd, "login", "--profile", a.profile), filepath.Dir(a.linkPath))
 		}
-		return fmt.Errorf("profile %q does not exist; run `edka login --profile %s`", a.profile, a.profile)
+		return fmt.Errorf("profile %q does not exist; run `%s`", a.profile, followUp(cmd, "login", "--profile", a.profile))
 	}
 	a.current = current
 	base := first(a.apiFlag, os.Getenv("EDKA_API_URL"), current.APIURL, config.DefaultAPI)

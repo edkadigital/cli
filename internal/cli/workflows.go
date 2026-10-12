@@ -101,7 +101,7 @@ func (a *App) addWorkflows(root *cobra.Command) {
 	run := &cobra.Command{Use: "run -- <command> [args…]", Short: "Run a local command with EDKA_* context variables set", Long: "Run a local command with the current Edka context in its environment, as\nEDKA_PROFILE, EDKA_API_URL, EDKA_ORGANIZATION, EDKA_CLUSTER and EDKA_DEPLOYMENT.\n\n`edka` commands inside it read these variables ahead of the directory link and\nthe active profile, so a script keeps the same target after it changes\ndirectory. A variable with no value is set empty, and those commands fall back\nto the link and profile for it. When run has a cluster, an empty EDKA_DEPLOYMENT\ninstead means no deployment, and no link's deployment applies.\n\nWith --kubeconfig, run also sets KUBECONFIG to a private file with your own\nkubeconfig for the cluster. It expires after an hour, and run deletes the file\nwhen the command exits. The one-time kubeconfig download stays available.\n\nrun passes no API token or application secrets, and exits with the command's\nexit code. Ctrl+C and SIGTERM reach the command, and run waits for it to exit.", GroupID: "work", Args: cobra.MinimumNArgs(1), DisableFlagParsing: false, Example: "  edka run --cluster staging -- ./scripts/release.sh\n  edka run --kubeconfig -- kubectl get pods -A\n  edka run -- sh -c 'echo \"$EDKA_CLUSTER $EDKA_DEPLOYMENT\"'", RunE: func(cmd *cobra.Command, args []string) error {
 		var kubeconfig string
 		if withKubeconfig {
-			path, cleanup, err := a.temporaryKubeconfig(cmd.Context())
+			path, cleanup, err := a.temporaryKubeconfig(cmd.Context(), cmd)
 			if err != nil {
 				return err
 			}
@@ -126,7 +126,7 @@ func (a *App) addWorkflows(root *cobra.Command) {
 // temporaryKubeconfig writes an hour-long kubeconfig for the context cluster
 // to a new private directory. cleanup removes the directory; the kubeconfig
 // stays valid until it expires.
-func (a *App) temporaryKubeconfig(ctx context.Context) (path string, cleanup func(), err error) {
+func (a *App) temporaryKubeconfig(ctx context.Context, cmd *cobra.Command) (path string, cleanup func(), err error) {
 	c, err := a.resolveCluster(ctx, "")
 	if err != nil {
 		return "", nil, err
@@ -138,7 +138,7 @@ func (a *App) temporaryKubeconfig(ctx context.Context) (path string, cleanup fun
 	response, err := a.request(ctx, "POST", "/api/clusters/"+id+"/user-kubeconfig/temporary", nil, nil)
 	var apiError *api.Error
 	if errors.As(err, &apiError) && apiError.Status == 409 {
-		return "", nil, fmt.Errorf("%w\nRotating revokes your previous kubeconfig: edka api clusters user-credentials rotate-own --cluster %s", err, ui.Clean(c.Name))
+		return "", nil, fmt.Errorf("%w\nRotating revokes your previous kubeconfig: %s", err, followUp(cmd, "api", "clusters", "user-credentials", "rotate-own", "--cluster", c.Name))
 	}
 	if err != nil {
 		return "", nil, err
@@ -218,8 +218,8 @@ func (a *App) runChild(ctx context.Context, command *exec.Cmd) error {
 	}
 }
 
-func (a *App) deploymentLogs(ctx context.Context, target string) (string, error) {
-	id, err := a.deploymentID(ctx, target)
+func (a *App) deploymentLogs(cmd *cobra.Command, target string) (string, error) {
+	id, err := a.deploymentID(cmd.Context(), target)
 	if err != nil {
 		return "", err
 	}
@@ -228,7 +228,7 @@ func (a *App) deploymentLogs(ctx context.Context, target string) (string, error)
 
 // logsCommand reads pod logs from the path that locate resolves for its
 // argument. Deployment, app and cronjob log routes share these parameters.
-func (a *App) logsCommand(use, short string, locate func(context.Context, string) (string, error)) *cobra.Command {
+func (a *App) logsCommand(use, short string, locate func(*cobra.Command, string) (string, error)) *cobra.Command {
 	var follow, previous, timestamps bool
 	var tail int
 	var interval, since time.Duration
@@ -257,7 +257,7 @@ func (a *App) logsCommand(use, short string, locate func(context.Context, string
 		if len(args) > 0 {
 			target = args[0]
 		}
-		path, err := locate(cmd.Context(), target)
+		path, err := locate(cmd, target)
 		if err != nil {
 			return err
 		}

@@ -294,9 +294,9 @@ func (a *App) addClusters(root *cobra.Command) {
 		var apiError *api.Error
 		if errors.As(err, &apiError) && apiError.Status == 403 && strings.Contains(apiError.Message, "already been downloaded") {
 			if merge {
-				return fmt.Errorf("%w\nRotating issues a new one and revokes the previous kubeconfig: edka clusters kubeconfig %s --rotate --merge", err, ui.Clean(c.Name))
+				return fmt.Errorf("%w\nRotating issues a new one and revokes the previous kubeconfig: %s", err, followUp(cmd, "clusters", "kubeconfig", c.Name, "--rotate", "--merge"))
 			}
-			return fmt.Errorf("%w\nRotating issues a new one and revokes the previous kubeconfig: edka clusters kubeconfig %s --rotate --output-file %s", err, ui.Clean(c.Name), shellJoin([]string{outputFile}))
+			return fmt.Errorf("%w\nRotating issues a new one and revokes the previous kubeconfig: %s", err, followUp(cmd, "clusters", "kubeconfig", c.Name, "--rotate", "--output-file", outputFile))
 		}
 		if err != nil {
 			return err
@@ -361,12 +361,12 @@ func (a *App) addClusters(root *cobra.Command) {
 		response, err := a.request(cmd.Context(), "DELETE", "/api/clusters/"+id, nil, nil)
 		var apiError *api.Error
 		if errors.As(err, &apiError) && apiError.Status == 403 && strings.Contains(apiError.Message, "protected") {
-			return fmt.Errorf("cluster %s is protected; run `edka clusters unprotect %s` first", ui.Clean(c.Name), ui.Clean(c.Name))
+			return fmt.Errorf("cluster %s is protected; run `%s` first", ui.Clean(c.Name), followUp(cmd, "clusters", "unprotect", c.Name))
 		}
 		if err != nil {
 			return err
 		}
-		a.message("✓ Deleting %s in the background\n  Check progress: edka clusters get %s", ui.Clean(c.Name), ui.Clean(c.Name))
+		a.message("✓ Deleting %s in the background\n  Check progress: %s", ui.Clean(c.Name), followUp(cmd, "clusters", "get", c.Name))
 		if a.output != "table" {
 			return a.render(response)
 		}

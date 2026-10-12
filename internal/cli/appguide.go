@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/edkadigital/cli/internal/ui"
+	"github.com/spf13/cobra"
 )
 
 var showIfEquality = regexp.MustCompile(`^(\w+)\s*===\s*['"](.+)['"]$`)
@@ -143,7 +144,7 @@ func domainChoices(domains []map[string]any, trafficClass string) []ui.Choice {
 
 // askHostname asks for a hostname Edka manages on the chosen traffic class, as
 // the console does. The Tailscale traffic class takes any hostname.
-func (a *App) askHostname(ctx context.Context, cluster, clusterName string, f appField, trafficClass string) (string, error) {
+func (a *App) askHostname(ctx context.Context, cmd *cobra.Command, cluster, clusterName string, f appField, trafficClass string) (string, error) {
 	if trafficClass == "tailscale" {
 		return a.askLine(f.label() + ": ")
 	}
@@ -153,7 +154,7 @@ func (a *App) askHostname(ctx context.Context, cluster, clusterName string, f ap
 	}
 	choices := domainChoices(domains, trafficClass)
 	if len(choices) == 0 {
-		return "", fmt.Errorf("no domains in cluster %s use traffic class %s; add one with `edka domains add <domain> --class %s`, or set the hostname with --set %s=<hostname>", ui.Clean(clusterName), ui.Clean(trafficClass), ui.Clean(trafficClass), f.Name)
+		return "", fmt.Errorf("no domains in cluster %s use traffic class %s; add one with `%s`, or set the hostname with --set %s=<hostname>", ui.Clean(clusterName), ui.Clean(trafficClass), followUp(cmd, "domains", "add", placeholder("domain"), "--class", trafficClass), f.Name)
 	}
 	if len(choices) == 1 {
 		a.message("Domain: %s, the only one for traffic class %s", ui.Clean(choices[0].Name), ui.Clean(trafficClass))
@@ -210,7 +211,7 @@ func (a *App) askYesNo(question string, yes bool) (bool, error) {
 // guideInstall asks in a terminal for what an install needs and the flags left
 // out, then shows every chosen setting and asks to go ahead. Other settings keep
 // their defaults.
-func (a *App) guideInstall(ctx context.Context, cluster *candidate, clusterID string, app *candidate, fields []appField, configuration map[string]any, labels map[string]string, name *string) error {
+func (a *App) guideInstall(ctx context.Context, cmd *cobra.Command, cluster *candidate, clusterID string, app *candidate, fields []appField, configuration map[string]any, labels map[string]string, name *string) error {
 	shown := [][2]string{}
 	if *name == "" && number(app.Record["installed_count"]) > 0 {
 		answer, err := a.askLine(fmt.Sprintf("%s is already installed in cluster %s. Name for this one: ", ui.Clean(app.Name), ui.Clean(cluster.Name)))
@@ -251,7 +252,7 @@ func (a *App) guideInstall(ctx context.Context, cluster *candidate, clusterID st
 					class = ""
 				}
 			}
-			value, err = a.askHostname(ctx, clusterID, cluster.Name, f, class)
+			value, err = a.askHostname(ctx, cmd, clusterID, cluster.Name, f, class)
 		default:
 			value, label, err = a.askSetting(ctx, clusterID, f, effective)
 		}
@@ -263,7 +264,7 @@ func (a *App) guideInstall(ctx context.Context, cluster *candidate, clusterID st
 	}
 	fmt.Fprintf(a.Err, "\nInstall %s in cluster %s with:\n", ui.Clean(app.Name), ui.Clean(cluster.Name))
 	fmt.Fprint(a.Err, settingLines(shown))
-	fmt.Fprintf(a.Err, "Other settings keep their defaults; list them with `%s`.\n", catalogCommand(app))
+	fmt.Fprintf(a.Err, "Other settings keep their defaults; list them with `%s`.\n", catalogCommand(cmd, app))
 	if a.yes {
 		return nil
 	}

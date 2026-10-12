@@ -805,7 +805,7 @@ func TestWaitRejectsPreviousHealthyRollout(t *testing.T) {
 	a := App{current: config.Profile{APIURL: server.URL}, Out: &out, Err: &bytes.Buffer{}, HTTP: server.Client(), output: "json"}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	if _, err := a.waitDeployment(ctx, "d1", "api", 2); err != nil {
+	if _, err := a.waitDeployment(ctx, bareCommand(), "d1", "api", 2); err != nil {
 		t.Fatal(err)
 	}
 	if reads != 2 || runtimeReads != 1 {
@@ -820,7 +820,7 @@ func TestWaitFailsWhenRequestedRevisionIsReplaced(t *testing.T) {
 	}))
 	defer server.Close()
 	a := App{current: config.Profile{APIURL: server.URL}, Out: &bytes.Buffer{}, Err: &bytes.Buffer{}, HTTP: server.Client()}
-	_, err := a.waitDeployment(context.Background(), "d1", "api", 2)
+	_, err := a.waitDeployment(context.Background(), bareCommand(), "d1", "api", 2)
 	if err == nil || !strings.Contains(err.Error(), "replaced by generation 3") {
 		t.Fatal(err)
 	}
@@ -1084,6 +1084,63 @@ func TestFollowUpCarriesTheContextFlags(t *testing.T) {
 	}
 	// A name from Edka cannot write escape sequences to the terminal.
 	if got := followUp(cmd, "domains", "get", "x\x1b[2J.example.com"); got != "edka domains get 'x.example.com' --profile work --organization o1 --cluster prod" {
+		t.Fatal(got)
+	}
+	// A flag the command to run names keeps its value, and a placeholder stays
+	// for the reader to replace.
+	if got := followUp(cmd, "registries", "remove", "ghcr", "--cluster", placeholder("cluster")); got != "edka registries remove ghcr --cluster <cluster> --profile work --organization o1" {
+		t.Fatal(got)
+	}
+	// A name that looks like a placeholder is quoted, so a shell does not read
+	// < and > as redirections.
+	if got := followUp(cmd, "nodepools", "delete", "<x>"); got != "edka nodepools delete '<x>' --profile work --organization o1 --cluster prod" {
+		t.Fatal(got)
+	}
+}
+
+// A hint names the deployment it acts on, unless the user chose it with
+// --deployment: the flag, which may hold an ID, then names it alone.
+func TestFollowUpNamesTheDeploymentOnce(t *testing.T) {
+	for _, tc := range []struct {
+		line       string
+		deployment deploymentArg
+		want       string
+	}{
+		{"env set A=1 --deployment d1", deploymentArg{"d1", "api"}, "edka deployments status --deployment d1"},
+		{"env set A=1 --deployment api", deploymentArg{"d1", "api"}, "edka deployments status --deployment api"},
+		{"env set A=1 --cluster prod", deploymentArg{"d1", "api"}, "edka deployments status api --cluster prod"},
+		// The argument chose another deployment than the one the flag names.
+		{"up web --deployment api", deploymentArg{"d2", "web"}, "edka deployments status web --deployment api"},
+	} {
+		root := New("test", strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
+		cmd, rest, err := root.Find(strings.Fields(tc.line))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := cmd.ParseFlags(rest); err != nil {
+			t.Fatal(err)
+		}
+		if got := followUp(cmd, "deployments", "status", tc.deployment); got != tc.want {
+			t.Errorf("%s: got %s", tc.line, got)
+		}
+	}
+}
+
+// An `edka api` command takes IDs through its own flags and refuses
+// --deployment, so a hint that names one leaves out --cluster and --deployment.
+func TestFollowUpLeavesTheResourceFlagsOutOfEndpointCommands(t *testing.T) {
+	root := New("test", strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
+	cmd, rest, err := root.Find(strings.Fields("build --cluster prod --deployment api --profile work --wait"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.ParseFlags(rest); err != nil {
+		t.Fatal(err)
+	}
+	if got := followUp(cmd, "api", "deployments", "builds", "list", "--id", "d1"); got != "edka api deployments builds list --id d1 --profile work" {
+		t.Fatal(got)
+	}
+	if got := followUp(cmd, "up", "api", "--wait"); got != "edka up api --wait --profile work --cluster prod --deployment api" {
 		t.Fatal(got)
 	}
 }
