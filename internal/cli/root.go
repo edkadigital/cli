@@ -490,7 +490,13 @@ func (a *App) resolveContext(cmd *cobra.Command) error {
 	current, exists := a.cfg.Profiles[a.profile]
 	if !exists && !local(cmd) {
 		if a.profileFlag == "" && os.Getenv("EDKA_PROFILE") == "" && a.profile == linkedProfile {
-			return fmt.Errorf("profile %q from %s does not exist; run `%s`, or `edka unlink` in %s", a.profile, a.linkPath, followUp(cmd, "login", "--profile", a.profile), filepath.Dir(a.linkPath))
+			// The link applies only on its own API, so the sign-in goes there
+			// unless the user chose an API. The default API needs no flag.
+			login := []any{"login", "--profile", a.profile}
+			if a.apiFlag == "" && os.Getenv("EDKA_API_URL") == "" && a.link.APIURL != "" && a.link.APIURL != config.DefaultAPI {
+				login = append(login, "--api-url", a.link.APIURL)
+			}
+			return fmt.Errorf("profile %q from %s does not exist; run `%s`, or `edka unlink` in %s", a.profile, a.linkPath, followUp(cmd, login...), filepath.Dir(a.linkPath))
 		}
 		return fmt.Errorf("profile %q does not exist; run `%s`", a.profile, followUp(cmd, "login", "--profile", a.profile))
 	}
