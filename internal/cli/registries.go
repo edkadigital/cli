@@ -93,13 +93,7 @@ func registryPath(name string) (string, error) {
 // stdin that is not a terminal. It is never an argument, which shell history
 // and the process list would keep.
 func (a *App) registryPassword(ctx context.Context, name, username string) (string, error) {
-	if !ui.InputTerminal(a.In) {
-		return a.stdinSecret("the password")
-	}
-	if a.noInput {
-		return "", fmt.Errorf("pipe the password on stdin: printf %%s \"$PASSWORD\" | edka registries add %s", name)
-	}
-	return a.promptSecret(ctx, fmt.Sprintf("Password or token of %s for registry %s: ", ui.Clean(username), ui.Clean(name)), "the password")
+	return a.oneSecret(ctx, "the password", fmt.Sprintf("Password or token of %s for registry %s: ", ui.Clean(username), ui.Clean(name)), fmt.Errorf("pipe the password on stdin: printf %%s \"$PASSWORD\" | edka registries add %s", name))
 }
 
 // bytesOf prints a size in the binary units Kubernetes uses.

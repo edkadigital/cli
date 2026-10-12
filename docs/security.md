@@ -93,8 +93,10 @@ late answer to a query would otherwise become part of the secret.
 or a `--data` file. `registries add` reads a registry's password the same way, at a
 hidden prompt or from stdin, and Edka never returns it.
 `domains add --dns-provider cloudflare` and `domains update --replace-token` read a
-Cloudflare API token from `CLOUDFLARE_API_TOKEN`, from stdin or at a hidden prompt,
-never from an argument, and Edka never returns it either. `secrets set` reads each
+Cloudflare API token from `EDKA_CLOUDFLARE_API_TOKEN`, from stdin or at a hidden
+prompt, never from an argument, and Edka never returns it either. They leave
+`CLOUDFLARE_API_TOKEN` alone: wrangler and Terraform read it, and it often holds a
+token for more zones than the cluster needs. `secrets set` reads each
 value at a hidden prompt, from stdin or from a file, never from an argument, and
 `secrets list` and `secrets get` show keys only. The terminal stops echoing before a hidden prompt appears.
 

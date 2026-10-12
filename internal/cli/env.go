@@ -369,9 +369,27 @@ func (a *App) stdinSecret(what string) (string, error) {
 		value = strings.TrimSuffix(value, "\n")
 	}
 	if value == "" {
-		return "", fmt.Errorf("no value for %s on stdin", what)
+		return "", emptyStdin(what)
 	}
 	return value, nil
+}
+
+// emptyStdin is the error of a stdin that holds no value. It names the value.
+type emptyStdin string
+
+func (what emptyStdin) Error() string { return "no value for " + string(what) + " on stdin" }
+
+// oneSecret reads one secret value from a stdin that is not a terminal, or at
+// a hidden prompt. noInput is the error when the command may not prompt. what
+// names the value in an error.
+func (a *App) oneSecret(ctx context.Context, what, prompt string, noInput error) (string, error) {
+	if !ui.InputTerminal(a.In) {
+		return a.stdinSecret(what)
+	}
+	if a.noInput {
+		return "", noInput
+	}
+	return a.promptSecret(ctx, prompt, what)
 }
 
 // promptSecret reads one value at a hidden prompt. what names the value in an error.

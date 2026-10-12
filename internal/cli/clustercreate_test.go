@@ -22,6 +22,8 @@ type stepAPI struct {
 	steps    map[string][]string
 	requests []string
 	bodies   map[string]string
+	// sent holds the body of each request to a route, in order.
+	sent map[string][]string
 	// queries holds the query string of the last request to each route.
 	queries map[string]string
 }
@@ -31,7 +33,7 @@ func newStepAPI(t *testing.T, steps map[string][]string) (*httptest.Server, *ste
 	interval := pollInterval
 	pollInterval = time.Millisecond
 	t.Cleanup(func() { pollInterval = interval })
-	api := &stepAPI{steps: steps, bodies: map[string]string{}, queries: map[string]string{}}
+	api := &stepAPI{steps: steps, bodies: map[string]string{}, sent: map[string][]string{}, queries: map[string]string{}}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		api.mu.Lock()
 		defer api.mu.Unlock()
@@ -39,6 +41,7 @@ func newStepAPI(t *testing.T, steps map[string][]string) (*httptest.Server, *ste
 		body, _ := io.ReadAll(r.Body)
 		api.requests = append(api.requests, route)
 		api.bodies[route] = string(body)
+		api.sent[route] = append(api.sent[route], string(body))
 		api.queries[route] = r.URL.RawQuery
 		responses, ok := api.steps[route]
 		if !ok || len(responses) == 0 {

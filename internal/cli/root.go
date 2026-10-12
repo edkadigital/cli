@@ -23,6 +23,7 @@ import (
 	"github.com/edkadigital/cli/internal/credential"
 	"github.com/edkadigital/cli/internal/ui"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 type App struct {
@@ -271,6 +272,31 @@ func shellJoin(args []string) string {
 		}
 	}
 	return strings.Join(quoted, " ")
+}
+
+// invocation is cmd as the user ran it: its arguments, then each flag they set,
+// global ones included, so a hint that repeats it acts on the same resources.
+func invocation(cmd *cobra.Command, args []string) string {
+	words := append(strings.Fields(cmd.CommandPath()), args...)
+	cmd.Flags().Visit(func(flag *pflag.Flag) {
+		name := "--" + flag.Name
+		switch value := flag.Value.(type) {
+		case pflag.SliceValue:
+			for _, item := range value.GetSlice() {
+				words = append(words, name, item)
+			}
+		default:
+			switch {
+			case value.Type() != "bool":
+				words = append(words, name, value.String())
+			case value.String() == "true":
+				words = append(words, name)
+			default:
+				words = append(words, name+"=false")
+			}
+		}
+	})
+	return shellJoin(words)
 }
 func mark(annotation string, commands ...*cobra.Command) {
 	for _, c := range commands {

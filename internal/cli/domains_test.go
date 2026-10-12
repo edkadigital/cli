@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -56,6 +57,13 @@ func (s *stepAPI) body(route string) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.bodies[route]
+}
+
+// bodiesOf is the body of each request to route, in the order they came.
+func (s *stepAPI) bodiesOf(route string) []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.sent[route])
 }
 
 func TestDomainsListAndGet(t *testing.T) {
@@ -386,10 +394,29 @@ func TestDomainGetShowsTheCloudflareZone(t *testing.T) {
 	if err != nil || !strings.Contains(squeeze(out), "Cloudflare zone example.com Challenge record _acme-challenge.cf.example.com TXT") {
 		t.Fatal(out, err)
 	}
+
+	// A CNAME at the challenge name would block the TXT record, so neither get
+	// nor verify asks for one, even when Edka still has a delegation.
+	delegation := `{"record_name":"_acme-challenge.cf.example.com","record_type":"CNAME","record_value":"old456.acme.edka.net"}`
+	pending := tlsView(cloudflareDomain, delegation, missingStatus, `{"state":"pending","message":"Checking the challenge name in the Cloudflare zone."}`)
+	_, base = cloudflareDomainAPI(t, map[string][]string{
+		"GET /api/clusters/c1/domains/f1/wildcard-tls":  {pending},
+		"POST /api/clusters/c1/domains/f1/wildcard-tls": {pending},
+	})
+	out, _, err = execute(t, base, "domains", "get", "*.cf.example.com")
+	if err != nil || strings.Contains(out, "CNAME") || strings.Contains(out, "old456") {
+		t.Fatal(out, err)
+	}
+	_, errOut, err = execute(t, base, "domains", "verify", "*.cf.example.com")
+	if err != nil || strings.Contains(errOut, "Create this record") || !strings.Contains(errOut, "Edka keeps checking") {
+		t.Fatal(errOut, err)
+	}
 }
 
 func TestDomainAddWithACloudflareToken(t *testing.T) {
-	t.Setenv("CLOUDFLARE_API_TOKEN", "")
+	// CLOUDFLARE_API_TOKEN belongs to wrangler and Terraform, and is never read.
+	t.Setenv("EDKA_CLOUDFLARE_API_TOKEN", "")
+	t.Setenv("CLOUDFLARE_API_TOKEN", "wrangler-token")
 	created := `{"id":"n4","cluster_id":"c1","domain":"*.shop.example.com","ingress_class":"eg","is_wildcard":true,"include_apex":false,"validation_method":"dns-01","dns_provider":"cloudflare","dns_zone_id":"zone123","dns_zone_name":"example.com"}`
 	api, base := domainAPI(t, map[string][]string{
 		"POST /api/clusters/c1/domains":                {`{"success":true,"data":` + created + `}`},
@@ -404,19 +431,20 @@ func TestDomainAddWithACloudflareToken(t *testing.T) {
 		t.Fatal(got)
 	}
 	inOrder(t, errOut, "✓ Added *.shop.example.com to cluster sinaia\n", "Next: create the records. Edka issues the certificate through the Cloudflare zone; follow it with `edka domains verify '*.shop.example.com' --wait`\n")
-	if !strings.Contains(squeeze(out), "Cloudflare zone example.com Challenge record _acme-challenge.shop.example.com TXT") || strings.Contains(out, "CNAME") || strings.Contains(out+errOut, "cf-token") {
+	if !strings.Contains(squeeze(out), "Cloudflare zone example.com Challenge record _acme-challenge.shop.example.com TXT") || strings.Contains(out, "CNAME") || strings.Contains(out+errOut, "cf-token") || strings.Contains(errOut, "Using the Cloudflare API token") {
 		t.Fatal(out, errOut)
 	}
 
-	// CLOUDFLARE_API_TOKEN comes before stdin, and a hostname is validated over DNS.
-	t.Setenv("CLOUDFLARE_API_TOKEN", " env-token\n")
+	// EDKA_CLOUDFLARE_API_TOKEN comes before stdin, a hostname is validated over
+	// DNS, and the provider's name is not case-sensitive.
+	t.Setenv("EDKA_CLOUDFLARE_API_TOKEN", " env-token\n")
 	hostname := `{"id":"n5","cluster_id":"c1","domain":"internal.example.com","ingress_class":"eg-ts","is_wildcard":false,"validation_method":"dns-01","dns_provider":"cloudflare","dns_zone_id":"zone123","dns_zone_name":"example.com"}`
 	api, base = domainAPI(t, map[string][]string{
 		"POST /api/clusters/c1/domains":                {`{"success":true,"data":` + hostname + `}`},
 		"GET /api/clusters/c1/domains/n5/wildcard-tls": {tlsView(hostname, "null", missingStatus, readyDNS)},
 	})
-	out, errOut, err = executeInput(t, base, "stdin-token\n", "domains", "add", "internal.example.com", "--class", "eg-ts", "--dns-provider", "cloudflare", "--cluster", "sinaia")
-	if err != nil || !strings.Contains(errOut, "Using the Cloudflare API token in CLOUDFLARE_API_TOKEN\n") || !strings.Contains(squeeze(out), "Challenge record _acme-challenge.internal.example.com TXT") {
+	out, errOut, err = executeInput(t, base, "stdin-token\n", "domains", "add", "internal.example.com", "--class", "eg-ts", "--dns-provider", "Cloudflare", "--cluster", "sinaia")
+	if err != nil || !strings.Contains(errOut, "Using the Cloudflare API token in EDKA_CLOUDFLARE_API_TOKEN\n") || !strings.Contains(squeeze(out), "Challenge record _acme-challenge.internal.example.com TXT") {
 		t.Fatal(out, errOut, err)
 	}
 	if got := api.body("POST /api/clusters/c1/domains"); got != `{"cloudflare_api_token":"env-token","dns_provider":"cloudflare","domain":"internal.example.com","include_apex":false,"ingress_class":"eg-ts","validation_method":"dns-01"}` {
@@ -425,12 +453,13 @@ func TestDomainAddWithACloudflareToken(t *testing.T) {
 
 	// An Edka API without the option adds a domain with a CNAME record, and the
 	// command says so.
+	t.Setenv("EDKA_CLOUDFLARE_API_TOKEN", "")
 	ignored := `{"id":"n6","cluster_id":"c1","domain":"*.shop.example.com","ingress_class":"eg","is_wildcard":true,"include_apex":false,"validation_method":"dns-01","acme_delegation_id":"new789"}`
 	_, base = domainAPI(t, map[string][]string{
 		"POST /api/clusters/c1/domains":                {`{"success":true,"data":` + ignored + `}`},
 		"GET /api/clusters/c1/domains/n6/wildcard-tls": {tlsView(ignored, `{"record_name":"_acme-challenge.shop.example.com","record_type":"CNAME","record_value":"new789.acme.edka.net"}`, missingStatus, missingDNS)},
 	})
-	out, errOut, err = executeInput(t, base, "", "domains", "add", "*.shop.example.com", "--dns-provider", "cloudflare", "--cluster", "sinaia")
+	out, errOut, err = executeInput(t, base, "cf-token", "domains", "add", "*.shop.example.com", "--dns-provider", "cloudflare", "--cluster", "sinaia")
 	if err != nil {
 		t.Fatal(errOut, err)
 	}
@@ -440,9 +469,12 @@ func TestDomainAddWithACloudflareToken(t *testing.T) {
 	}
 
 	// With no token, nothing is sent.
-	t.Setenv("CLOUDFLARE_API_TOKEN", "")
 	api, base = domainAPI(t, nil)
-	if _, _, err := executeInput(t, base, "", "domains", "add", "*.shop.example.com", "--dns-provider", "cloudflare", "--cluster", "sinaia"); err == nil || !strings.Contains(err.Error(), "no value for the Cloudflare API token on stdin; pipe it, or set CLOUDFLARE_API_TOKEN") || api.writes() != 0 {
+	if _, _, err := executeInput(t, base, "", "domains", "add", "*.shop.example.com", "--dns-provider", "cloudflare", "--cluster", "sinaia"); err == nil || !strings.Contains(err.Error(), "no value for the Cloudflare API token on stdin; pipe it, or set EDKA_CLOUDFLARE_API_TOKEN") || api.writes() != 0 {
+		t.Fatal(err, api.requests)
+	}
+	// A token that was piped gets no advice to pipe it.
+	if _, _, err := executeInput(t, base, strings.Repeat("x", maxSecretValue+1), "domains", "add", "*.shop.example.com", "--dns-provider", "cloudflare", "--cluster", "sinaia"); err == nil || err.Error() != "secret value exceeds 1 MiB" || api.writes() != 0 {
 		t.Fatal(err, api.requests)
 	}
 
@@ -454,26 +486,57 @@ func TestDomainAddWithACloudflareToken(t *testing.T) {
 }
 
 func TestDomainUpdateReplacesTheCloudflareToken(t *testing.T) {
-	t.Setenv("CLOUDFLARE_API_TOKEN", "")
+	t.Setenv("EDKA_CLOUDFLARE_API_TOKEN", "")
 	replaced := `{"success":true,"data":` + cloudflareDomain + `}`
-	api, base := cloudflareDomainAPI(t, map[string][]string{"PATCH /api/clusters/c1/domains/f1": {replaced}})
+	route := "PATCH /api/clusters/c1/domains/f1"
+	api, base := cloudflareDomainAPI(t, map[string][]string{route: {replaced}})
 	out, errOut, err := executeInput(t, base, "new-token\n", "domains", "update", "*.cf.example.com", "--replace-token", "--json")
-	if err != nil || api.body("PATCH /api/clusters/c1/domains/f1") != `{"cloudflare_api_token":"new-token"}` || !strings.Contains(errOut, "✓ Replaced the Cloudflare API token of *.cf.example.com, for zone example.com\n") || !strings.Contains(out, `"dns_zone_name": "example.com"`) {
-		t.Fatal(out, errOut, err, api.body("PATCH /api/clusters/c1/domains/f1"))
+	if err != nil || api.body(route) != `{"cloudflare_api_token":"new-token"}` || !strings.Contains(errOut, "✓ Replaced the Cloudflare API token of *.cf.example.com, for zone example.com\n") || !strings.Contains(out, `"dns_zone_name": "example.com"`) {
+		t.Fatal(out, errOut, err, api.body(route))
 	}
 
 	// With --apex, the token goes first, in a request of its own.
-	api, base = cloudflareDomainAPI(t, map[string][]string{"PATCH /api/clusters/c1/domains/f1": {replaced, `{"success":true,"data":{"id":"f1","include_apex":true}}`}})
+	api, base = cloudflareDomainAPI(t, map[string][]string{route: {replaced, `{"success":true,"data":{"id":"f1","include_apex":true}}`}})
 	_, errOut, err = executeInput(t, base, "new-token\n", "domains", "update", "*.cf.example.com", "--replace-token", "--apex")
-	if err != nil || api.count("PATCH /api/clusters/c1/domains/f1") != 2 || api.body("PATCH /api/clusters/c1/domains/f1") != `{"include_apex":true}` {
-		t.Fatal(errOut, err, api.requests)
+	if got := api.bodiesOf(route); err != nil || !slices.Equal(got, []string{`{"cloudflare_api_token":"new-token"}`, `{"include_apex":true}`}) {
+		t.Fatal(errOut, err, got)
 	}
 	inOrder(t, errOut, "✓ Replaced the Cloudflare API token of *.cf.example.com", "✓ *.cf.example.com includes cf.example.com\n")
 
+	// A refused apex leaves the new token in place, and --json still prints the
+	// domain Edka confirmed with it.
+	api, base = cloudflareDomainAPI(t, map[string][]string{route: {replaced, `409 {"error":"The apex hostname cf.example.com is already configured for this cluster"}`}})
+	out, errOut, err = executeInput(t, base, "new-token\n", "domains", "update", "*.cf.example.com", "--replace-token", "--apex", "--json")
+	if err == nil || !strings.Contains(err.Error(), "The apex hostname cf.example.com is already configured for this cluster") || api.count(route) != 2 || !strings.Contains(errOut, "✓ Replaced the Cloudflare API token") || strings.Contains(errOut, "includes") || !strings.Contains(out, `"dns_provider": "cloudflare"`) {
+		t.Fatal(out, errOut, err)
+	}
+
 	// A refused token leaves the apex alone.
-	api, base = cloudflareDomainAPI(t, map[string][]string{"PATCH /api/clusters/c1/domains/f1": {`400 {"error":"Cloudflare refused the API token (Invalid API Token). Check that the token is active and has Zone Read and DNS Edit on the zone."}`}})
-	_, errOut, err = executeInput(t, base, "bad-token", "domains", "update", "*.cf.example.com", "--replace-token", "--apex")
-	if err == nil || !strings.Contains(err.Error(), "Cloudflare refused the API token") || api.count("PATCH /api/clusters/c1/domains/f1") != 1 || strings.Contains(errOut, "✓") {
-		t.Fatal(errOut, err, api.requests)
+	api, base = cloudflareDomainAPI(t, map[string][]string{route: {`400 {"error":"Cloudflare refused the API token (Invalid API Token). Check that the token is active and has Zone Read and DNS Edit on the zone."}`}})
+	out, errOut, err = executeInput(t, base, "bad-token", "domains", "update", "*.cf.example.com", "--replace-token", "--apex", "--json")
+	if err == nil || !strings.Contains(err.Error(), "Cloudflare refused the API token") || api.count(route) != 1 || strings.Contains(errOut, "✓") || out != "" {
+		t.Fatal(out, errOut, err, api.requests)
+	}
+}
+
+// A hint that pipes a value repeats the command with every flag the user set,
+// so it acts on the same cluster and makes the same changes.
+func TestInvocationRepeatsTheFlagsSet(t *testing.T) {
+	for _, test := range []struct{ args, want string }{
+		{"domains update *.example.com --replace-token --apex=false --cluster prod", "edka domains update '*.example.com' --apex=false --cluster prod --replace-token"},
+		{"domains add *.example.org --dns-provider cloudflare --class eg-ts --apex --cluster prod", "edka domains add '*.example.org' --apex --class eg-ts --cluster prod --dns-provider cloudflare"},
+		{"domains verify *.example.com --namespace default --namespace shop", "edka domains verify '*.example.com' --namespace default --namespace shop"},
+	} {
+		root := New("test", strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
+		cmd, rest, err := root.Find(strings.Fields(test.args))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := cmd.ParseFlags(rest); err != nil {
+			t.Fatal(err)
+		}
+		if got := invocation(cmd, cmd.Flags().Args()); got != test.want {
+			t.Errorf("%s: got %s", test.args, got)
+		}
 	}
 }
