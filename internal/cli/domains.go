@@ -389,6 +389,10 @@ func (a *App) addDomains(root *cobra.Command) {
 		if warning := responseWarning(response.Body); warning != "" {
 			a.message("  Note: %s", ui.Clean(warning))
 		}
+		// An Edka API without the option ignores it and adds a domain with a CNAME record.
+		if dnsProvider != "" && !viaCloudflare(created) {
+			a.message("  Note: Edka added the domain without the Cloudflare API token. It validates with the CNAME record below.")
+		}
 		view, err := a.domainView(ctx, created)
 		if err != nil {
 			return err

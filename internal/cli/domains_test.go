@@ -423,6 +423,22 @@ func TestDomainAddWithACloudflareToken(t *testing.T) {
 		t.Fatal(got)
 	}
 
+	// An Edka API without the option adds a domain with a CNAME record, and the
+	// command says so.
+	ignored := `{"id":"n6","cluster_id":"c1","domain":"*.shop.example.com","ingress_class":"eg","is_wildcard":true,"include_apex":false,"validation_method":"dns-01","acme_delegation_id":"new789"}`
+	_, base = domainAPI(t, map[string][]string{
+		"POST /api/clusters/c1/domains":                {`{"success":true,"data":` + ignored + `}`},
+		"GET /api/clusters/c1/domains/n6/wildcard-tls": {tlsView(ignored, `{"record_name":"_acme-challenge.shop.example.com","record_type":"CNAME","record_value":"new789.acme.edka.net"}`, missingStatus, missingDNS)},
+	})
+	out, errOut, err = executeInput(t, base, "", "domains", "add", "*.shop.example.com", "--dns-provider", "cloudflare", "--cluster", "sinaia")
+	if err != nil {
+		t.Fatal(errOut, err)
+	}
+	inOrder(t, errOut, "✓ Added *.shop.example.com to cluster sinaia\n", "  Note: Edka added the domain without the Cloudflare API token. It validates with the CNAME record below.\n", "Next: create the records, then run `edka domains verify '*.shop.example.com'`\n")
+	if !strings.Contains(squeeze(out), "_acme-challenge.shop.example.com CNAME new789.acme.edka.net certificate") || strings.Contains(out, "Cloudflare zone") {
+		t.Fatal(out)
+	}
+
 	// With no token, nothing is sent.
 	t.Setenv("CLOUDFLARE_API_TOKEN", "")
 	api, base = domainAPI(t, nil)
