@@ -304,6 +304,65 @@ func TestEnvironmentClusterPinsDeployment(t *testing.T) {
 		}
 	}
 }
+
+// A link applies only on its own API, so the sign-in a missing linked profile
+// asks for goes to that API, unless the user chose one.
+func TestMissingLinkedProfileSignsInToTheLinkedAPI(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("EDKA_CONFIG_DIR", dir)
+	t.Setenv("EDKA_TOKEN", "")
+	t.Setenv("EDKA_PROFILE", "")
+	t.Setenv("EDKA_CLUSTER", "")
+	t.Setenv("EDKA_DEPLOYMENT", "")
+	t.Setenv("EDKA_ORGANIZATION", "")
+	project := t.TempDir()
+	t.Chdir(project)
+	path := filepath.Join(project, ".edka.json")
+	run := func(args ...string) (string, error) {
+		var out bytes.Buffer
+		root := New("test", strings.NewReader(""), &out, &bytes.Buffer{})
+		root.SetArgs(args)
+		err := root.Execute()
+		return out.String(), err
+	}
+	for _, tc := range []struct {
+		api, env string
+		args     []string
+		want     string
+	}{
+		{"https://work.example", "", nil, "edka login --profile work --api-url https://work.example"},
+		{"https://work.example", "", []string{"--api-url", "https://other.example"}, "edka login --profile work --api-url https://other.example"},
+		{"https://work.example", "https://other.example", nil, "edka login --profile work"},
+		{config.DefaultAPI, "", nil, "edka login --profile work"},
+	} {
+		link := fmt.Sprintf(`{"version":1,"profile":"work","api_url":%q,"cluster":"c1","deployment":"d1"}`, tc.api)
+		if err := os.WriteFile(path, []byte(link), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("EDKA_API_URL", tc.env)
+		_, err := run(append([]string{"clusters", "list"}, tc.args...)...)
+		want := fmt.Sprintf("profile %q from %s does not exist; run `%s`, or `edka unlink` in %s", "work", path, tc.want, project)
+		if err == nil || err.Error() != want {
+			t.Errorf("link on %s, EDKA_API_URL=%q, %v: %v\nwant %s", tc.api, tc.env, tc.args, err, want)
+		}
+	}
+
+	// The profile that sign-in saves keeps the link's API, so the link applies.
+	if err := os.WriteFile(path, []byte(`{"version":1,"profile":"work","api_url":"https://work.example","cluster":"c1","deployment":"d1"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("EDKA_API_URL", "")
+	c, _ := config.Load(dir)
+	c.Profiles["work"] = config.Profile{APIURL: "https://work.example", Organization: "o1"}
+	if err := config.Save(dir, c); err != nil {
+		t.Fatal(err)
+	}
+	out, err := run("context", "--json")
+	var context map[string]any
+	if err != nil || json.Unmarshal([]byte(out), &context) != nil || context["cluster"] != "c1" || context["deployment"] != "d1" {
+		t.Fatal(out, err)
+	}
+}
 func TestProfileListIsSorted(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("EDKA_CONFIG_DIR", dir)
@@ -1094,6 +1153,19 @@ func TestFollowUpCarriesTheContextFlags(t *testing.T) {
 	// A name that looks like a placeholder is quoted, so a shell does not read
 	// < and > as redirections.
 	if got := followUp(cmd, "nodepools", "delete", "<x>"); got != "edka nodepools delete '<x>' --profile work --organization o1 --cluster prod" {
+		t.Fatal(got)
+	}
+	// A flag set to "" chooses nothing, so the command to run leaves it out:
+	// `deployments create` refuses --deployment, even an empty one.
+	root = New("test", strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
+	cmd, rest, err = root.Find([]string{"up", "--deployment", "", "--cluster", "prod", "--data", "@x.json", "--diff"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.ParseFlags(rest); err != nil {
+		t.Fatal(err)
+	}
+	if got := followUp(cmd, "deployments", "create", "--dry-run"); got != "edka deployments create --dry-run --cluster prod" {
 		t.Fatal(got)
 	}
 }
