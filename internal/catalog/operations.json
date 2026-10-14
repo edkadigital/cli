@@ -1,5 +1,5 @@
 {
-  "source_sha": "b7aaee80887d8ba80d6be72f90665e2df71d1fbc",
+  "source_sha": "ba3a8b114298df965ec806b67c0cf3118c79bfaf",
   "confirm_words": [
     "cancel",
     "cleanup-orphaned-nodes",
@@ -5774,6 +5774,20 @@
       "method": "GET",
       "path": "/api/clusters/:id/gitops/status",
       "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters hetzner-servers list",
+      "method": "GET",
+      "path": "/api/clusters/:id/hetzner-servers",
+      "summary": "List the cluster's Hetzner servers that a pool of existing servers can take",
       "params": [
         {
           "name": "id",
