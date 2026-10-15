@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -12,6 +13,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/edkadigital/cli/internal/ui"
 	"github.com/edkadigital/cli/skills"
@@ -46,7 +48,7 @@ func (a *App) addSkill(root *cobra.Command) {
 	a.strictGroup(skill)
 	var project bool
 	var dir string
-	install := &cobra.Command{Use: "install", Short: "Install the agent skill for Claude Code and other agents", Long: "Write the agent skill that matches this version of the CLI to\n`~/.claude/skills/edka`, where Claude Code finds it. The skill shows a coding agent\nhow to check which cluster and deployment a command acts on, diagnose a failure,\npreview a change and ask before a destructive command. Its references list every\ncommand with its flags.\n\n`--project` writes it to `.claude/skills/edka` at the root of the current\nrepository, to commit with the project. `--dir` writes it to another agent's skills\ndirectory. Run the install again after `edka upgrade` to match the new version.\n\nAn install replaces the files an earlier one wrote. It asks before it replaces a\nskill directory that holds other files.", Args: cobra.NoArgs, Example: "  edka skill install\n  edka skill install --project\n  edka skill install --dir ~/.agents/skills --json", RunE: func(_ *cobra.Command, _ []string) error {
+	install := &cobra.Command{Use: "install", Short: "Install the agent skill for Claude Code and other agents", Long: "Write the agent skill that matches this version of the CLI to\n`~/.claude/skills/edka`, where Claude Code finds it. The skill shows a coding agent\nhow to check which cluster and deployment a command acts on, diagnose a failure,\npreview a change and ask before a destructive command. Its references list every\ncommand with its flags.\n\n`--project` writes it to `.claude/skills/edka` at the root of the current\nrepository, to commit with the project. `--dir` writes it to another agent's skills\ndirectory. `edka upgrade` rewrites the skill in `~/.claude/skills/edka`; run the\ninstall again after it for the other directories.\n\nAn install replaces the files an earlier one wrote. It asks before it replaces a\nskill directory that holds other files.", Args: cobra.NoArgs, Example: "  edka skill install\n  edka skill install --project\n  edka skill install --dir ~/.agents/skills --json", RunE: func(_ *cobra.Command, _ []string) error {
 		parent, err := skillsDir(project, dir)
 		if err != nil {
 			return err
@@ -159,6 +161,75 @@ func (a *App) installSkill(files fs.FS, target string) (*skillInstall, error) {
 	return result, nil
 }
 
+// skillRefresh is what `edka upgrade` did with the skill an earlier `edka skill
+// install` wrote to the user's skills directory.
+type skillRefresh struct {
+	Path      string `json:"path"`
+	Refreshed bool   `json:"refreshed"`
+	// Reason is why the skill was kept as it was.
+	Reason string `json:"reason,omitempty"`
+}
+
+// refreshSkill has the release that an upgrade installed at executable write
+// its skill over the one an earlier `edka skill install` wrote to
+// ~/.claude/skills/edka. This binary embeds the skill of the version the
+// release replaced, so it can't write the new one itself. A skill directory
+// without a manifest is not one the CLI wrote, and refreshSkill leaves it alone
+// and returns nil. It keeps a link, and a skill with files that changed after
+// the install, since only the user can say whether to replace them.
+func (a *App) refreshSkill(ctx context.Context, executable, version string) *skillRefresh {
+	parent, err := skillsDir(false, "")
+	if err != nil {
+		return nil
+	}
+	target := filepath.Join(parent, skillName)
+	info, err := os.Lstat(target)
+	if err != nil {
+		return nil
+	}
+	if _, err := os.Stat(filepath.Join(target, skillManifest)); err != nil {
+		return nil
+	}
+	refresh := &skillRefresh{Path: target}
+	if !info.IsDir() {
+		refresh.Reason = "it is a link"
+	} else if _, changed, err := skillChanges(target, nil); err != nil {
+		refresh.Reason = "it can't be read: " + err.Error()
+	} else if len(changed) > 0 {
+		refresh.Reason = fmt.Sprintf("files in it changed after the install (%s)", fileList(changed))
+	} else {
+		install, cancel := context.WithTimeout(ctx, time.Minute)
+		defer cancel()
+		out, err := runTool(install, nil, executable, "skill", "install", "--dir", parent, "--no-input", "--json")
+		var installed skillInstall
+		if err == nil {
+			err = json.Unmarshal(out, &installed)
+		}
+		if err != nil {
+			refresh.Reason = fmt.Sprintf("edka %s could not write it: %s", version, releaseError(err))
+		} else {
+			refresh.Path, refresh.Refreshed = installed.Path, true
+			a.message("✓ Refreshed the agent skill in %s for edka %s", installed.Path, installed.Version)
+			return refresh
+		}
+	}
+	a.message("Kept the agent skill in %s, since %s. Run `edka skill install` to replace it.", target, refresh.Reason)
+	return refresh
+}
+
+// releaseError is the message of a failure that a release ran with --json
+// printed: a JSON object on the last line of its stderr.
+func releaseError(err error) string {
+	lines := strings.Split(err.Error(), "\n")
+	var failure struct {
+		Error string `json:"error"`
+	}
+	if json.Unmarshal([]byte(lines[len(lines)-1]), &failure) == nil && failure.Error != "" {
+		return failure.Error
+	}
+	return err.Error()
+}
+
 // inspectSkill lists the files in target. When target holds a file that an
 // earlier install did not write and that differs from the skill's, or is not a
 // directory, it returns the question to ask before the install replaces it.
@@ -177,7 +248,16 @@ func inspectSkill(target string, skill map[string][]byte) (existing []string, qu
 	default:
 		return nil, fmt.Sprintf("Replace %s, which is not a directory, with the edka skill", target), nil
 	}
-	var foreign []string
+	existing, foreign, err := skillChanges(target, skill)
+	if err != nil || len(foreign) == 0 {
+		return existing, "", err
+	}
+	return existing, fmt.Sprintf("Replace %s and the files in it that an earlier install did not write (%s)", target, fileList(foreign)), nil
+}
+
+// skillChanges lists the files in the skill directory target, and those of
+// them that an earlier install did not write and that differ from the skill's.
+func skillChanges(target string, skill map[string][]byte) (existing, foreign []string, err error) {
 	var record skillRecord
 	if data, err := os.ReadFile(filepath.Join(target, skillManifest)); err == nil {
 		// A manifest that can't be read vouches for no file.
@@ -210,13 +290,15 @@ func inspectSkill(target string, skill map[string][]byte) (existing []string, qu
 		}
 		return nil
 	})
-	if err != nil || len(foreign) == 0 {
-		return existing, "", err
+	return existing, foreign, err
+}
+
+// fileList names the first five files, and how many more there are.
+func fileList(files []string) string {
+	if len(files) > 5 {
+		files = append(slices.Clip(files[:5]), fmt.Sprintf("and %d more", len(files)-5))
 	}
-	if len(foreign) > 5 {
-		foreign = append(foreign[:5], fmt.Sprintf("and %d more", len(foreign)-5))
-	}
-	return existing, fmt.Sprintf("Replace %s and the files in it that an earlier install did not write (%s)", target, strings.Join(foreign, ", ")), nil
+	return strings.Join(files, ", ")
 }
 
 // skillHash is the SHA-256 of content with Windows line breaks read as Unix

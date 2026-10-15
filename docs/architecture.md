@@ -236,6 +236,13 @@ SHA-256 of each file, and the next install replaces those files without asking. 
 asks before it replaces any other file, and writes the new skill beside the old one
 before it swaps the two.
 
+After `edka upgrade` replaces the binary, it runs the new one as `edka skill install
+--dir ~/.claude/skills --no-input --json`, since the old binary embeds the old
+skill. It does so only when `~/.claude/skills/edka` is a directory with a manifest
+and every file in it still matches its SHA-256. Otherwise it keeps the skill and
+says why on stderr, and the upgrade still succeeds. `--json` reports the outcome in
+`skill`, null when there was no skill the CLI wrote.
+
 Tests exercise the entire PKCE client handshake against an HTTP authorization
 fixture, actual loopback callback state/issuer validation, concurrent refresh,
 origin/redirect handling, generated command registration, request body/query types,

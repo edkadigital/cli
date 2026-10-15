@@ -51,7 +51,8 @@ command with its flags.
 
 `--project` writes it to `.claude/skills/edka` at the root of the current
 repository, to commit with the project. `--dir` writes it to another agent's skills
-directory. Run the install again after `edka upgrade` to match the new version.
+directory. `edka upgrade` rewrites the skill in `~/.claude/skills/edka`; run the
+install again after it for the other directories.
 
 An install replaces the files an earlier one wrote. It asks before it replaces a
 skill directory that holds other files.
@@ -82,6 +83,10 @@ SHA-256 in the release's checksums.txt, and replace this binary with it.
 
 A download that does not match replaces nothing. `--check` reports the latest
 release without installing it.
+
+After an upgrade the new release rewrites the agent skill that `edka skill install`
+wrote to `~/.claude/skills/edka`. It keeps a skill with files that changed after
+the install.
 
 Flags:
 
