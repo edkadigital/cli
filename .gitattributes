@@ -4,3 +4,5 @@ go.mod text eol=lf
 go.sum text eol=lf
 Makefile text eol=lf
 *.yml text eol=lf
+# The skill test compares these files byte for byte with the command tree.
+skills/** text eol=lf

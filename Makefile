@@ -5,7 +5,7 @@ LDFLAGS := -s -w -X main.version=$(VERSION)
 GOLANGCI_LINT_VERSION := v2.14.0
 GOVULNCHECK := golang.org/x/vuln/cmd/govulncheck@v1.8.0
 
-.PHONY: build install test check lint vuln clean
+.PHONY: build install test check lint vuln skill clean
 build:
 	go build -trimpath -ldflags '$(LDFLAGS)' -o bin/$(BINARY) ./cmd/edka
 install:
@@ -19,6 +19,9 @@ check: lint
 lint:
 	@command -v golangci-lint >/dev/null || { echo "golangci-lint is not installed. Install $(GOLANGCI_LINT_VERSION): https://golangci-lint.run/docs/welcome/install/"; exit 1; }
 	golangci-lint run ./...
+# skill rewrites the command reference of the agent skill in skills/edka.
+skill:
+	go test ./internal/cli -run '^TestAgentSkillMatchesCommands$$' -count=1 -update-skill
 # vuln reads the Go vulnerability database, so it needs the network.
 vuln:
 	go run $(GOVULNCHECK) ./...

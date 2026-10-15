@@ -42,8 +42,12 @@ func TestSuggestedCommandsExist(t *testing.T) {
 			}
 		}
 	}
-	// Commands in the documentation's code blocks, which people copy.
+	// Commands in the documentation's code blocks, which people copy, and in
+	// the agent skill's, which agents run.
 	docs, _ := filepath.Glob("../../docs/*.md")
+	skill, _ := filepath.Glob("../../skills/edka/*.md")
+	references, _ := filepath.Glob("../../skills/edka/references/*.md")
+	docs = append(append(docs, skill...), references...)
 	for _, file := range append(docs, "../../README.md") {
 		data, err := os.ReadFile(file)
 		if err != nil {
