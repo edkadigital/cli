@@ -218,6 +218,19 @@ edka api clusters nodepools list --cluster production
 edka api get /api/inventory/resources --query kind=deployment --json
 ```
 
+## Coding agents
+
+[`skills/edka`](skills/edka) is an agent skill for the CLI. It shows a coding agent
+how to check which cluster and deployment a command acts on, diagnose a failure,
+preview a change, keep secrets off the command line and ask before a destructive
+command. Its references list every command with its flags and examples.
+
+```sh
+npx skills add edkadigital/cli
+```
+
+For Claude Code alone, copy [`skills/edka`](skills/edka) into `~/.claude/skills/`.
+
 ## Documentation
 
 | Page | Covers |

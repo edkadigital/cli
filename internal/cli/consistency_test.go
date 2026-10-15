@@ -35,6 +35,24 @@ func TestAShortFlagMeansOneThing(t *testing.T) {
 	}
 }
 
+// Help names a flag's value after the first text in backticks in its usage, so
+// that text is a value name, such as `name`, and not a command.
+func TestFlagValueNamesAreOneWord(t *testing.T) {
+	root := New("test", strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
+	var visit func(*cobra.Command)
+	visit = func(cmd *cobra.Command) {
+		cmd.LocalFlags().VisitAll(func(flag *pflag.Flag) {
+			if name, _ := pflag.UnquoteUsage(flag); strings.ContainsAny(name, " \t") {
+				t.Errorf("--%s of `%s` takes a value named %q", flag.Name, cmd.CommandPath(), name)
+			}
+		})
+		for _, child := range cmd.Commands() {
+			visit(child)
+		}
+	}
+	visit(root)
+}
+
 // `edka --help` lists each command with its description on one line. A long
 // description wraps in a terminal of 100 columns.
 func TestCommandDescriptionsFitOneLine(t *testing.T) {

@@ -226,6 +226,11 @@ A wait repeats a read that fails because Edka can't be reached, or that Edka
 answers with 408, 429 or a 5xx status. The pause between reads grows, and the
 wait stops with the error after two minutes of failed reads.
 
+`skills/edka` is an agent skill that teaches coding agents to use the CLI. Its
+guidance in SKILL.md is written by hand. A test builds the command index at the end
+of SKILL.md and the files in `references/` from the command tree, and fails when
+they differ from the commands' help; `make skill` rewrites them.
+
 Tests exercise the entire PKCE client handshake against an HTTP authorization
 fixture, actual loopback callback state/issuer validation, concurrent refresh,
 origin/redirect handling, generated command registration, request body/query types,
