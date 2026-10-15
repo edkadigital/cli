@@ -124,6 +124,7 @@ func New(version string, in io.Reader, out, errOut io.Writer) *cobra.Command {
 	a.addPreviews(root)
 	a.apiCmd = a.addTools(root)
 	a.addUpgrade(root)
+	a.addSkill(root)
 	c, err := catalog.Load()
 	if err != nil {
 		panic(err)
