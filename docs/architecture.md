@@ -229,7 +229,12 @@ wait stops with the error after two minutes of failed reads.
 `skills/edka` is an agent skill that teaches coding agents to use the CLI. Its
 guidance in SKILL.md is written by hand. A test builds the command index at the end
 of SKILL.md and the files in `references/` from the command tree, and fails when
-they differ from the commands' help; `make skill` rewrites them.
+they differ from the commands' help; `make skill` rewrites them. The `skills`
+package embeds the directory, so `edka skill install` writes the skill of the
+binary's own commands. Beside the skill it writes `.edka-skill.json` with the
+SHA-256 of each file, and the next install replaces those files without asking. It
+asks before it replaces any other file, and writes the new skill beside the old one
+before it swaps the two.
 
 Tests exercise the entire PKCE client handshake against an HTTP authorization
 fixture, actual loopback callback state/issuer validation, concurrent refresh,

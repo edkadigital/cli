@@ -225,11 +225,19 @@ how to check which cluster and deployment a command acts on, diagnose a failure,
 preview a change, keep secrets off the command line and ask before a destructive
 command. Its references list every command with its flags and examples.
 
+`edka skill install` writes the skill that matches your edka version to
+`~/.claude/skills/edka`, where Claude Code finds it. `--project` writes it to
+`.claude/skills/edka` in the current repository, and `--dir` to the skills directory
+of another agent. Run it again after `edka upgrade`.
+
 ```sh
-npx skills add edkadigital/cli
+edka skill install
+edka skill install --project
+edka skill install --dir ~/.agents/skills
 ```
 
-For Claude Code alone, copy [`skills/edka`](skills/edka) into `~/.claude/skills/`.
+`npx skills add edkadigital/cli` installs the skill from this repository instead,
+for the agents the skills CLI knows.
 
 ## Documentation
 
