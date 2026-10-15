@@ -228,7 +228,9 @@ command. Its references list every command with its flags and examples.
 `edka skill install` writes the skill that matches your edka version to
 `~/.claude/skills/edka`, where Claude Code finds it. `--project` writes it to
 `.claude/skills/edka` in the current repository, and `--dir` to the skills directory
-of another agent. Run it again after `edka upgrade`.
+of another agent. `edka upgrade` rewrites the skill in `~/.claude/skills/edka` with
+the new release's, unless you changed files in it. Run the install again after an
+upgrade for the other directories, and after `brew upgrade edka`.
 
 ```sh
 edka skill install
@@ -258,8 +260,9 @@ for the agents the skills CLI knows.
 edka upgrade
 ```
 
-`edka upgrade` installs the latest release after checking its SHA-256. A Homebrew
-install upgrades with `brew upgrade edka`.
+`edka upgrade` installs the latest release after checking its SHA-256, then has the
+new release rewrite the agent skill that `edka skill install` wrote to
+`~/.claude/skills/edka`. A Homebrew install upgrades with `brew upgrade edka`.
 
 ## Security
 

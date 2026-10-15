@@ -61,7 +61,7 @@ func (a *App) releaseChannel() selfupdate.Channel {
 
 func (a *App) addUpgrade(root *cobra.Command) {
 	var check bool
-	a.upgradeCmd = &cobra.Command{Use: "upgrade", Short: "Install the latest release of the CLI", Long: "Download the latest release from github.com/edkadigital/cli, check it against the\nSHA-256 in the release's checksums.txt, and replace this binary with it.\n\nA download that does not match replaces nothing. `--check` reports the latest\nrelease without installing it.", GroupID: "tools", Args: cobra.NoArgs, Example: "  edka upgrade\n  edka upgrade --check\n  edka upgrade --check --json", RunE: func(cmd *cobra.Command, _ []string) error {
+	a.upgradeCmd = &cobra.Command{Use: "upgrade", Short: "Install the latest release of the CLI", Long: "Download the latest release from github.com/edkadigital/cli, check it against the\nSHA-256 in the release's checksums.txt, and replace this binary with it.\n\nA download that does not match replaces nothing. `--check` reports the latest\nrelease without installing it.\n\nAfter an upgrade the new release rewrites the agent skill that `edka skill install`\nwrote to `~/.claude/skills/edka`. It keeps a skill with files that changed after\nthe install.", GroupID: "tools", Args: cobra.NoArgs, Example: "  edka upgrade\n  edka upgrade --check\n  edka upgrade --check --json", RunE: func(cmd *cobra.Command, _ []string) error {
 		released := selfupdate.Released(a.Version)
 		if !released && !check {
 			return fmt.Errorf("edka %s was built from a checkout, and a release does not replace it; update the checkout and run `make install`", a.Version)
@@ -78,7 +78,7 @@ func (a *App) addUpgrade(root *cobra.Command) {
 			return err
 		}
 		newer := selfupdate.Newer(latest, a.Version)
-		result := map[string]any{"version": a.Version, "latest": latest, "update_available": newer, "updated": false}
+		result := map[string]any{"version": a.Version, "latest": latest, "update_available": newer, "updated": false, "skill": nil}
 		switch {
 		case !released:
 			a.message("The latest release is %s. edka %s was built from a checkout.", latest, a.Version)
@@ -104,6 +104,7 @@ func (a *App) addUpgrade(root *cobra.Command) {
 			}
 			result["updated"] = true
 			a.message("✓ Upgraded edka %s to %s", a.Version, latest)
+			result["skill"] = a.refreshSkill(cmd.Context(), path, latest)
 		}
 		if a.output == "json" {
 			return ui.Render(a.Out, jsonBody(result), "json", false)

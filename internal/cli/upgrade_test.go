@@ -26,9 +26,16 @@ func asRelease(t *testing.T, version string, release *updatetest.Release, args .
 	return asReleaseAt(t, filepath.Join(t.TempDir(), "edka"), version, release, args...)
 }
 
+// userHome is the home directory the tests started in. An upgrade rewrites the
+// agent skill there, so a test that upgrades gets a home of its own.
+var userHome, _ = os.UserHomeDir()
+
 // asReleaseAt runs the CLI as asRelease does, with its binary at path.
 func asReleaseAt(t *testing.T, path, version string, release *updatetest.Release, args ...string) (_, out, errOut string, err error) {
 	t.Helper()
+	if home, _ := os.UserHomeDir(); home == userHome {
+		skillHome(t)
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +210,19 @@ func TestUpgradeDebugPrintsItsRequests(t *testing.T) {
 // The upgrade replaces the program that runs it. A copy of this test binary
 // stands in for edka, since Windows treats a running program unlike a file.
 func TestUpgradeReplacesTheRunningBinary(t *testing.T) {
+	skillHome(t)
 	release := updatetest.Publish(t, "v1.3.0", []byte("new binary"))
+	path, _ := upgradeAsProgram(t, release)
+	if got := installedBinary(t, path); got != "new binary" {
+		t.Fatalf("%d bytes", len(got))
+	}
+}
+
+// upgradeAsProgram runs `edka upgrade` from a copy of this test binary, as
+// edka v1.2.3 with release as the latest release, and returns the path of the
+// copy and what the upgrade printed.
+func upgradeAsProgram(t *testing.T, release *updatetest.Release, env ...string) (string, string) {
+	t.Helper()
 	self, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
@@ -234,12 +253,12 @@ func TestUpgradeReplacesTheRunningBinary(t *testing.T) {
 	}
 	cmd := exec.Command(path, "-test.run=^TestUpgradeHelper$")
 	cmd.Env = append(os.Environ(), "EDKA_UPGRADE_HELPER="+release.Channel.URL, "EDKA_UPGRADE_HELPER_CA="+ca, "EDKA_CONFIG_DIR="+t.TempDir())
-	if output, err := cmd.CombinedOutput(); err != nil || !strings.Contains(string(output), "✓ Upgraded edka v1.2.3 to v1.3.0") {
+	cmd.Env = append(cmd.Env, env...)
+	output, err := cmd.CombinedOutput()
+	if err != nil || !strings.Contains(string(output), "✓ Upgraded edka v1.2.3 to v1.3.0") {
 		t.Fatalf("%s: %v", output, err)
 	}
-	if got := installedBinary(t, path); got != "new binary" {
-		t.Fatalf("%d bytes", len(got))
-	}
+	return path, string(output)
 }
 
 func TestUpgradeHelper(t *testing.T) {
