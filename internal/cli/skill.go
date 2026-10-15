@@ -226,6 +226,9 @@ func skillHash(content []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// renameSkill is os.Rename, which tests make fail.
+var renameSkill = os.Rename
+
 // replaceDir puts files at target, in place of whatever target held. It writes
 // them to a directory beside target and swaps the two, so a failed write
 // leaves target as it was.
@@ -238,7 +241,14 @@ func replaceDir(target string, files map[string][]byte) error {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = os.RemoveAll(staging) }()
+	// A swap that can't put the previous skill back leaves it here, so the
+	// staging directory then stays.
+	keep := false
+	defer func() {
+		if !keep {
+			_ = os.RemoveAll(staging)
+		}
+	}()
 	next, previous := filepath.Join(staging, "next"), filepath.Join(staging, "previous")
 	for name, content := range files {
 		file := filepath.Join(next, filepath.FromSlash(name))
@@ -251,16 +261,19 @@ func replaceDir(target string, files map[string][]byte) error {
 	}
 	moved := false
 	if _, err := os.Lstat(target); err == nil {
-		if err := os.Rename(target, previous); err != nil {
+		if err := renameSkill(target, previous); err != nil {
 			return err
 		}
 		moved = true
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-	if err := os.Rename(next, target); err != nil {
+	if err := renameSkill(next, target); err != nil {
 		if moved {
-			_ = os.Rename(previous, target)
+			if restore := renameSkill(previous, target); restore != nil {
+				keep = true
+				return fmt.Errorf("%w; the previous skill is in %s", err, previous)
+			}
 		}
 		return err
 	}

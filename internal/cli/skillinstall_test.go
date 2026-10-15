@@ -270,3 +270,45 @@ func sameDir(t *testing.T, got, want string) {
 		t.Fatalf("installed in %s, want %s", got, want)
 	}
 }
+
+// A swap that fails puts the previous skill back, and when it can't, keeps it
+// where the error says.
+func TestSkillInstallKeepsThePreviousSkillWhenTheSwapFails(t *testing.T) {
+	for _, restores := range []bool{true, false} {
+		target := skillHome(t)
+		if err := os.MkdirAll(target, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(target, "SKILL.md"), []byte("my skill\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		rename := renameSkill
+		renameSkill = func(from, to string) error {
+			if filepath.Base(from) == "next" || (!restores && filepath.Base(from) == "previous") {
+				return &os.LinkError{Op: "rename", Old: from, New: to, Err: os.ErrPermission}
+			}
+			return os.Rename(from, to)
+		}
+		_, err := installSkillJSON(t, "--yes")
+		renameSkill = rename
+		if err == nil {
+			t.Fatal("the install succeeded")
+		}
+		kept := target
+		if !restores {
+			_, path, found := strings.Cut(err.Error(), "the previous skill is in ")
+			if !found {
+				t.Fatal(err)
+			}
+			kept = path
+		}
+		if data, err := os.ReadFile(filepath.Join(kept, "SKILL.md")); err != nil || string(data) != "my skill\n" {
+			t.Fatalf("restores %v: %q, %v", restores, data, err)
+		}
+		// Only a staging directory that holds the previous skill is left.
+		staging, _ := filepath.Glob(filepath.Join(filepath.Dir(target), ".edka-skill-*"))
+		if len(staging) != map[bool]int{true: 0, false: 1}[restores] {
+			t.Fatalf("restores %v: %v", restores, staging)
+		}
+	}
+}
