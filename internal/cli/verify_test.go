@@ -154,16 +154,20 @@ func TestPasskeyCheckThatEndsUnconfirmed(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		reads []string
-		want  string
+		// wait is how long the command waits for the check. A case that ends on
+		// Edka's answer waits far longer than it takes, so a slow runner still
+		// reads that answer.
+		wait time.Duration
+		want string
 	}{
-		{"declined", []string{checkPending, checkDenied}, "Verification was declined in the console."},
-		{"expired", []string{checkPending, `404 {"error":"Not found"}`}, "Verification expired. Run the command again."},
-		{"expired status", []string{`{"data":{"id":"s1","status":"expired"}}`}, "Verification expired. Run the command again."},
-		{"not confirmed in time", []string{checkPending}, "Verification expired. Run the command again."},
+		{"declined", []string{checkPending, checkDenied}, 5 * time.Second, "Verification was declined in the console."},
+		{"expired", []string{checkPending, `404 {"error":"Not found"}`}, 5 * time.Second, "Verification expired. Run the command again."},
+		{"expired status", []string{`{"data":{"id":"s1","status":"expired"}}`}, 5 * time.Second, "Verification expired. Run the command again."},
+		{"not confirmed in time", []string{checkPending}, 50 * time.Millisecond, "Verification expired. Run the command again."},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			wait := verificationWait
-			verificationWait = 50 * time.Millisecond
+			verificationWait = tc.wait
 			t.Cleanup(func() { verificationWait = wait })
 			server, requests := passkeyAPI(t, map[string][]string{
 				restartRoute:              {needsPasskey, `{"data":{"restarted":true}}`},
