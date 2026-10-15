@@ -164,7 +164,7 @@ func (a *App) addCronjobs(root *cobra.Command) {
 		}
 		return path, nil
 	})
-	logs.Flags().StringVar(&job, "run", "", "Run name from `edka cronjobs runs` (default: the newest)")
+	logs.Flags().StringVar(&job, "run", "", "Run `name` from `edka cronjobs runs` (default: the newest)")
 	trigger := &cobra.Command{Use: "trigger <cronjob>", Short: "Start a run now", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
 		c, path, err := a.resolveCronjob(cmd.Context(), cmd, args[0])
 		if err != nil {

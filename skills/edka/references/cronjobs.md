@@ -64,7 +64,7 @@ Flags:
 - `--interval duration`: Log polling interval (default 2s)
 - `--pod string`: Pod name (default: the failing pod with most restarts, else the newest)
 - `--previous`: Read the previous container instance, for example after a crash
-- `--run edka cronjobs runs`: Run name from edka cronjobs runs (default: the newest)
+- `--run name`: Run name from `edka cronjobs runs` (default: the newest)
 - `--since duration`: Read the lines of the last duration, such as 15m or 2h
 - `-n, --tail int`: Number of log lines (at most 2000) (default 100)
 - `--timestamps`: Start each line with its time
