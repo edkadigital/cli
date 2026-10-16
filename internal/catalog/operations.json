@@ -1,5 +1,5 @@
 {
-  "source_sha": "ba3a8b114298df965ec806b67c0cf3118c79bfaf",
+  "source_sha": "98353f7421432c2b30d05c2ee63d873a6e15c84f",
   "confirm_words": [
     "cancel",
     "cleanup-orphaned-nodes",
@@ -6493,6 +6493,24 @@
       "confirm": true
     },
     {
+      "command": "clusters nodes reboot",
+      "method": "POST",
+      "path": "/api/clusters/:id/nodes/:name/reboot",
+      "summary": "Reboot a node after draining it and installing its OS updates",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "name",
+          "flag": "name"
+        }
+      ],
+      "step_up": true,
+      "confirm": true
+    },
+    {
       "command": "clusters observability components create",
       "method": "POST",
       "path": "/api/clusters/:clusterId/observability/components/:componentName",
@@ -6624,6 +6642,66 @@
       "params": [
         {
           "name": "clusterId",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters os-updates get",
+      "method": "GET",
+      "path": "/api/clusters/:id/os-updates",
+      "summary": "Show the OS update settings, node OS status and update round of a cluster",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters os-updates rounds create",
+      "method": "POST",
+      "path": "/api/clusters/:id/os-updates/rounds",
+      "summary": "Start an OS update round over the nodes with pending updates or a pending reboot",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": true,
+      "confirm": true
+    },
+    {
+      "command": "clusters os-updates rounds delete",
+      "method": "DELETE",
+      "path": "/api/clusters/:id/os-updates/rounds/:roundId",
+      "summary": "Cancel an open OS update round",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "roundId",
+          "flag": "round-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "clusters os-updates update",
+      "method": "PUT",
+      "path": "/api/clusters/:id/os-updates",
+      "summary": "Set the OS update settings and maintenance window of a cluster",
+      "params": [
+        {
+          "name": "id",
           "flag": "cluster"
         }
       ],
