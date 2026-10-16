@@ -1,5 +1,5 @@
 {
-  "source_sha": "98353f7421432c2b30d05c2ee63d873a6e15c84f",
+  "source_sha": "ee6efd048ac9fa2c8826234cee681553f98b0a8f",
   "confirm_words": [
     "cancel",
     "cleanup-orphaned-nodes",
@@ -6377,6 +6377,24 @@
       "confirm": false
     },
     {
+      "command": "clusters nat-gateway members reboot",
+      "method": "POST",
+      "path": "/api/clusters/:id/nat-gateway/members/:memberId/reboot",
+      "summary": "Update and reboot a NAT gateway member, moving its outbound traffic first",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "memberId",
+          "flag": "member-id"
+        }
+      ],
+      "step_up": true,
+      "confirm": true
+    },
+    {
       "command": "clusters nat-gateway metrics history get",
       "method": "GET",
       "path": "/api/clusters/:id/nat-gateway/metrics/history",
@@ -6666,7 +6684,7 @@
       "command": "clusters os-updates rounds create",
       "method": "POST",
       "path": "/api/clusters/:id/os-updates/rounds",
-      "summary": "Start an OS update round over the nodes with pending updates or a pending reboot",
+      "summary": "Start an OS update round over the picked hosts, or every host with updates",
       "params": [
         {
           "name": "id",
