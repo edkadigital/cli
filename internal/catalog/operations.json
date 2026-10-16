@@ -1,5 +1,5 @@
 {
-  "source_sha": "ee6efd048ac9fa2c8826234cee681553f98b0a8f",
+  "source_sha": "0dce9d3916437376129f5331a676397a9d9b986a",
   "confirm_words": [
     "cancel",
     "cleanup-orphaned-nodes",
@@ -6529,6 +6529,24 @@
       "confirm": true
     },
     {
+      "command": "clusters nodes vulnerabilities list",
+      "method": "GET",
+      "path": "/api/clusters/:id/nodes/:name/vulnerabilities",
+      "summary": "Show the vulnerability findings of one node",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "name",
+          "flag": "name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
       "command": "clusters observability components create",
       "method": "POST",
       "path": "/api/clusters/:clusterId/observability/components/:componentName",
@@ -7913,6 +7931,34 @@
         }
       ],
       "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "clusters vulnerabilities cves list",
+      "method": "GET",
+      "path": "/api/clusters/:id/vulnerabilities/cves",
+      "summary": "List the CVEs of one vulnerability finding of a cluster",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters vulnerabilities list",
+      "method": "GET",
+      "path": "/api/clusters/:id/vulnerabilities",
+      "summary": "Show the vulnerability findings of a cluster",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        }
+      ],
+      "step_up": false,
       "confirm": false
     },
     {
