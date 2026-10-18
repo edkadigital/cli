@@ -101,8 +101,10 @@ prints the flags and examples of any command, and the
 - An organization can ask for a passkey check before sensitive actions, such as a
   kubeconfig download. Without a terminal the command stops with
   `This action needs a passkey check. Approve it at <address>…`, and `--json` adds
-  `verify_url`. Give the user the address, wait until they confirm with their
-  passkey, then run the command again within 5 minutes. Only the user can confirm.
+  `verify_url`. When Edka sends a code for the Edka app on the user's phone, the
+  message names it and `--json` adds `verify_code`. Give the user the address and
+  the code, wait until they confirm with their passkey, then run the command again
+  within 5 minutes. Only the user can confirm.
 - `edka run --kubeconfig -- kubectl …` gives one command a kubeconfig that expires
   after an hour and is deleted when the command exits. Use it for kubectl.
   `edka clusters kubeconfig` issues the user's kubeconfig once and writes it to disk,

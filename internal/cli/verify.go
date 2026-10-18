@@ -40,11 +40,18 @@ var (
 type StepUpError struct {
 	// URL is the console page where the user confirms the check.
 	URL string
-	api *api.Error
+	// Code is what the Edka app on the user's phone asks for before it
+	// approves the check, or 0 when Edka sent none.
+	Code int
+	api  *api.Error
 }
 
 func (e *StepUpError) Error() string {
-	return fmt.Sprintf("This action needs a passkey check. Approve it at %s, then run the command again within 5 minutes. To approve first, run `edka verify`.", ui.Clean(e.URL))
+	where := ui.Clean(e.URL)
+	if e.Code > 0 {
+		where += fmt.Sprintf(" or in the Edka app on your phone with code %d", e.Code)
+	}
+	return fmt.Sprintf("This action needs a passkey check. Approve it at %s, then run the command again within 5 minutes. To approve first, run `edka verify`.", where)
 }
 func (e *StepUpError) Unwrap() error { return e.api }
 
@@ -54,6 +61,9 @@ type verification struct {
 	Status    string `json:"status"`
 	URL       string `json:"verify_url"`
 	ExpiresAt string `json:"expires_at"`
+	// Code is what the Edka app on the user's phone asks for before it
+	// approves the check. Edka sends one while the check is pending.
+	Code int `json:"code"`
 }
 
 func readVerification(body []byte) (*verification, error) {
@@ -67,9 +77,10 @@ func readVerification(body []byte) (*verification, error) {
 }
 
 // startVerification asks Edka for a passkey check, for the operation a refused
-// request named, if any.
+// request named, if any. The CLI prints the check's code wherever it prints its
+// address, so a phone can approve it too.
 func (a *App) startVerification(ctx context.Context, operation string) (*verification, error) {
-	body := map[string]string{}
+	body := map[string]any{"shows_code": true}
 	if operation != "" {
 		body["operation"] = operation
 	}
@@ -92,9 +103,13 @@ func (a *App) startVerification(ctx context.Context, operation string) (*verific
 	return v, nil
 }
 
-// showVerification prints the page that confirms a check, and opens it.
+// showVerification prints the page that confirms a check, and its code, and
+// opens the page.
 func (a *App) showVerification(v *verification, browser bool) {
 	a.message("Confirm with your passkey in the Edka console: %s", ui.Clean(v.URL))
+	if v.Code > 0 {
+		a.message("Code for the Edka app on your phone: %d", v.Code)
+	}
 	if browser {
 		// The address is printed, so a browser that does not open loses nothing.
 		_ = openBrowser(v.URL)
@@ -169,7 +184,7 @@ func (a *App) stepUp(ctx context.Context, refused *api.Error) error {
 		return refused
 	}
 	if !interactive(a) {
-		return &StepUpError{URL: v.URL, api: refused}
+		return &StepUpError{URL: v.URL, Code: v.Code, api: refused}
 	}
 	a.showVerification(v, true)
 	if _, err := a.awaitVerification(ctx, v); err != nil {
