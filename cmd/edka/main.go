@@ -80,6 +80,9 @@ func run() int {
 			var stepUp *cli.StepUpError
 			if errors.As(err, &stepUp) {
 				v["verify_url"] = stepUp.URL
+				if stepUp.Code > 0 {
+					v["verify_code"] = stepUp.Code
+				}
 			}
 			_ = json.NewEncoder(os.Stderr).Encode(v)
 		} else {

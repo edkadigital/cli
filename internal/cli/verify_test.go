@@ -16,14 +16,17 @@ import (
 )
 
 const (
-	verifyURL     = "https://console.example/accounts/acme/cli/verify/s1"
-	needsPasskey  = `428 {"error":"step_up_required","message":"Recent identity verification is required.","operation":"deployments.restart"}`
-	checkStarted  = `{"data":{"id":"s1","status":"pending","verify_url":"` + verifyURL + `","expires_at":"2026-10-09T12:05:00Z"}}`
-	checkPending  = `{"data":{"id":"s1","status":"pending","expires_at":"2026-10-09T12:05:00Z"}}`
-	checkApproved = `{"data":{"id":"s1","status":"approved","expires_at":"2026-10-09T12:06:00Z"}}`
-	checkDenied   = `{"data":{"id":"s1","status":"denied","expires_at":"2026-10-09T12:05:00Z"}}`
-	restartRoute  = "POST /api/deployments/d1/restart"
-	restartBody   = `{"reason":"passkey test"}`
+	verifyURL    = "https://console.example/accounts/acme/cli/verify/s1"
+	needsPasskey = `428 {"error":"step_up_required","message":"Recent identity verification is required.","operation":"deployments.restart"}`
+	checkStarted = `{"data":{"id":"s1","status":"pending","code":47,"verify_url":"` + verifyURL + `","expires_at":"2026-10-09T12:05:00Z"}}`
+	checkPending = `{"data":{"id":"s1","status":"pending","code":47,"expires_at":"2026-10-09T12:05:00Z"}}`
+	// checkWithoutCode is a check from an Edka that sends no code.
+	checkWithoutCode = `{"data":{"id":"s1","status":"pending","verify_url":"` + verifyURL + `","expires_at":"2026-10-09T12:05:00Z"}}`
+	showsCode        = "Code for the Edka app on your phone: 47\n"
+	checkApproved    = `{"data":{"id":"s1","status":"approved","expires_at":"2026-10-09T12:06:00Z"}}`
+	checkDenied      = `{"data":{"id":"s1","status":"denied","expires_at":"2026-10-09T12:05:00Z"}}`
+	restartRoute     = "POST /api/deployments/d1/restart"
+	restartBody      = `{"reason":"passkey test"}`
 )
 
 // sent is a request a passkeyAPI received.
@@ -137,13 +140,13 @@ func TestPasskeyCheckConfirmedSendsTheRequestAgain(t *testing.T) {
 		t.Fatalf("sent %q, then %q", got[0].body, got[4].body)
 	}
 	var check map[string]any
-	if json.Unmarshal([]byte(got[1].body), &check) != nil || check["operation"] != "deployments.restart" || len(check) != 1 {
+	if json.Unmarshal([]byte(got[1].body), &check) != nil || check["operation"] != "deployments.restart" || check["shows_code"] != true || len(check) != 2 {
 		t.Fatalf("started the check with %q", got[1].body)
 	}
 	if browsed := opened(); len(browsed) != 1 || browsed[0] != verifyURL {
 		t.Fatalf("opened %q", browsed)
 	}
-	inOrder(t, errOut, "Confirm with your passkey in the Edka console: "+verifyURL+"\n", "✓ Verified\n")
+	inOrder(t, errOut, "Confirm with your passkey in the Edka console: "+verifyURL+"\n", showsCode, "✓ Verified\n")
 }
 
 // A check the user declines, one that expires, and one nobody confirms in time
@@ -218,10 +221,10 @@ func TestPasskeyCheckWithoutATerminal(t *testing.T) {
 	_, _, err := restart(t, server.URL)
 	var stepUp *StepUpError
 	var apiError *api.Error
-	if !errors.As(err, &stepUp) || stepUp.URL != verifyURL || !errors.As(err, &apiError) || apiError.Status != http.StatusPreconditionRequired {
+	if !errors.As(err, &stepUp) || stepUp.URL != verifyURL || stepUp.Code != 47 || !errors.As(err, &apiError) || apiError.Status != http.StatusPreconditionRequired {
 		t.Fatalf("err %v", err)
 	}
-	if want := "This action needs a passkey check. Approve it at " + verifyURL + ", then run the command again within 5 minutes. To approve first, run `edka verify`."; err.Error() != want {
+	if want := "This action needs a passkey check. Approve it at " + verifyURL + " or in the Edka app on your phone with code 47, then run the command again within 5 minutes. To approve first, run `edka verify`."; err.Error() != want {
 		t.Fatalf("err %q", err)
 	}
 	if got := routesOf(requests()); got != restartRoute+"\nPOST /api/cli/step-up" {
@@ -244,6 +247,32 @@ func TestPasskeyCheckThatDoesNotStart(t *testing.T) {
 		if !errors.As(err, &apiError) || apiError.Status != http.StatusPreconditionRequired || !strings.Contains(err.Error(), "Recent identity verification is required. (HTTP 428)\nConfirm with your passkey: run `edka verify`") {
 			t.Fatalf("err %v", err)
 		}
+	}
+}
+
+// An Edka that sends no code gets the console address alone, at a terminal and
+// without one.
+func TestPasskeyCheckWithoutACode(t *testing.T) {
+	browser(t)
+	server, _ := passkeyAPI(t, map[string][]string{
+		restartRoute:              {needsPasskey},
+		"POST /api/cli/step-up":   {checkWithoutCode},
+		"GET /api/cli/step-up/s1": {checkApproved},
+	})
+	_, errOut, err := execute(t, server.URL, "verify")
+	if err != nil {
+		t.Fatal(err, errOut)
+	}
+	if want := "Confirm with your passkey in the Edka console: " + verifyURL + "\n"; !strings.Contains(errOut, want) || strings.Contains(errOut, "code") {
+		t.Fatalf("stderr %q", errOut)
+	}
+	_, _, err = restart(t, server.URL)
+	var stepUp *StepUpError
+	if !errors.As(err, &stepUp) || stepUp.Code != 0 {
+		t.Fatalf("err %v", err)
+	}
+	if want := "This action needs a passkey check. Approve it at " + verifyURL + ", then run the command again within 5 minutes. To approve first, run `edka verify`."; err.Error() != want {
+		t.Fatalf("err %q", err)
 	}
 }
 
@@ -279,13 +308,13 @@ func TestVerify(t *testing.T) {
 				}
 			}
 			got := requests()
-			if len(got) != 4 || got[0].route != "POST /api/cli/step-up" || got[0].body != "{}" {
+			if len(got) != 4 || got[0].route != "POST /api/cli/step-up" || got[0].body != `{"shows_code":true}` {
 				t.Fatalf("requests %v", got)
 			}
 			if len(opened()) != tc.browsed {
 				t.Fatalf("opened %q", opened())
 			}
-			inOrder(t, errOut, "Confirm with your passkey in the Edka console: "+verifyURL+"\n", "✓ Verified. Sensitive actions from this login work for 5 minutes.\n")
+			inOrder(t, errOut, "Confirm with your passkey in the Edka console: "+verifyURL+"\n", showsCode, "✓ Verified. Sensitive actions from this login work for 5 minutes.\n")
 		})
 	}
 	server, _ := passkeyAPI(t, map[string][]string{
