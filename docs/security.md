@@ -57,6 +57,15 @@ archive come from the same release, so the check finds a damaged or cut-off
 download. Whether the release is Edka's rests on GitHub's TLS certificate and on who
 may publish releases in the repository. The archives are not signed.
 
+The release workflow signs the macOS binary in each archive with a Developer ID
+certificate of the Apple team `U8GNBT24CW`, and Apple notarizes it, so macOS doesn't
+block a copy that a browser downloaded. `codesign -dv edka` prints the team as
+`TeamIdentifier=U8GNBT24CW`, and the workflow fails a release signed by any other team.
+The job that signs it runs only Apple's `codesign` and `notarytool` on the archives of
+the build. It alone reads the certificate and the App Store Connect key, which are
+secrets of an environment that only release tags may use. `edka upgrade` and the
+install scripts don't check the signature.
+
 `install.sh` and `install.ps1` check an archive the same way, against the
 `checksums.txt` of its release, and install nothing on a mismatch. With curl,
 `install.sh` stays on HTTPS, redirects included. `edka.io/install.sh` and

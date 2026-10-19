@@ -53,8 +53,125 @@ jobs:
           path: |
             dist/*.tar.gz
             dist/*.zip
-  publish:
+  # The macOS binaries are signed with a Developer ID certificate of the Apple
+  # team U8GNBT24CW and notarized by Apple, so macOS doesn't block a copy that
+  # a browser downloaded. This job runs only Apple's tools on the archives of
+  # the build job, and it alone reads these secrets of the release
+  # environment, whose deployment rule admits v* tags and nothing else:
+  #
+  #   MACOS_CERTIFICATE           the Developer ID Application certificate and
+  #                               its private key, as a base64 .p12 file
+  #   MACOS_CERTIFICATE_PASSWORD  the password of the .p12 file
+  #   APPLE_API_KEY               the contents of an App Store Connect team
+  #                               key's .p8 file, with the Developer role
+  #   APPLE_API_KEY_ID            that key's ID
+  #   APPLE_API_ISSUER            the issuer ID of the team's keys
+  macos:
     needs: build
+    runs-on: macos-latest
+    environment: release
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        goarch: [amd64, arm64]
+    env:
+      ARCHIVE: edka_${{ github.ref_name }}_darwin_${{ matrix.goarch }}.tar.gz
+      # docs/security.md names the same team.
+      TEAM_ID: U8GNBT24CW
+    steps:
+      - name: Check the signing secrets
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          missing=()
+          for name in MACOS_CERTIFICATE MACOS_CERTIFICATE_PASSWORD APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER; do
+            if [ -z "${!name}" ]; then missing+=("$name"); fi
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Set ${missing[*]} in the release environment, then re-run this job. The comment above the macos job in release.yml says what each secret holds."
+            exit 1
+          fi
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: darwin-${{ matrix.goarch }}
+          path: dist
+      # The runner image has Apple's Developer ID intermediate certificate.
+      - name: Import the certificate
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          keychain=$RUNNER_TEMP/signing.keychain-db
+          password=$(openssl rand -base64 32)
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          printf '%s' "$MACOS_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" -f pkcs12 -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/certificate.p12"
+          # codesign may use the key without asking for the keychain password.
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain"
+          echo "KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+      - name: Sign the binary
+        run: |
+          mkdir package
+          tar -xzf "dist/$ARCHIVE" -C package
+          # --force replaces the ad-hoc signature that Go gives an arm64
+          # binary. The notary service asks for the hardened runtime and a
+          # timestamp from Apple.
+          codesign --force --timestamp --options runtime --identifier io.edka.cli \
+            --keychain "$KEYCHAIN" --sign 'Developer ID Application' package/edka
+          codesign --verify --strict --verbose=2 package/edka
+          signature=$(codesign --display --verbose=2 package/edka 2>&1)
+          echo "$signature"
+          if ! grep -qx "TeamIdentifier=$TEAM_ID" <<< "$signature"; then
+            echo "::error::The certificate in MACOS_CERTIFICATE belongs to another team than $TEAM_ID."
+            exit 1
+          fi
+      - name: Notarize the binary
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          printf '%s\n' "$APPLE_API_KEY" > "$RUNNER_TEMP/AuthKey.p8"
+          notary=(--key "$RUNNER_TEMP/AuthKey.p8" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER")
+          # The service takes a zip. A ticket can't be stapled to a bare
+          # binary, so macOS asks Apple for it the first time it checks edka.
+          ditto -c -k --keepParent package/edka "$RUNNER_TEMP/edka.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/edka.zip" "${notary[@]}" --wait --output-format json > "$RUNNER_TEMP/notary.json" || true
+          status=$(jq -r '.status // empty' "$RUNNER_TEMP/notary.json" 2>/dev/null || true)
+          id=$(jq -r '.id // empty' "$RUNNER_TEMP/notary.json" 2>/dev/null || true)
+          # The log lists each problem the service found, warnings included.
+          if [ -n "$id" ]; then xcrun notarytool log "$id" "${notary[@]}" || true; fi
+          if [ "$status" != Accepted ]; then
+            echo "::error::Notarization of edka for darwin/${{ matrix.goarch }} ended with status ${status:-unknown}. notarytool's output above says why."
+            exit 1
+          fi
+          echo "Apple notarized edka for darwin/${{ matrix.goarch }} in submission $id."
+      - name: Pack the signed binary
+        run: |
+          # Without these options, macOS tar adds ._ files and the extended
+          # attributes of each file, a quarantine mark among them.
+          tar --no-mac-metadata --no-xattrs -czf "dist/$ARCHIVE" -C package edka README.md LICENSE
+      # publish reads this artifact in place of the one from the build job.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: darwin-${{ matrix.goarch }}
+          path: dist/${{ env.ARCHIVE }}
+          overwrite: true
+      - name: Remove the keychain and the key
+        if: always()
+        run: |
+          if [ -n "${KEYCHAIN:-}" ]; then security delete-keychain "$KEYCHAIN" || true; fi
+          rm -f "$RUNNER_TEMP/AuthKey.p8"
+  publish:
+    needs: [build, macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write

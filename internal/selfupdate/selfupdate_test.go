@@ -306,6 +306,9 @@ func TestReleaseWorkflowBuildsTheArchivesAnUpgradeDownloads(t *testing.T) {
 		`archive="edka_${GITHUB_REF_NAME}_${GOOS}_${GOARCH}"`,
 		`zip "../$archive.zip" "$binary" README.md`,
 		`tar -czf "dist/$archive.tar.gz" -C dist/package "$binary" README.md`,
+		// The macos job packs the signed binary again.
+		"ARCHIVE: edka_${{ github.ref_name }}_darwin_${{ matrix.goarch }}.tar.gz",
+		`-czf "dist/$ARCHIVE" -C package edka README.md`,
 		"sha256sum *.tar.gz *.zip > checksums.txt",
 		// GitHub's latest release leaves pre-releases out.
 		"--prerelease",
