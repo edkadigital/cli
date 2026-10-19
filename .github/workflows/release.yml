@@ -113,6 +113,12 @@ jobs:
           printf '%s' "$MACOS_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
           security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" -f pkcs12 -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
           rm "$RUNNER_TEMP/certificate.p12"
+          # An export of another certificate, or of the certificate without
+          # its private key, has no Developer ID Application identity.
+          if ! security find-identity -p codesigning "$keychain" | grep -q '"Developer ID Application: '; then
+            echo "::error::MACOS_CERTIFICATE has no Developer ID Application certificate with its private key. In Keychain Access, export that certificate from My Certificates as a .p12, then set MACOS_CERTIFICATE and MACOS_CERTIFICATE_PASSWORD again."
+            exit 1
+          fi
           # codesign may use the key without asking for the keychain password.
           security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain" >/dev/null
           security list-keychains -d user -s "$keychain"
