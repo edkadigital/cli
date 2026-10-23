@@ -204,7 +204,8 @@ func TestTrustsCreateGrantsOneAppOnTheNamedClusters(t *testing.T) {
 	if body["workflow"] != ".github/workflows/release.yml" || fmt.Sprint(body["refs"]) != "[refs/heads/main]" {
 		t.Fatalf("body %v", body)
 	}
-	if !strings.Contains(errOut, "EDKA_TRUST: "+testTrustID) || !strings.Contains(errOut, "id-token: write") {
+	// The settings keep their lines, so they paste into a workflow as YAML.
+	if !strings.Contains(errOut, "    permissions:\n      contents: read\n      id-token: write\n    env:\n      EDKA_TRUST: "+testTrustID+"\n") {
 		t.Fatalf("stderr %q", errOut)
 	}
 }

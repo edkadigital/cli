@@ -212,3 +212,43 @@ func TestAudienceIsTheOriginAsEdkaWritesIt(t *testing.T) {
 		}
 	}
 }
+
+func TestTrustKeepsAValidTokenWhenARenewalFails(t *testing.T) {
+	server := newEdka(t, 900)
+	calls := 0
+	github := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		if calls > 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		fmt.Fprint(w, `{"value":"github-token-1"}`)
+	}))
+	defer github.Close()
+	now := time.Date(2026, 10, 23, 12, 0, 0, 0, time.UTC)
+	trust, err := NewTrust(testTrust, server.server.URL, "test", api.HTTPClient(5*time.Second), func(name string) string {
+		if name == ActionsRequestURL {
+			return github.URL + "/token"
+		}
+		return "runner-request-token"
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	trust.Now = func() time.Time { return now }
+	ctx := context.Background()
+	if token, err := trust.Token(ctx); err != nil || token != "edka_trust_1" {
+		t.Fatalf("token %q, err %v", token, err)
+	}
+	// 90 seconds left: the renewal fails and the token still serves.
+	now = now.Add(13*time.Minute + 30*time.Second)
+	if token, err := trust.Token(ctx); err != nil || token != "edka_trust_1" {
+		t.Fatalf("token %q, err %v", token, err)
+	}
+	// 15 seconds left: the failure reaches the caller, which a wait retries.
+	now = now.Add(75 * time.Second)
+	_, err = trust.Token(ctx)
+	if err == nil || !api.Transient(err) || !strings.Contains(err.Error(), "id-token: write") {
+		t.Fatalf("err %v, transient %v", err, api.Transient(err))
+	}
+}

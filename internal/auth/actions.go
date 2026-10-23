@@ -28,6 +28,10 @@ const (
 // exchanged again, so no request starts with one about to run out.
 const renewBefore = 2 * time.Minute
 
+// stillValid is how long a token must still last to stand in for one whose
+// renewal failed.
+const stillValid = 30 * time.Second
+
 var trustID = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 // Trust signs in from a GitHub Actions job: it asks the runner for an OIDC
@@ -98,20 +102,30 @@ func (t *Trust) Token(ctx context.Context) (string, error) {
 	if t.token != "" && t.expiresAt.Sub(t.now()) > renewBefore {
 		return t.token, nil
 	}
-	audience, err := Audience(t.BaseURL)
+	token, lifetime, err := t.renew(ctx)
 	if err != nil {
-		return "", err
-	}
-	idToken, err := t.idToken(ctx, audience)
-	if err != nil {
-		return "", err
-	}
-	token, lifetime, err := t.exchange(ctx, idToken)
-	if err != nil {
+		// A renewal starts two minutes early. While the last token has time left,
+		// a failed one is tried again on the next request instead of failing this one.
+		if t.token != "" && t.expiresAt.Sub(t.now()) > stillValid {
+			return t.token, nil
+		}
 		return "", err
 	}
 	t.token, t.expiresAt = token, t.now().Add(lifetime)
 	return t.token, nil
+}
+
+// renew requests a GitHub token and exchanges it.
+func (t *Trust) renew(ctx context.Context) (string, time.Duration, error) {
+	audience, err := Audience(t.BaseURL)
+	if err != nil {
+		return "", 0, err
+	}
+	idToken, err := t.idToken(ctx, audience)
+	if err != nil {
+		return "", 0, err
+	}
+	return t.exchange(ctx, idToken)
 }
 
 // idToken asks the runner for an OIDC token for the audience. The request
@@ -151,7 +165,8 @@ func (t *Trust) idToken(ctx context.Context, audience string) (string, error) {
 		return "", err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("GitHub refused the OIDC token request (HTTP %d); check that the job has `permissions: id-token: write`", resp.StatusCode)
+		// An *api.Error, so a wait retries a 5xx or 429 like any other read.
+		return "", &api.Error{Status: resp.StatusCode, Message: "GitHub refused the OIDC token request", Hint: "Check that the job has `permissions: id-token: write`.", Trust: t.ID}
 	}
 	var answer struct {
 		Value string `json:"value"`

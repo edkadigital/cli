@@ -144,7 +144,7 @@ func (a *App) addTrusts(root *cobra.Command) {
 		}, a.color); err != nil {
 			return err
 		}
-		fmt.Fprintf(a.Out, "\nJob settings:\n%s\n", ui.Clean(trustJob(m)))
+		fmt.Fprintf(a.Out, "\nJob settings:\n%s\n", ui.CleanText(trustJob(m)))
 		return nil
 	}}
 
@@ -211,7 +211,7 @@ func (a *App) addTrusts(root *cobra.Command) {
 		if err != nil {
 			return err
 		}
-		a.message("✓ Created trust %s for %s\n  Give the workflow's job these settings:\n%s", ui.Clean(text(m, "name")), ui.Clean(text(m, "repository")), ui.Clean(trustJob(m)))
+		a.message("✓ Created trust %s for %s\n  Give the workflow's job these settings:\n%s", ui.Clean(text(m, "name")), ui.Clean(text(m, "repository")), ui.CleanText(trustJob(m)))
 		return nil
 	}}
 	create.Flags().StringVar(&repository, "repository", "", "GitHub repository as owner/name")
