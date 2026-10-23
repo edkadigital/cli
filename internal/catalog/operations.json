@@ -1,5 +1,5 @@
 {
-  "source_sha": "2d17c132a7fc1c4935a23628c37db8c43d59020e",
+  "source_sha": "266a3f61a4d8102853d3223864f79f34d341baf8",
   "confirm_words": [
     "cancel",
     "cleanup-orphaned-nodes",
@@ -10639,7 +10639,7 @@
             "items": {
               "type": "string",
               "maxLength": 255,
-              "pattern": "^refs\\/(heads|tags)\\/[A-Za-z0-9._/*-]+$"
+              "pattern": "^refs\\/(heads|tags)\\/[A-Za-z0-9._/*+-]+$"
             }
           },
           "environments": {
@@ -10853,7 +10853,7 @@
             "items": {
               "type": "string",
               "maxLength": 255,
-              "pattern": "^refs\\/(heads|tags)\\/[A-Za-z0-9._/*-]+$"
+              "pattern": "^refs\\/(heads|tags)\\/[A-Za-z0-9._/*+-]+$"
             }
           },
           "environments": {
