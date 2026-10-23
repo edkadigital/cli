@@ -414,6 +414,17 @@ Create, change and delete Kubernetes secrets in a cluster.
 
 Flags and examples: [references/secrets.md](references/secrets.md)
 
+### `edka trusts`
+
+Let GitHub Actions workflows sign in without a secret.
+
+- `edka trusts create <name>`: Let a GitHub Actions workflow publish and update one app
+- `edka trusts delete <trust>`: Stop a workflow from signing in
+- `edka trusts get <trust>`: Show a trust and the job settings that use it
+- `edka trusts list`: List the workflows that may sign in
+
+Flags and examples: [references/trusts.md](references/trusts.md)
+
 ### Tools
 
 Context, profiles, health checks, shell completion, upgrades and the agent skill of the CLI.
@@ -461,5 +472,6 @@ Every command takes these flags. A variable in parentheses sets the same value.
 - `--output string`: Output format: table, json, raw (default "table")
 - `--profile string`: Saved profile (EDKA_PROFILE)
 - `--timeout duration`: HTTP request timeout (default 30s)
+- `--trust string`: Sign in from GitHub Actions with this trust (EDKA_TRUST)
 - `-y, --yes`: Confirm destructive operations
 <!-- END GENERATED -->

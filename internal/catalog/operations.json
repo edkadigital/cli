@@ -1,5 +1,5 @@
 {
-  "source_sha": "0dce9d3916437376129f5331a676397a9d9b986a",
+  "source_sha": "a09db77d6e20b763f04f2a3ea3ebc69611c02177",
   "confirm_words": [
     "cancel",
     "cleanup-orphaned-nodes",
@@ -2637,6 +2637,87 @@
                       ]
                     }
                   },
+                  "extension_images": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "maxLength": 59,
+                          "pattern": "^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$"
+                        },
+                        "image": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 512,
+                          "pattern": "^\\S+$"
+                        },
+                        "extension_control_path": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "dynamic_library_path": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "ld_library_path": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "bin_path": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "env": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                              },
+                              "value": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "value"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "image"
+                      ]
+                    }
+                  },
+                  "custom_image": {
+                    "type": "string",
+                    "maxLength": 512,
+                    "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*(?::[0-9]+)?(?:\\/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)+:[A-Za-z0-9_][A-Za-z0-9._-]{0,127}(?:@sha256:[a-f0-9]{64})?$"
+                  },
                   "restore": {
                     "type": "object",
                     "properties": {
@@ -2688,6 +2769,37 @@
                         "type": "string",
                         "maxLength": 63,
                         "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                      },
+                      "archive": {
+                        "type": "object",
+                        "properties": {
+                          "snapshot_id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "source_id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "server_name": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,252}$"
+                          },
+                          "backup_id": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+                          },
+                          "end_time": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                          }
+                        },
+                        "required": [
+                          "snapshot_id"
+                        ]
                       }
                     },
                     "required": [
@@ -3886,6 +3998,60 @@
       "method": "POST",
       "path": "/api/clusters/:clusterId/databases/:databaseId/mysql/maintenance",
       "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "databaseId",
+          "flag": "database-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters databases postgres collation-rebuild create",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/databases/:databaseId/postgres/collation-rebuild",
+      "summary": "Start a rebuild of the indexes on glibc or ICU collations",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "databaseId",
+          "flag": "database-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters databases postgres collations list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/databases/:databaseId/postgres/collations",
+      "summary": "Check which indexes sort by glibc or ICU collations",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "databaseId",
+          "flag": "database-id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters databases postgres image-move create",
+      "method": "POST",
+      "path": "/api/clusters/:clusterId/databases/:databaseId/postgres/image-move",
+      "summary": "Start the move of a PostgreSQL database to the Debian 13 image",
       "params": [
         {
           "name": "clusterId",
@@ -5368,9 +5534,45 @@
       "confirm": false
     },
     {
+      "command": "clusters explorer nodes disk-metrics list",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/explorer/nodes/:name/disk-metrics",
+      "summary": "Show a node's disk IO, file system use, IO pressure and RAID state over a window",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "name",
+          "flag": "name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
       "command": "clusters explorer nodes drain-preview get",
       "method": "GET",
       "path": "/api/clusters/:clusterId/explorer/nodes/:name/drain-preview",
+      "summary": "",
+      "params": [
+        {
+          "name": "clusterId",
+          "flag": "cluster"
+        },
+        {
+          "name": "name",
+          "flag": "name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters explorer nodes drive-health get",
+      "method": "GET",
+      "path": "/api/clusters/:clusterId/explorer/nodes/:name/drive-health",
       "summary": "",
       "params": [
         {
@@ -6509,6 +6711,78 @@
       ],
       "step_up": false,
       "confirm": true
+    },
+    {
+      "command": "clusters nodes disk get",
+      "method": "GET",
+      "path": "/api/clusters/:id/nodes/:name/disk",
+      "summary": "Show a node's disk",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "name",
+          "flag": "name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters nodes disk inventory get",
+      "method": "GET",
+      "path": "/api/clusters/:id/nodes/:name/disk/inventory",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "name",
+          "flag": "name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters nodes local-disk recovery-token get",
+      "method": "GET",
+      "path": "/api/clusters/:id/nodes/:name/local-disk/recovery-token",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "name",
+          "flag": "name"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "clusters nodes local-disk unlock create",
+      "method": "POST",
+      "path": "/api/clusters/:id/nodes/:name/local-disk/unlock",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "cluster"
+        },
+        {
+          "name": "name",
+          "flag": "name"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
     },
     {
       "command": "clusters nodes reboot",
@@ -9700,6 +9974,158 @@
       "confirm": false
     },
     {
+      "command": "mobile devices create",
+      "method": "POST",
+      "path": "/api/mobile/devices",
+      "summary": "Create or update the push registration of this phone",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "mobile devices delete",
+      "method": "DELETE",
+      "path": "/api/mobile/devices/:id",
+      "summary": "Remove a phone from push",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "mobile devices list",
+      "method": "GET",
+      "path": "/api/mobile/devices",
+      "summary": "List this user's phones registered for push in the organization",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "mobile devices update",
+      "method": "PATCH",
+      "path": "/api/mobile/devices/:id",
+      "summary": "Update a phone's push settings",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "mobile live-activities create",
+      "method": "POST",
+      "path": "/api/mobile/live-activities",
+      "summary": "Create the registration that lets the instance update a Live Activity",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "mobile live-activities delete",
+      "method": "DELETE",
+      "path": "/api/mobile/live-activities/:id",
+      "summary": "Remove a Live Activity registration",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": true
+    },
+    {
+      "command": "mobile passkey challenge create",
+      "method": "POST",
+      "path": "/api/mobile/passkey/challenge",
+      "summary": "Create a passkey challenge for a check on this phone",
+      "params": [],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "mobile step-up cli approve",
+      "method": "POST",
+      "path": "/api/mobile/step-up/cli/:id/approve",
+      "summary": "Approve a CLI login's passkey request with a passkey and its code",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "mobile step-up cli check-code",
+      "method": "POST",
+      "path": "/api/mobile/step-up/cli/:id/check-code",
+      "summary": "Check the code of a CLI login's passkey request before the console approves it",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "mobile step-up cli deny",
+      "method": "POST",
+      "path": "/api/mobile/step-up/cli/:id/deny",
+      "summary": "Deny a CLI login's passkey request",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "mobile step-up cli get",
+      "method": "GET",
+      "path": "/api/mobile/step-up/cli/:id",
+      "summary": "Get a CLI login's passkey request",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "mobile step-up create",
+      "method": "POST",
+      "path": "/api/mobile/step-up",
+      "summary": "Verify a passkey and grant five minutes of protected actions",
+      "params": [],
+      "step_up": true,
+      "confirm": false
+    },
+    {
+      "command": "mobile summary get",
+      "method": "GET",
+      "path": "/api/mobile/summary",
+      "summary": "Get the organization at a glance",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
       "command": "notification list",
       "method": "GET",
       "path": "/api/notification",
@@ -10154,6 +10580,384 @@
       "params": [],
       "step_up": false,
       "confirm": false
+    },
+    {
+      "command": "trusts create",
+      "method": "POST",
+      "path": "/api/trusts",
+      "summary": "",
+      "params": [],
+      "step_up": true,
+      "confirm": false,
+      "body": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "provider": {
+            "default": "github_actions",
+            "type": "string",
+            "enum": [
+              "github_actions"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "repository": {
+            "type": "string"
+          },
+          "repository_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            ]
+          },
+          "repository_owner_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            ]
+          },
+          "refs": {
+            "default": [],
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 255,
+              "pattern": "^refs\\/(heads|tags)\\/[A-Za-z0-9._/*+-]+$"
+            }
+          },
+          "environments": {
+            "default": [],
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+            }
+          },
+          "workflow": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "pattern": "^\\.github\\/workflows\\/[A-Za-z0-9._/-]+\\.ya?ml$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "grants": {
+            "minItems": 1,
+            "maxItems": 2,
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "type": "string",
+                      "const": "publish"
+                    },
+                    "app": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 40,
+                      "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "app"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "type": "string",
+                      "const": "update"
+                    },
+                    "app": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 40,
+                      "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+                    },
+                    "clusters": {
+                      "default": null,
+                      "anyOf": [
+                        {
+                          "minItems": 1,
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "app"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "name",
+          "repository",
+          "grants"
+        ],
+        "additionalProperties": false,
+        "examples": [
+          {
+            "name": "Release workflow",
+            "repository": "acme/api",
+            "refs": [
+              "refs/heads/main"
+            ],
+            "workflow": ".github/workflows/release.yml",
+            "grants": [
+              {
+                "action": "publish",
+                "app": "api"
+              },
+              {
+                "action": "update",
+                "app": "api"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "command": "trusts delete",
+      "method": "DELETE",
+      "path": "/api/trusts/:id",
+      "summary": "Delete a trust",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": true,
+      "confirm": true
+    },
+    {
+      "command": "trusts get",
+      "method": "GET",
+      "path": "/api/trusts/:id",
+      "summary": "Get a trust",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "trusts list",
+      "method": "GET",
+      "path": "/api/trusts",
+      "summary": "List the GitHub Actions workflows the organization trusts to sign in",
+      "params": [],
+      "step_up": false,
+      "confirm": false
+    },
+    {
+      "command": "trusts update",
+      "method": "PATCH",
+      "path": "/api/trusts/:id",
+      "summary": "",
+      "params": [
+        {
+          "name": "id",
+          "flag": "id"
+        }
+      ],
+      "step_up": true,
+      "confirm": false,
+      "body": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "repository": {
+            "type": "string"
+          },
+          "repository_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            ]
+          },
+          "repository_owner_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            ]
+          },
+          "refs": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 255,
+              "pattern": "^refs\\/(heads|tags)\\/[A-Za-z0-9._/*+-]+$"
+            }
+          },
+          "environments": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+            }
+          },
+          "workflow": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "pattern": "^\\.github\\/workflows\\/[A-Za-z0-9._/-]+\\.ya?ml$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "grants": {
+            "minItems": 1,
+            "maxItems": 2,
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "type": "string",
+                      "const": "publish"
+                    },
+                    "app": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 40,
+                      "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "app"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "type": "string",
+                      "const": "update"
+                    },
+                    "app": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 40,
+                      "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+                    },
+                    "clusters": {
+                      "default": null,
+                      "anyOf": [
+                        {
+                          "minItems": 1,
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "app"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [],
+        "examples": [
+          {
+            "refs": [
+              "refs/heads/main",
+              "refs/tags/v*"
+            ]
+          }
+        ]
+      }
     },
     {
       "command": "wrapped-secrets unwrap",

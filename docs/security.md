@@ -47,6 +47,20 @@ out of shell arguments, repository files and logs. Edka issues no long-lived
 machine-to-machine CLI tokens. The CLI collects no telemetry and runs no shell
 scripts.
 
+A GitHub Actions job signs in with a trust instead of a stored secret. With
+`EDKA_TRUST` or `--trust` set to a trust's ID, the CLI asks the runner for an OIDC
+token through `ACTIONS_ID_TOKEN_REQUEST_URL`, with the API origin as its audience,
+and Edka exchanges it for an access token of the trust. The runner's request token
+goes only to that URL, over HTTPS (HTTP only on loopback), and never through a
+redirect. The access token lasts 15 minutes and stays in memory. The CLI exchanges
+a new GitHub token two minutes before it expires, so a long `--wait` keeps working,
+and saves nothing. Edka accepts each GitHub token once and checks its signature,
+issuer, audience, expiry, repository ID, owner ID, ref, environment and workflow
+against the trust. A trust's token reaches only the routes of `edka apps publish`
+and `edka apps update`, for the one app the trust names, and never passes a
+passkey check. `EDKA_TOKEN` and `EDKA_TRUST` together are refused, and so is
+`edka login` while `EDKA_TRUST` is set.
+
 The CLI replaces its binary only when `edka upgrade` runs. The upgrade reads the
 latest release of github.com/edkadigital/cli over HTTPS, without a token. It follows a
 redirect only over HTTPS to github.com or a host of githubusercontent.com, where
