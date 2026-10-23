@@ -229,19 +229,36 @@ wait stops with the error after two minutes of failed reads.
 `skills/edka` is an agent skill that teaches coding agents to use the CLI. Its
 guidance in SKILL.md is written by hand. A test builds the command index at the end
 of SKILL.md and the files in `references/` from the command tree, and fails when
-they differ from the commands' help; `make skill` rewrites them. The `skills`
-package embeds the directory, so `edka skill install` writes the skill of the
-binary's own commands. Beside the skill it writes `.edka-skill.json` with the
-SHA-256 of each file, and the next install replaces those files without asking. It
-asks before it replaces any other file, and writes the new skill beside the old one
-before it swaps the two.
+they differ from the commands' help; `make skill` rewrites them.
+
+`skills/edka-app` teaches an agent to package an app. Its source is the skill in
+edkadigital/apps, beside the package format, and `make app-skill` copies it from
+that repository's main branch. The test of suggested commands checks each `edka`
+command in its code blocks, as it does for `skills/edka`, so a copy can't name
+commands the binary lacks. A release fails when its copy differs from the one in edkadigital/apps.
+
+The `skills` package embeds both directories, so `edka skill install` writes the
+skills of the binary's own commands, all of them or the ones named. It writes them
+for each coding agent in `internal/cli/codingagents.go` whose settings directory
+exists, or for the agents `--agent` names. The table follows the one `npx skills
+add` installs by (vercel-labs/skills): each agent's settings directory, its skills
+directory in the home and in a repository, and the variables that move them, such
+as `CLAUDE_CONFIG_DIR`. Agents that read the same directory share one copy. Each
+directory gets a copy rather than a link, so each has its own manifest and an
+upgrade can tell the user's changes in one apart.
+
+Beside each skill it writes `.edka-skill.json` with the SHA-256 of each file, and
+the next install replaces those files without asking. It asks before it replaces any
+other file, asks every question before it writes a skill, and writes each new skill
+beside the old one before it swaps the two.
 
 After `edka upgrade` replaces the binary, it runs the new one as `edka skill install
---dir ~/.claude/skills --no-input --json`, since the old binary embeds the old
-skill. It does so only when `~/.claude/skills/edka` is a directory with a manifest
-and every file in it still matches its SHA-256. Otherwise it keeps the skill and
-says why on stderr, and the upgrade still succeeds. `--json` reports the outcome in
-`skill`, null when there was no skill the CLI wrote.
+--dir <directory> --no-input --json <skill...>` for each agent's skills directory in
+the home, since the old binary embeds the old skills. It names each skill whose
+directory there has a manifest and files that all still match their SHA-256, so a
+skill the user never installed stays uninstalled. It keeps a link and a skill with
+changed files, and says why on stderr, and the upgrade still succeeds. `--json`
+reports each skill in `skills`, null when there was no skill the CLI wrote.
 
 Tests exercise the entire PKCE client handshake against an HTTP authorization
 fixture, actual loopback callback state/issuer validation, concurrent refresh,

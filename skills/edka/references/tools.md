@@ -1,6 +1,6 @@
 # Tools
 
-Context, profiles, health checks, shell completion, upgrades and the agent skill of the CLI.
+Context, profiles, health checks, shell completion, upgrades and the agent skills of the CLI.
 
 ## `edka completion <bash|zsh|fish|powershell>`
 
@@ -39,35 +39,51 @@ edka profile remove staging
 
 Set the default profile.
 
-## `edka skill install`
+## `edka skill install [skill...]`
 
-Install the agent skill for Claude Code and other agents.
+Install the agent skills for Claude Code and other agents.
 
-Write the agent skill that matches this version of the CLI to
-`~/.claude/skills/edka`, where Claude Code finds it. The skill shows a coding agent
-how to check which cluster and deployment a command acts on, diagnose a failure,
-preview a change and ask before a destructive command. Its references list every
-command with its flags.
+Write the agent skills that match this version of the CLI for each coding agent
+installed here, to the skills directory it reads, each skill in a directory of its
+name:
 
-`--project` writes it to `.claude/skills/edka` at the root of the current
-repository, to commit with the project. `--dir` writes it to another agent's skills
-directory. `edka upgrade` rewrites the skill in `~/.claude/skills/edka`; run the
-install again after it for the other directories.
+- `edka` shows a coding agent how to check which cluster and deployment a command
+  acts on, diagnose a failure, preview a change and ask before a destructive
+  command. Its references list every command with its flags.
+- `edka-app` shows it how to package an application as an Edka app, validate and
+  publish it, and install it on a cluster.
+
+An agent is installed when its settings directory exists, such as `~/.claude` or
+`~/.cursor`. `--agent` names the agents to install for instead, found or not:
+claude-code, codex, cursor, gemini-cli, github-copilot, opencode, windsurf, amp,
+goose, droid, kiro-cli, cline, roo, junie, qwen-code and hermes-agent. With no
+agent found, the install is for Claude Code and Codex. Claude Code reads
+`$CLAUDE_CONFIG_DIR/skills` when the variable is set, and Codex, Cline and other
+agents share `~/.agents/skills`.
+
+Name skills to install only those. `--project` writes them to the agents' skills
+directories at the root of the current repository, such as `.claude/skills` and
+`.agents/skills`, to commit with the project. `--dir` writes them to one directory
+instead. `edka upgrade` rewrites the skills in the agents' directories in your home;
+run the install again after it for the other directories.
 
 An install replaces the files an earlier one wrote. It asks before it replaces a
 skill directory that holds other files.
 
 Flags:
 
-- `--dir string`: Install in this skills directory, such as ~/.agents/skills
-- `--project`: Install in .claude/skills at the root of this repository
+- `--agent strings`: Install for these agents, found or not; repeatable
+- `--dir string`: Install in this skills directory alone
+- `--project`: Install in the agents' skills directories at the root of this repository
 
 Examples:
 
 ```bash
 edka skill install
+edka skill install edka-app
+edka skill install --agent claude-code,cursor
 edka skill install --project
-edka skill install --dir ~/.agents/skills --json
+edka skill install --dir ./skills --json
 ```
 
 ## `edka unlink`
@@ -84,9 +100,9 @@ SHA-256 in the release's checksums.txt, and replace this binary with it.
 A download that does not match replaces nothing. `--check` reports the latest
 release without installing it.
 
-After an upgrade the new release rewrites the agent skill that `edka skill install`
-wrote to `~/.claude/skills/edka`. It keeps a skill with files that changed after
-the install.
+After an upgrade the new release rewrites the agent skills that `edka skill install`
+wrote to the skills directories of coding agents in your home, such as
+`~/.claude/skills`. It keeps a skill with files that changed after the install.
 
 Flags:
 

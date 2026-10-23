@@ -220,25 +220,40 @@ edka api get /api/inventory/resources --query kind=deployment --json
 
 ## Coding agents
 
-[`skills/edka`](skills/edka) is an agent skill for the CLI. It shows a coding agent
-how to check which cluster and deployment a command acts on, diagnose a failure,
-preview a change, keep secrets off the command line and ask before a destructive
-command. Its references list every command with its flags and examples.
+The CLI comes with two agent skills:
 
-`edka skill install` writes the skill that matches your edka version to
-`~/.claude/skills/edka`, where Claude Code finds it. `--project` writes it to
-`.claude/skills/edka` in the current repository, and `--dir` to the skills directory
-of another agent. `edka upgrade` rewrites the skill in `~/.claude/skills/edka` with
-the new release's, unless you changed files in it. Run the install again after an
-upgrade for the other directories, and after `brew upgrade edka`.
+- [`skills/edka`](skills/edka) shows a coding agent how to check which cluster and
+  deployment a command acts on, diagnose a failure, preview a change, keep secrets
+  off the command line and ask before a destructive command. Its references list
+  every command with its flags and examples.
+- [`skills/edka-app`](skills/edka-app) shows it how to package an application as an
+  Edka app, validate and publish it, and install it on a cluster. It is a copy of
+  the skill in [edkadigital/apps](https://github.com/edkadigital/apps), next to the
+  package format it follows.
+
+`edka skill install` writes the skills that match your edka version for each coding
+agent installed on your machine, to the skills directory it reads: Claude Code,
+Codex, Cursor, Gemini CLI, GitHub Copilot, OpenCode, Windsurf, Amp, Goose, Droid,
+Kiro CLI, Cline, Roo Code, Junie, Qwen Code and Hermes Agent. Agents that read the
+same directory, such as `~/.agents/skills`, share one copy. Claude Code's
+directory follows `CLAUDE_CONFIG_DIR`. `--agent` names the agents instead, and with
+no agent found the install is for Claude Code and Codex.
+
+Name a skill to install only that one. `--project` writes them to the agents'
+directories in the current repository, such as `.claude/skills` and
+`.agents/skills`, and `--dir` to one directory you name. `edka upgrade` rewrites the
+skills you installed in the agents' directories in your home with the new release's,
+unless you changed files in one. Run the install again after an upgrade for the
+other directories, and after `brew upgrade edka`.
 
 ```sh
 edka skill install
+edka skill install edka-app
+edka skill install --agent claude-code,cursor
 edka skill install --project
-edka skill install --dir ~/.agents/skills
 ```
 
-`npx skills add edkadigital/cli` installs the skill from this repository instead,
+`npx skills add edkadigital/cli` installs the skills from this repository instead,
 for the agents the skills CLI knows.
 
 ## Documentation
@@ -261,8 +276,8 @@ edka upgrade
 ```
 
 `edka upgrade` installs the latest release after checking its SHA-256, then has the
-new release rewrite the agent skill that `edka skill install` wrote to
-`~/.claude/skills/edka`. A Homebrew install upgrades with `brew upgrade edka`.
+new release rewrite the agent skills that `edka skill install` wrote to the coding
+agents' directories in your home. A Homebrew install upgrades with `brew upgrade edka`.
 
 ## Security
 

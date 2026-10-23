@@ -427,7 +427,7 @@ Flags and examples: [references/trusts.md](references/trusts.md)
 
 ### Tools
 
-Context, profiles, health checks, shell completion, upgrades and the agent skill of the CLI.
+Context, profiles, health checks, shell completion, upgrades and the agent skills of the CLI.
 
 - `edka completion <bash|zsh|fish|powershell>`: Generate shell completions
 - `edka context`: Show effective profile and project context
@@ -435,7 +435,7 @@ Context, profiles, health checks, shell completion, upgrades and the agent skill
 - `edka profile list`: List profiles without secrets
 - `edka profile remove <name>`: Remove a signed-out profile
 - `edka profile use <name>`: Set the default profile
-- `edka skill install`: Install the agent skill for Claude Code and other agents
+- `edka skill install [skill...]`: Install the agent skills for Claude Code and other agents
 - `edka unlink`: Remove this directory's project context
 - `edka upgrade`: Install the latest release of the CLI
 - `edka version`: Show the version, commit and API revision of this binary
