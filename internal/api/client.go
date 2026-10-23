@@ -43,6 +43,11 @@ type Error struct {
 	// (HTTP 428, reason "step_up_required") is for.
 	Operation string
 	RequestID string
+	// Trust is the trust a GitHub Actions job signed in with, which changes the
+	// hint: a trust has no login to renew and reaches only what its grants allow.
+	Trust string
+	// Hint replaces the hint of the status, for a caller that knows better.
+	Hint string
 }
 
 const (
@@ -100,12 +105,21 @@ func (e *Error) Error() string {
 	switch e.Status {
 	case 401:
 		hint = "\nRun `edka login` to sign in again."
+		if e.Trust != "" {
+			hint = "\nEdka refused the GitHub Actions sign-in. Check the trust in the organization settings of the Edka console."
+		}
 	case 403:
 		hint = "\nCheck your organization role and granted CLI permissions. Sensitive actions may require the console."
+		if e.Trust != "" {
+			hint = "\nA trust reaches only what its grants allow. Check them in the organization settings of the Edka console."
+		}
 	case 428:
 		hint = "\nConfirm with your passkey: run `edka verify`, then run the command again within 5 minutes."
 	case 429:
 		hint = "\nToo many requests. Wait before trying again."
+	}
+	if e.Hint != "" {
+		hint = "\n" + e.Hint
 	}
 	if e.RequestID != "" {
 		hint += "\nRequest ID: " + e.RequestID
@@ -146,6 +160,8 @@ type Client struct {
 	Organization string
 	Version      string
 	HTTP         *http.Client
+	// Trust names the trust the token belongs to, for the hints of errors.
+	Trust string
 }
 
 func NormalizeBase(raw string) (string, error) {
@@ -267,7 +283,7 @@ func (c *Client) Do(ctx context.Context, method, path string, query url.Values, 
 				}
 			}
 		}
-		return nil, &Error{Status: resp.StatusCode, Message: message, Reason: reason, Code: code, Details: clip(details, maxErrorDetails), Fields: fields, Data: payload, Operation: operation, RequestID: resp.Header.Get("X-Request-ID")}
+		return nil, &Error{Status: resp.StatusCode, Message: message, Reason: reason, Code: code, Details: clip(details, maxErrorDetails), Fields: fields, Data: payload, Operation: operation, RequestID: resp.Header.Get("X-Request-ID"), Trust: c.Trust}
 	}
 	return &Response{Body: data, Status: resp.StatusCode, Header: resp.Header}, nil
 }

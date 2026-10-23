@@ -43,6 +43,7 @@ type App struct {
 	clusterFlag      string
 	deploymentFlag   string
 	organizationFlag string
+	trustFlag        string
 	storeMode        string
 	colorMode        string
 	output           string
@@ -73,6 +74,8 @@ type App struct {
 	// verifying is set while a passkey check runs, so its own requests never
 	// start another.
 	verifying bool
+	// trust signs in from GitHub Actions, once EDKA_TRUST or --trust names one.
+	trust *auth.Trust
 }
 
 func New(version string, in io.Reader, out, errOut io.Writer) *cobra.Command {
@@ -90,6 +93,7 @@ func New(version string, in io.Reader, out, errOut io.Writer) *cobra.Command {
 	f.StringVar(&a.clusterFlag, "cluster", "", "Cluster ID or name (EDKA_CLUSTER)")
 	f.StringVar(&a.deploymentFlag, "deployment", "", "Deployment ID or name (EDKA_DEPLOYMENT)")
 	f.StringVar(&a.organizationFlag, "organization", "", "Authorized organization ID (EDKA_ORGANIZATION)")
+	f.StringVar(&a.trustFlag, "trust", "", "Sign in from GitHub Actions with this trust (EDKA_TRUST)")
 	f.StringVar(&a.storeMode, "credential-store", "auto", "Credential storage: auto, keyring, file (EDKA_CREDENTIAL_STORE)")
 	f.StringVar(&a.output, "output", "table", "Output format: table, json, raw")
 	f.BoolVar(&a.json, "json", false, "Print machine-readable JSON")
@@ -118,6 +122,7 @@ func New(version string, in io.Reader, out, errOut io.Writer) *cobra.Command {
 	a.addNodePools(root)
 	a.addDomains(root)
 	a.addRegistries(root)
+	a.addTrusts(root)
 	a.addSecrets(root)
 	a.addDatabases(root)
 	a.addCronjobs(root)
@@ -147,7 +152,7 @@ func New(version string, in io.Reader, out, errOut io.Writer) *cobra.Command {
 }
 
 // rareGlobalFlags are the global flags that only `edka --help` lists.
-var rareGlobalFlags = []string{"api-url", "color", "credential-store", "debug", "organization", "timeout"}
+var rareGlobalFlags = []string{"api-url", "color", "credential-store", "debug", "organization", "timeout", "trust"}
 
 // shortenGlobalFlags leaves rareGlobalFlags out of the help of every command
 // below the root. The flags still work there.
@@ -560,7 +565,28 @@ func envSet(name string) bool {
 	return v != "" && v != "0" && !strings.EqualFold(v, "false")
 }
 func (a *App) store() credential.Store { return credential.Store{Dir: a.dir, Mode: a.storeMode} }
+
+// trustID is the trust a GitHub Actions job signs in with, or empty.
+func (a *App) trustID() string { return first(a.trustFlag, os.Getenv("EDKA_TRUST")) }
+
 func (a *App) client(ctx context.Context) (*api.Client, error) {
+	if id := a.trustID(); id != "" {
+		if os.Getenv("EDKA_TOKEN") != "" {
+			return nil, fmt.Errorf("set EDKA_TOKEN or EDKA_TRUST, not both")
+		}
+		if a.trust == nil {
+			trust, err := auth.NewTrust(id, a.current.APIURL, a.Version, a.HTTP, nil)
+			if err != nil {
+				return nil, err
+			}
+			a.trust = trust
+		}
+		token, err := a.trust.Token(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return &api.Client{BaseURL: a.current.APIURL, Token: token, Organization: a.organization, Version: a.Version, HTTP: a.HTTP, Trust: id}, nil
+	}
 	token := os.Getenv("EDKA_TOKEN")
 	if token == "" {
 		var err error
@@ -731,8 +757,11 @@ func (a *App) addAuth(root *cobra.Command) {
 	var readOnly, noBrowser bool
 	var port int
 	login := &cobra.Command{Use: "login", Short: "Sign in securely through your browser", GroupID: "start", Args: cobra.NoArgs, Example: "  edka login\n  edka login --read-only\n  edka login --profile local --api-url http://localhost:8080", RunE: func(cmd *cobra.Command, _ []string) error {
+		if a.trustID() != "" {
+			return fmt.Errorf("unset EDKA_TRUST before browser login; a GitHub Actions job signs in with it and needs no login")
+		}
 		if a.noInput && !ui.InputTerminal(a.In) {
-			return fmt.Errorf("browser login needs a terminal; use EDKA_TOKEN for CI")
+			return fmt.Errorf("browser login needs a terminal; in GitHub Actions, sign in with a trust (EDKA_TRUST)")
 		}
 		if os.Getenv("EDKA_TOKEN") != "" {
 			return fmt.Errorf("unset EDKA_TOKEN before browser login")
