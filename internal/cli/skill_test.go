@@ -87,7 +87,7 @@ func skillTopics(root *cobra.Command) []skillTopic {
 	shared := map[string]*skillTopic{
 		"start": {file: "setup.md", title: "Sign-in and project link", summary: "Sign in, link a directory to a cluster and deployment, and confirm your identity."},
 		"work":  {file: "workflows.md", title: "Everyday workflows", summary: "Deploy, build, read logs, diagnose, change variables, scale, restart and roll back a deployment."},
-		"tools": {file: "tools.md", title: "Tools", summary: "Context, profiles, health checks, shell completion, upgrades and the agent skill of the CLI."},
+		"tools": {file: "tools.md", title: "Tools", summary: "Context, profiles, health checks, shell completion, upgrades and the agent skills of the CLI."},
 	}
 	var topics []skillTopic
 	var api *cobra.Command

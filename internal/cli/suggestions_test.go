@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -43,11 +44,13 @@ func TestSuggestedCommandsExist(t *testing.T) {
 		}
 	}
 	// Commands in the documentation's code blocks, which people copy, and in
-	// the agent skill's, which agents run.
+	// the agent skills', which agents run. skills/edka-app is a copy from
+	// edkadigital/apps, so a copy that names commands this CLI lacks fails here.
 	docs, _ := filepath.Glob("../../docs/*.md")
 	skill, _ := filepath.Glob("../../skills/edka/*.md")
 	references, _ := filepath.Glob("../../skills/edka/references/*.md")
-	docs = append(append(docs, skill...), references...)
+	appSkill, _ := filepath.Glob("../../skills/edka-app/*.md")
+	docs = append(append(append(docs, skill...), references...), appSkill...)
 	for _, file := range append(docs, "../../README.md") {
 		data, err := os.ReadFile(file)
 		if err != nil {
@@ -102,6 +105,16 @@ func checkSuggestion(words []string, placeholder *regexp.Regexp) error {
 		return nil
 	}
 	target.InitDefaultHelpFlag()
+	// A placeholder after a flag stands for its value, such as a number.
+	rest = slices.Clone(rest)
+	for i := 1; i < len(rest); i++ {
+		if !placeholder.MatchString(strings.Trim(rest[i], `"`)) || !strings.HasPrefix(rest[i-1], "--") {
+			continue
+		}
+		if flag := target.Flags().Lookup(strings.TrimPrefix(rest[i-1], "--")); flag != nil && flag.NoOptDefVal == "" {
+			rest[i] = flag.DefValue
+		}
+	}
 	if err := target.ParseFlags(rest); err != nil {
 		return err
 	}

@@ -14,6 +14,15 @@ jobs:
           go-version: stable
       - run: go test -race ./...
       - run: go vet ./...
+      # The binary embeds skills/edka-app, a copy of the skill in
+      # edkadigital/apps. A tag with an older copy publishes nothing.
+      - name: Check the edka-app skill
+        run: |
+          make app-skill
+          if [ -n "$(git status --porcelain -- skills/edka-app)" ]; then
+            echo "skills/edka-app differs from edkadigital/apps; run make app-skill and commit it" >&2
+            exit 1
+          fi
       # A tag with a known vulnerability publishes nothing.
       - run: make vuln
   # The latest Go release has the security fixes of the standard library.

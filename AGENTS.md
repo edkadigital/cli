@@ -6,7 +6,9 @@ credentials separate from profiles and project links. Never weaken TLS, redirect
 OAuth state/issuer/PKCE, audience, scope, membership or confirmation checks.
 
 Run `make test` and `make check` for behavior changes, and `make skill` after a
-change to a command's help, which the agent skill in `skills/edka` repeats. Keep
+change to a command's help, which the agent skill in `skills/edka` repeats.
+`skills/edka-app` is a copy of the skill in edkadigital/apps: change it there, then
+run `make app-skill` here. A release fails when the copy is older. Keep
 machine output on stdout and progress and errors on stderr. Report what the API
 confirmed, never an optimistic success message.
 
