@@ -1,5 +1,5 @@
 {
-  "source_sha": "266a3f61a4d8102853d3223864f79f34d341baf8",
+  "source_sha": "a09db77d6e20b763f04f2a3ea3ebc69611c02177",
   "confirm_words": [
     "cancel",
     "cleanup-orphaned-nodes",
@@ -10709,6 +10709,7 @@
                       "default": null,
                       "anyOf": [
                         {
+                          "minItems": 1,
                           "maxItems": 50,
                           "type": "array",
                           "items": {
@@ -10921,6 +10922,7 @@
                       "default": null,
                       "anyOf": [
                         {
+                          "minItems": 1,
                           "maxItems": 50,
                           "type": "array",
                           "items": {
