@@ -3,6 +3,7 @@ package cli
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -21,6 +22,7 @@ import (
 	"github.com/edkadigital/cli/internal/catalog"
 	"github.com/edkadigital/cli/internal/config"
 	"github.com/edkadigital/cli/internal/credential"
+	"github.com/edkadigital/cli/internal/devicekey"
 	"github.com/edkadigital/cli/internal/ui"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -59,6 +61,8 @@ type App struct {
 	clusters         []map[string]any
 	apiCmd           *cobra.Command
 	catalog          *catalog.Catalog
+	// deviceKey is the key the profile's tokens are bound to, opened once.
+	deviceKey *devicekey.Key
 	// polling turns off the request animation while a wait prints progress or
 	// --debug prints requests.
 	polling bool
@@ -587,15 +591,42 @@ func (a *App) client(ctx context.Context) (*api.Client, error) {
 		}
 		return &api.Client{BaseURL: a.current.APIURL, Token: token, Organization: a.organization, Version: a.Version, HTTP: a.HTTP, Trust: id}, nil
 	}
-	token := os.Getenv("EDKA_TOKEN")
-	if token == "" {
-		var err error
-		token, err = auth.Token(ctx, a.store(), a.profile, a.current.APIURL, a.HTTP)
+	client := &api.Client{BaseURL: a.current.APIURL, Token: os.Getenv("EDKA_TOKEN"), Organization: a.organization, Version: a.Version, HTTP: a.HTTP}
+	if client.Token != "" {
+		return client, nil
+	}
+	credentials, err := auth.Token(ctx, a.store(), a.profile, a.current.APIURL, a.HTTP)
+	if err != nil {
+		return nil, err
+	}
+	client.Token = credentials.AccessToken
+	if credentials.DeviceKey != nil {
+		key, err := a.openDeviceKey(*credentials.DeviceKey)
 		if err != nil {
 			return nil, err
 		}
+		client.Prover = key
 	}
-	return &api.Client{BaseURL: a.current.APIURL, Token: token, Organization: a.organization, Version: a.Version, HTTP: a.HTTP}, nil
+	return client, nil
+}
+
+// openDeviceKey opens the key the tokens are bound to, once per command: a
+// refresh that binds a session gives it a key it didn't have.
+func (a *App) openDeviceKey(saved devicekey.Saved) (*devicekey.Key, error) {
+	if a.deviceKey != nil {
+		current := a.deviceKey.Saved()
+		if current.Protection == saved.Protection && bytes.Equal(current.Handle, saved.Handle) {
+			return a.deviceKey, nil
+		}
+		a.deviceKey.Close()
+		a.deviceKey = nil
+	}
+	key, err := devicekey.Open(saved)
+	if err != nil {
+		return nil, err
+	}
+	a.deviceKey = key
+	return key, nil
 }
 
 // request sends an API request. A request that needs a passkey check runs the
@@ -771,11 +802,24 @@ func (a *App) addAuth(root *cobra.Command) {
 		}
 		ctx, cancel := context.WithTimeout(cmd.Context(), 5*time.Minute)
 		defer cancel()
-		session, server, err := auth.Login(ctx, auth.LoginOptions{BaseURL: a.current.APIURL, Profile: a.profile, Dir: a.dir, ReadOnly: readOnly, NoBrowser: noBrowser, Port: port, Output: a.Err, HTTP: a.HTTP})
+		previous, _ := a.store().Load(a.profile)
+		session, server, key, err := auth.Login(ctx, auth.LoginOptions{BaseURL: a.current.APIURL, Profile: a.profile, Dir: a.dir, ReadOnly: readOnly, NoBrowser: noBrowser, Port: port, Output: a.Err, HTTP: a.HTTP})
 		if err != nil {
 			return err
 		}
 		client := api.Client{BaseURL: a.current.APIURL, Token: session.AccessToken, Version: a.Version, HTTP: a.HTTP}
+		saved := false
+		if key != nil {
+			// A login that fails before its credentials are saved leaves no
+			// key behind; the Windows TPM provider keeps keys until deleted.
+			defer func() {
+				key.Close()
+				if !saved {
+					_ = devicekey.Delete(key.Saved())
+				}
+			}()
+			client.Prover = key
+		}
 		identity, err := client.Do(ctx, "GET", "/api/cli/whoami", nil, nil)
 		if err != nil {
 			return fmt.Errorf("verify authorized identity: %w", err)
@@ -802,6 +846,11 @@ func (a *App) addAuth(root *cobra.Command) {
 		if err != nil {
 			return err
 		}
+		saved = true
+		// The key of the login this one replaces is no longer used.
+		if previous != nil && previous.DeviceKey != nil {
+			_ = devicekey.Delete(*previous.DeviceKey)
+		}
 		a.cfg.Profiles[a.profile] = a.current
 		a.cfg.Active = a.profile
 		if err := config.Save(a.dir, a.cfg); err != nil {
@@ -810,7 +859,14 @@ func (a *App) addAuth(root *cobra.Command) {
 		if location == "file" && a.storeMode == "auto" {
 			a.message("System keyring unavailable. Credentials saved in a private file in %s.", a.dir)
 		}
-		a.message("✓ Signed in to %s as %s\n  Next: edka link", ui.Clean(a.current.OrganizationName), ui.Clean(fmt.Sprint(user["email"])))
+		a.message("✓ Signed in to %s as %s", ui.Clean(a.current.OrganizationName), ui.Clean(fmt.Sprint(user["email"])))
+		if key != nil {
+			a.message("  Your tokens work only with %s.", key.Protection().Describe())
+			if key.HardwareError != nil {
+				a.message("  The key could not go in this computer's security chip: %s", ui.Clean(key.HardwareError.Error()))
+			}
+		}
+		a.message("  Next: edka link")
 		if a.output == "json" {
 			return a.render(identity)
 		}
@@ -832,6 +888,11 @@ func (a *App) addAuth(root *cobra.Command) {
 		}
 		if err := a.store().Delete(a.profile); err != nil {
 			return err
+		}
+		if session != nil && session.DeviceKey != nil {
+			if err := devicekey.Delete(*session.DeviceKey); err != nil {
+				a.message("Could not delete the device key: %s", ui.Clean(err.Error()))
+			}
 		}
 		a.message("✓ Signed out of %s", a.profile)
 		if a.output == "json" {

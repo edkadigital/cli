@@ -154,6 +154,16 @@ type Response struct {
 	Status int
 	Header http.Header
 }
+
+// Prover signs the DPoP proof of a request (RFC 9449) with the key the access
+// token is bound to.
+type Prover interface {
+	Proof(method, url, accessToken string) (string, error)
+	// SyncClock takes the server's time from a response that refused a proof
+	// and reports whether a new proof is worth sending.
+	SyncClock(http.Header) bool
+}
+
 type Client struct {
 	BaseURL      string
 	Token        string
@@ -162,6 +172,14 @@ type Client struct {
 	HTTP         *http.Client
 	// Trust names the trust the token belongs to, for the hints of errors.
 	Trust string
+	// Prover is set when Token is bound to a device key: the request then
+	// carries the DPoP scheme and a proof signed by that key.
+	Prover Prover
+}
+
+// RefusedProof reports whether a response refused a request's DPoP proof.
+func RefusedProof(status int, header http.Header) bool {
+	return status == http.StatusUnauthorized && strings.Contains(header.Get("WWW-Authenticate"), "invalid_dpop_proof")
 }
 
 func NormalizeBase(raw string) (string, error) {
@@ -225,28 +243,50 @@ func (c *Client) Do(ctx context.Context, method, path string, query url.Values, 
 		values[k] = v
 	}
 	u.RawQuery = values.Encode()
-	req, err := http.NewRequestWithContext(ctx, method, u.String(), bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "edka-cli/"+c.Version)
-	if len(body) > 0 {
-		req.Header.Set("Content-Type", "application/json")
-	}
-	if c.Token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.Token)
-	}
-	if c.Organization != "" {
-		req.Header.Set("X-Organization-ID", c.Organization)
-	}
 	client := c.HTTP
 	if client == nil {
 		client = HTTPClient(30 * time.Second)
 	}
-	resp, err := client.Do(req)
+	send := func() (*http.Response, error) {
+		req, err := http.NewRequestWithContext(ctx, method, u.String(), bytes.NewReader(body))
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("User-Agent", "edka-cli/"+c.Version)
+		if len(body) > 0 {
+			req.Header.Set("Content-Type", "application/json")
+		}
+		if c.Token != "" && c.Prover != nil {
+			proof, err := c.Prover.Proof(method, u.String(), c.Token)
+			if err != nil {
+				return nil, err
+			}
+			req.Header.Set("Authorization", "DPoP "+c.Token)
+			req.Header.Set("DPoP", proof)
+		} else if c.Token != "" {
+			req.Header.Set("Authorization", "Bearer "+c.Token)
+		}
+		if c.Organization != "" {
+			req.Header.Set("X-Organization-ID", c.Organization)
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("connect to Edka: %w", err)
+		}
+		return resp, nil
+	}
+	resp, err := send()
 	if err != nil {
-		return nil, fmt.Errorf("connect to Edka: %w", err)
+		return nil, err
+	}
+	// A proof dated ahead of the server's clock is refused; one more, dated by
+	// the server's clock, tells a clock that runs ahead from a refused key.
+	if c.Prover != nil && RefusedProof(resp.StatusCode, resp.Header) && c.Prover.SyncClock(resp.Header) {
+		_ = resp.Body.Close()
+		if resp, err = send(); err != nil {
+			return nil, err
+		}
 	}
 	defer func() { _ = resp.Body.Close() }()
 	data, err := ReadBody(resp.Body)

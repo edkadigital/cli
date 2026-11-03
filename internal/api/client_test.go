@@ -191,3 +191,59 @@ func TestErrorKeepsStepUpOperation(t *testing.T) {
 		t.Fatal(text)
 	}
 }
+
+// fakeProver records the proofs it signs; the server tells them apart by number.
+type fakeProver struct {
+	proofs []string
+	synced bool
+}
+
+func (p *fakeProver) Proof(method, url, accessToken string) (string, error) {
+	p.proofs = append(p.proofs, method+" "+url+" "+accessToken)
+	return "proof-" + string(rune('0'+len(p.proofs))), nil
+}
+func (p *fakeProver) SyncClock(header http.Header) bool {
+	if p.synced || header.Get("Date") == "" {
+		return false
+	}
+	p.synced = true
+	return true
+}
+
+func TestBoundTokenCarriesAProofOfItsKey(t *testing.T) {
+	var refuse atomic.Int32
+	refuse.Store(1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "DPoP bound" {
+			t.Errorf("Authorization = %q", r.Header.Get("Authorization"))
+		}
+		if refuse.Add(-1) >= 0 {
+			if r.Header.Get("DPoP") == "proof-2" {
+				t.Error("the resent proof was refused")
+			}
+			w.Header().Set("WWW-Authenticate", `DPoP error="invalid_dpop_proof", algs="ES256"`)
+			w.WriteHeader(401)
+			_, _ = w.Write([]byte(`{"message":"refused"}`))
+			return
+		}
+		if r.Header.Get("DPoP") != "proof-2" {
+			t.Errorf("second DPoP = %q", r.Header.Get("DPoP"))
+		}
+		_, _ = w.Write([]byte(`{"data":{}}`))
+	}))
+	defer server.Close()
+	prover := &fakeProver{}
+	client := Client{BaseURL: server.URL, Token: "bound", Prover: prover, HTTP: HTTPClient(time.Second)}
+	if _, err := client.Do(context.Background(), "POST", "/api/clusters", url.Values{"page": {"2"}}, []byte(`{}`)); err != nil {
+		t.Fatal(err)
+	}
+	if len(prover.proofs) != 2 || prover.proofs[0] != "POST "+server.URL+"/api/clusters?page=2 bound" {
+		t.Fatalf("proofs = %v", prover.proofs)
+	}
+
+	// Once the clock is in step, a refusal is the answer.
+	refuse.Store(1)
+	if _, err := client.Do(context.Background(), "GET", "/api/clusters", nil, nil); err == nil || !strings.Contains(err.Error(), "HTTP 401") || len(prover.proofs) != 3 {
+		t.Fatalf("err = %v, proofs = %v", err, prover.proofs)
+	}
+}

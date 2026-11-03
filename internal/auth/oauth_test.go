@@ -120,8 +120,8 @@ func TestCompletePKCELogin(t *testing.T) {
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				t.Error(err)
 			}
-			if body["token_endpoint_auth_method"] != "none" || body["application_type"] != "native" {
-				t.Error("client must be public native")
+			if body["token_endpoint_auth_method"] != "none" || body["application_type"] != "native" || body["dpop_bound_access_tokens"] != false {
+				t.Error("client must be public native, without bound tokens")
 			}
 			w.WriteHeader(201)
 			w.Write([]byte(`{"client_id":"cli-test"}`))
@@ -151,7 +151,10 @@ func TestCompletePKCELogin(t *testing.T) {
 	}
 	done := make(chan result, 1)
 	go func() {
-		session, _, err := Login(ctx, LoginOptions{BaseURL: base, Dir: t.TempDir(), Profile: "default", ReadOnly: true, NoBrowser: true, Output: output})
+		session, _, key, err := Login(ctx, LoginOptions{BaseURL: base, Dir: t.TempDir(), Profile: "default", ReadOnly: true, NoBrowser: true, Output: output})
+		if key != nil {
+			t.Error("an API that binds no tokens got a device key")
+		}
 		done <- result{session, err}
 	}()
 	var address string
@@ -226,6 +229,10 @@ func TestConcurrentRefreshRotatesOnce(t *testing.T) {
 	var mu sync.Mutex
 	calls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/cli/config" {
+			fmt.Fprint(w, `{}`)
+			return
+		}
 		mu.Lock()
 		calls++
 		mu.Unlock()
@@ -248,9 +255,9 @@ func TestConcurrentRefreshRotatesOnce(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			token, err := Token(context.Background(), store, "default", server.URL, api.HTTPClient(time.Second))
-			if err != nil || token != "new" {
-				t.Errorf("%q %v", token, err)
+			credentials, err := Token(context.Background(), store, "default", server.URL, api.HTTPClient(time.Second))
+			if err != nil || credentials.AccessToken != "new" || credentials.DeviceKey != nil {
+				t.Errorf("%+v %v", credentials, err)
 			}
 		}()
 	}
@@ -407,7 +414,7 @@ func TestExchangeRejectsWhatIsNotABearerToken(t *testing.T) {
 			w.WriteHeader(test.status)
 			fmt.Fprint(w, test.body)
 		}))
-		token, err := exchange(context.Background(), api.HTTPClient(time.Second), server.URL+"/token", url.Values{"grant_type": {"refresh_token"}})
+		token, err := exchange(context.Background(), api.HTTPClient(time.Second), server.URL+"/token", url.Values{"grant_type": {"refresh_token"}}, nil)
 		server.Close()
 		if err == nil || token != nil || !strings.Contains(err.Error(), test.want) {
 			t.Errorf("%s: %v %v, want %q", test.name, token, err, test.want)
@@ -421,7 +428,7 @@ func TestExchangeRejectsWhatIsNotABearerToken(t *testing.T) {
 		fmt.Fprint(w, `{"access_token":"access","token_type":"bearer","expires_in":900}`)
 	}))
 	defer server.Close()
-	if token, err := exchange(context.Background(), api.HTTPClient(time.Second), server.URL+"/token", url.Values{}); err != nil || token.AccessToken != "access" {
+	if token, err := exchange(context.Background(), api.HTTPClient(time.Second), server.URL+"/token", url.Values{}, nil); err != nil || token.AccessToken != "access" {
 		t.Fatal(token, err)
 	}
 }
@@ -431,6 +438,10 @@ func TestTokenUsesAStoredTokenUntilItNearsExpiry(t *testing.T) {
 	var mu sync.Mutex
 	status, body := 200, `{"access_token":"new","token_type":"Bearer","expires_in":900,"scope":"cli:read cli:write"}`
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/cli/config" {
+			fmt.Fprint(w, `{}`)
+			return
+		}
 		mu.Lock()
 		defer mu.Unlock()
 		requests++
@@ -450,14 +461,14 @@ func TestTokenUsesAStoredTokenUntilItNearsExpiry(t *testing.T) {
 
 	// A token with more than a minute left is used as it is.
 	save(credential.Session{AccessToken: "current", RefreshToken: "refresh", ExpiresAt: time.Now().Add(5 * time.Minute)})
-	if token, err := Token(context.Background(), store, "default", server.URL, client); err != nil || token != "current" || requests != 0 {
-		t.Fatal(token, err, requests)
+	if credentials, err := Token(context.Background(), store, "default", server.URL, client); err != nil || credentials.AccessToken != "current" || requests != 0 {
+		t.Fatal(credentials, err, requests)
 	}
 	// One with less is refreshed. A response without a refresh token keeps the
 	// stored one, and its scope replaces the stored scope.
 	save(credential.Session{AccessToken: "stale", RefreshToken: "refresh", Scope: "cli:read", ExpiresAt: time.Now().Add(30 * time.Second)})
-	if token, err := Token(context.Background(), store, "default", server.URL, client); err != nil || token != "new" || requests != 1 {
-		t.Fatal(token, err, requests)
+	if credentials, err := Token(context.Background(), store, "default", server.URL, client); err != nil || credentials.AccessToken != "new" || requests != 1 {
+		t.Fatal(credentials, err, requests)
 	}
 	session, err := store.Load("default")
 	if err != nil || session.AccessToken != "new" || session.RefreshToken != "refresh" || session.Scope != "cli:read cli:write" || time.Until(session.ExpiresAt) < 14*time.Minute {
