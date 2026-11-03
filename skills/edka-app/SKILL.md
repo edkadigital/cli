@@ -15,8 +15,18 @@ Read `spec/package-format.md` and `spec/platform-fields.md` in
 
 ## Before starting
 
-The Edka CLI is signed in: `edka whoami` prints an organization. If it does
-not, ask the user to run `edka login`. Never ask for a password or a token.
+The Edka CLI is installed and signed in: `edka whoami` prints an organization.
+If the shell finds no `edka`, install it:
+
+```bash
+curl -fsSL https://edka.io/install.sh | sh
+```
+
+With Homebrew, `brew install edkadigital/tap/edka`. On Windows,
+`irm https://edka.io/install.ps1 | iex` in PowerShell.
+
+If `edka whoami` prints no organization, ask the user to run `edka login`.
+Never ask for a password or a token.
 
 ## 1. Read the app
 
@@ -94,6 +104,13 @@ In `template.yaml`:
   storage, `persistence`.
 - Change the default of a standard field, such as `memory_limit`, under
   `standard.defaults`.
+- When the app runs more than one image, the image the gateway reaches goes in
+  `--image`. Name every other image after its repository, everywhere the
+  installer reads it: the image `ghcr.io/acme/report-server` gets the values
+  key `reportServer`, the tag field `report_server_tag` labelled
+  "report-server tag", and the workload and container `report-server`. Never
+  name an image with a generic word such as `image`, `app` or `worker`, or after
+  its framework or language, such as `django` or `node`.
 - Put each secret in the Secret named `{{{ release_name }}}-config`, one key
   per secret field. Use `generate: true` for a secret the app only needs to be
   random. A secret field never has a `default`.
