@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        goos: [darwin, linux, windows]
+        goos: [linux, windows]
         goarch: [amd64, arm64]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -62,10 +62,45 @@ jobs:
           path: |
             dist/*.tar.gz
             dist/*.zip
+  # The macOS binaries keep the device key of a login in the Secure Enclave,
+  # through Apple's Security framework. That takes cgo, so they build on a Mac.
+  build-macos:
+    needs: test
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        goarch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+      - name: Build portable archive
+        env:
+          GOOS: darwin
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '1'
+          # The oldest macOS the Go release runs on; clang would otherwise
+          # target the runner's.
+          MACOSX_DEPLOYMENT_TARGET: '13.0'
+        run: |
+          mkdir -p dist/package
+          go build -trimpath -ldflags "-s -w -X main.version=$GITHUB_REF_NAME" -o dist/package/edka ./cmd/edka
+          # Without cgo the binary would keep every device key in software.
+          if ! go version -m dist/package/edka | grep -q 'CGO_ENABLED=1'; then
+            echo "::error::edka for darwin/$GOARCH was built without cgo and can't reach the Secure Enclave."
+            exit 1
+          fi
+          cp README.md LICENSE dist/package/
+          tar -czf "dist/edka_${GITHUB_REF_NAME}_darwin_${GOARCH}.tar.gz" -C dist/package edka README.md LICENSE
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: darwin-${{ matrix.goarch }}
+          path: dist/*.tar.gz
   # The macOS binaries are signed with a Developer ID certificate of the Apple
   # team U8GNBT24CW and notarized by Apple, so macOS doesn't block a copy that
   # a browser downloaded. This job runs only Apple's tools on the archives of
-  # the build job, and it alone reads these secrets of the release
+  # the build-macos job, and it alone reads these secrets of the release
   # environment, whose deployment rule admits v* tags and nothing else:
   #
   #   MACOS_CERTIFICATE           the Developer ID Application certificate and
@@ -76,7 +111,7 @@ jobs:
   #   APPLE_API_KEY_ID            that key's ID
   #   APPLE_API_ISSUER            the issuer ID of the team's keys
   macos:
-    needs: build
+    needs: build-macos
     runs-on: macos-latest
     environment: release
     timeout-minutes: 60

@@ -24,6 +24,15 @@ jobs:
         with:
           go-version: stable
           cache: true
+      # internal/devicekey tests its TPM keys against a software TPM.
+      - name: Start a software TPM
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq swtpm
+          swtpm socket --tpm2 --server type=tcp,port=2321 --ctrl type=tcp,port=2322 \
+            --tpmstate dir="$(mktemp -d)" --flags not-need-init,startup-clear --daemon
+          echo EDKA_TEST_SWTPM=localhost:2321 >> "$GITHUB_ENV"
       - name: Test with race detection
         run: go test -race ./...
       - name: Vet

@@ -24,6 +24,7 @@ import (
 	"github.com/edkadigital/cli/internal/api"
 	"github.com/edkadigital/cli/internal/config"
 	"github.com/edkadigital/cli/internal/credential"
+	"github.com/edkadigital/cli/internal/devicekey"
 	"github.com/gofrs/flock"
 )
 
@@ -39,7 +40,21 @@ type ServerConfig struct {
 	Resource     string `json:"resource"`
 	DiscoveryURL string `json:"discovery_url"`
 	ConsoleURL   string `json:"console_url"`
+	// DPoPAlgorithms are the proof algorithms the API accepts. ES256 there
+	// means it binds tokens to the key that proves them (RFC 9449).
+	DPoPAlgorithms []string `json:"dpop_signing_alg_values_supported"`
 }
+
+// BindsTokens reports whether the API binds tokens to a device key.
+func (s ServerConfig) BindsTokens() bool {
+	for _, algorithm := range s.DPoPAlgorithms {
+		if algorithm == "ES256" {
+			return true
+		}
+	}
+	return false
+}
+
 type tokenResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
@@ -69,27 +84,54 @@ func Challenge(verifier string) string {
 	sum := sha256.Sum256([]byte(verifier))
 	return base64.RawURLEncoding.EncodeToString(sum[:])
 }
-func exchange(ctx context.Context, client *http.Client, endpoint string, values url.Values) (*tokenResponse, error) {
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, strings.NewReader(values.Encode()))
+
+// exchange sends a token request. With a key, it carries a proof of the key,
+// and the tokens the server answers are bound to it.
+func exchange(ctx context.Context, client *http.Client, endpoint string, values url.Values, key *devicekey.Key) (*tokenResponse, error) {
+	post := func() (*http.Response, []byte, error) {
+		req, err := http.NewRequestWithContext(ctx, "POST", endpoint, strings.NewReader(values.Encode()))
+		if err != nil {
+			return nil, nil, err
+		}
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Accept", "application/json")
+		if key != nil {
+			proof, err := key.Proof("POST", endpoint, "")
+			if err != nil {
+				return nil, nil, err
+			}
+			req.Header.Set("DPoP", proof)
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			return nil, nil, fmt.Errorf("OAuth request: %w", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		data, err := api.ReadBody(resp.Body)
+		return resp, data, err
+	}
+	resp, data, err := post()
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Accept", "application/json")
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("OAuth request: %w", err)
+	var e struct {
+		Description string `json:"error_description"`
+		Error       string `json:"error"`
 	}
-	defer func() { _ = resp.Body.Close() }()
-	data, err := api.ReadBody(resp.Body)
-	if err != nil {
-		return nil, err
+	refusedProof := func() bool {
+		e.Error, e.Description = "", ""
+		_ = json.Unmarshal(data, &e)
+		return resp.StatusCode == http.StatusBadRequest && e.Error == "invalid_dpop_proof"
+	}
+	// A proof dated ahead of the server's clock is refused; send one dated by
+	// the server's clock once.
+	if key != nil && refusedProof() && key.SyncClock(resp.Header) {
+		if resp, data, err = post(); err != nil {
+			return nil, err
+		}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		var e struct {
-			Description string `json:"error_description"`
-			Error       string `json:"error"`
-		}
+		e.Error, e.Description = "", ""
 		_ = json.Unmarshal(data, &e)
 		message := e.Description
 		if message == "" {
@@ -104,11 +146,16 @@ func exchange(ctx context.Context, client *http.Client, endpoint string, values 
 	if err := json.Unmarshal(data, &token); err != nil {
 		return nil, err
 	}
-	if token.AccessToken == "" || !strings.EqualFold(token.TokenType, "Bearer") || token.ExpiresIn <= 0 {
+	bound := key != nil && strings.EqualFold(token.TokenType, "DPoP")
+	if token.AccessToken == "" || !bound && !strings.EqualFold(token.TokenType, "Bearer") || token.ExpiresIn <= 0 {
 		return nil, errors.New("authorization server returned an invalid token response")
 	}
 	return &token, nil
 }
+
+// bound reports whether a token response bound its tokens to the key of the
+// request.
+func (t *tokenResponse) bound() bool { return strings.EqualFold(t.TokenType, "DPoP") }
 func Discover(ctx context.Context, base string, client *http.Client) (*ServerConfig, *Metadata, error) {
 	c := api.Client{BaseURL: base, HTTP: client}
 	response, err := c.Do(ctx, "GET", "/api/cli/config", nil, nil)
@@ -226,28 +273,43 @@ func stopServer(server *http.Server) {
 	}
 }
 
-func Login(ctx context.Context, o LoginOptions) (*credential.Session, *ServerConfig, error) {
+// Login signs in with the browser. When the API binds tokens, it answers the
+// key they are bound to, which the caller closes.
+func Login(ctx context.Context, o LoginOptions) (_ *credential.Session, _ *ServerConfig, _ *devicekey.Key, err error) {
 	client := o.HTTP
 	if client == nil {
 		client = api.HTTPClient(30 * time.Second)
 	}
 	server, meta, err := Discover(ctx, o.BaseURL, client)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
+	}
+	// The key comes first: a TPM can take a moment, and the browser should not
+	// wait on it.
+	var key *devicekey.Key
+	if server.BindsTokens() {
+		if key, err = devicekey.Create(); err != nil {
+			return nil, nil, nil, fmt.Errorf("create the device key: %w", err)
+		}
+		defer func() {
+			if err != nil {
+				discardKey(key)
+			}
+		}()
 	}
 	listener, err := net.Listen("tcp4", fmt.Sprintf("127.0.0.1:%d", o.Port))
 	if err != nil {
-		return nil, nil, fmt.Errorf("open login callback: %w", err)
+		return nil, nil, nil, fmt.Errorf("open login callback: %w", err)
 	}
 	defer func() { _ = listener.Close() }()
 	redirect := "http://" + listener.Addr().String() + "/callback"
 	verifier, err := Random()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	state, err := Random()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	scope := "openid profile email offline_access cli:read"
 	if !o.ReadOnly {
@@ -262,44 +324,44 @@ func Login(ctx context.Context, o LoginOptions) (*credential.Session, *ServerCon
 	}
 	data, readErr := os.ReadFile(registrationPath)
 	if readErr != nil && !errors.Is(readErr, os.ErrNotExist) {
-		return nil, nil, readErr
+		return nil, nil, nil, readErr
 	}
 	if readErr == nil {
 		if err := json.Unmarshal(data, &registration); err != nil {
-			return nil, nil, fmt.Errorf("invalid OAuth client registration: %w", err)
+			return nil, nil, nil, fmt.Errorf("invalid OAuth client registration: %w", err)
 		}
 	}
 	if registration.BaseURL != o.BaseURL || registration.ClientID == "" {
-		body, err := json.Marshal(map[string]any{"client_name": "Edka CLI", "client_uri": "https://github.com/edkadigital/cli", "redirect_uris": []string{redirect}, "token_endpoint_auth_method": "none", "application_type": "native", "grant_types": []string{"authorization_code", "refresh_token"}, "response_types": []string{"code"}, "scope": scope, "resources": []string{server.Resource}})
+		body, err := json.Marshal(map[string]any{"client_name": "Edka CLI", "client_uri": "https://github.com/edkadigital/cli", "redirect_uris": []string{redirect}, "token_endpoint_auth_method": "none", "application_type": "native", "grant_types": []string{"authorization_code", "refresh_token"}, "response_types": []string{"code"}, "scope": scope, "resources": []string{server.Resource}, "dpop_bound_access_tokens": server.BindsTokens()})
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		req, err := http.NewRequestWithContext(ctx, "POST", meta.RegistrationEndpoint, strings.NewReader(string(body)))
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		req.Header.Set("Content-Type", "application/json")
 		resp, err := client.Do(req)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		data, readErr := api.ReadBody(resp.Body)
 		_ = resp.Body.Close()
 		if readErr != nil {
-			return nil, nil, readErr
+			return nil, nil, nil, readErr
 		}
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			return nil, nil, fmt.Errorf("register Edka CLI (HTTP %d); check CLI access is enabled", resp.StatusCode)
+			return nil, nil, nil, fmt.Errorf("register Edka CLI (HTTP %d); check CLI access is enabled", resp.StatusCode)
 		}
 		if err := json.Unmarshal(data, &registration); err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		if registration.ClientID == "" {
-			return nil, nil, errors.New("registration returned no client ID")
+			return nil, nil, nil, errors.New("registration returned no client ID")
 		}
 		registration.BaseURL = o.BaseURL
 		if err := config.WriteJSON(registrationPath, registration); err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 	}
 	result := make(chan callbackResult, 1)
@@ -313,7 +375,7 @@ func Login(ctx context.Context, o LoginOptions) (*credential.Session, *ServerCon
 	defer stopServer(httpServer)
 	endpoint, err := url.Parse(meta.AuthorizationEndpoint)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	q := endpoint.Query()
 	for k, v := range map[string]string{"response_type": "code", "client_id": registration.ClientID, "redirect_uri": redirect, "scope": scope, "state": state, "code_challenge": Challenge(verifier), "code_challenge_method": "S256", "resource": server.Resource, "prompt": "consent"} {
@@ -329,55 +391,110 @@ func Login(ctx context.Context, o LoginOptions) (*credential.Session, *ServerCon
 	var callback callbackResult
 	select {
 	case <-ctx.Done():
-		return nil, nil, ctx.Err()
+		return nil, nil, nil, ctx.Err()
 	case err := <-serverErrors:
-		return nil, nil, err
+		return nil, nil, nil, err
 	case callback = <-result:
 	}
 	if callback.Err != nil {
-		return nil, nil, callback.Err
+		return nil, nil, nil, callback.Err
 	}
-	token, err := exchange(ctx, client, meta.TokenEndpoint, url.Values{"grant_type": {"authorization_code"}, "client_id": {registration.ClientID}, "redirect_uri": {redirect}, "code": {callback.Code}, "code_verifier": {verifier}, "resource": {server.Resource}})
+	token, err := exchange(ctx, client, meta.TokenEndpoint, url.Values{"grant_type": {"authorization_code"}, "client_id": {registration.ClientID}, "redirect_uri": {redirect}, "code": {callback.Code}, "code_verifier": {verifier}, "resource": {server.Resource}}, key)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return &credential.Session{APIURL: o.BaseURL, Issuer: meta.Issuer, ClientID: registration.ClientID, TokenEndpoint: meta.TokenEndpoint, RevocationEndpoint: meta.RevocationEndpoint, AccessToken: token.AccessToken, RefreshToken: token.RefreshToken, ExpiresAt: time.Now().Add(time.Duration(token.ExpiresIn) * time.Second), Scope: token.Scope}, server, nil
+	session := &credential.Session{APIURL: o.BaseURL, Issuer: meta.Issuer, ClientID: registration.ClientID, TokenEndpoint: meta.TokenEndpoint, RevocationEndpoint: meta.RevocationEndpoint, AccessToken: token.AccessToken, RefreshToken: token.RefreshToken, ExpiresAt: time.Now().Add(time.Duration(token.ExpiresIn) * time.Second), Scope: token.Scope}
+	if key != nil && !token.bound() {
+		discardKey(key)
+		key = nil
+	}
+	if key != nil {
+		saved := key.Saved()
+		session.DeviceKey = &saved
+	}
+	return session, server, key, nil
 }
-func Token(ctx context.Context, store credential.Store, profile, base string, client *http.Client) (string, error) {
+
+// discardKey closes a key and deletes it from the hardware that keeps it by name.
+func discardKey(key *devicekey.Key) {
+	if key == nil {
+		return
+	}
+	key.Close()
+	_ = devicekey.Delete(key.Saved())
+}
+
+// Credentials are what a request needs: the access token and, when the token
+// is bound to a device key, what opens that key.
+type Credentials struct {
+	AccessToken string
+	DeviceKey   *devicekey.Saved
+}
+
+// Token answers the saved credentials of a profile, refreshed when the access
+// token nears its end. A session signed in before the API bound tokens is
+// bound to a new device key at that refresh.
+func Token(ctx context.Context, store credential.Store, profile, base string, client *http.Client) (Credentials, error) {
 	if !config.ValidName(profile) {
-		return "", fmt.Errorf("invalid profile name")
+		return Credentials{}, fmt.Errorf("invalid profile name")
 	}
 	if err := os.MkdirAll(store.Dir, 0700); err != nil {
-		return "", err
+		return Credentials{}, err
 	}
 	lock := flock.New(filepath.Join(store.Dir, "refresh-"+profile+".lock"))
 	locked, err := lock.TryLockContext(ctx, 100*time.Millisecond)
 	if err != nil {
-		return "", err
+		return Credentials{}, err
 	}
 	if !locked {
-		return "", errors.New("another Edka command is refreshing credentials")
+		return Credentials{}, errors.New("another Edka command is refreshing credentials")
 	}
 	defer func() { _ = lock.Unlock() }()
 	session, err := store.Load(profile)
 	if err != nil {
-		return "", err
+		return Credentials{}, err
 	}
 	if session.APIURL != base {
-		return "", errors.New("credentials belong to another API origin; use another profile or run `edka login`")
+		return Credentials{}, errors.New("credentials belong to another API origin; use another profile or run `edka login`")
 	}
 	if err := api.SameOrigin(base, session.TokenEndpoint); err != nil {
-		return "", err
+		return Credentials{}, err
 	}
 	if time.Until(session.ExpiresAt) > 60*time.Second {
-		return session.AccessToken, nil
+		return Credentials{AccessToken: session.AccessToken, DeviceKey: session.DeviceKey}, nil
 	}
 	if session.RefreshToken == "" {
-		return "", credential.ErrNotFound
+		return Credentials{}, credential.ErrNotFound
 	}
-	token, err := exchange(ctx, client, session.TokenEndpoint, url.Values{"grant_type": {"refresh_token"}, "client_id": {session.ClientID}, "refresh_token": {session.RefreshToken}, "resource": {base + "/api"}})
+	var key *devicekey.Key
+	created := false
+	if session.DeviceKey != nil {
+		if key, err = devicekey.Open(*session.DeviceKey); err != nil {
+			return Credentials{}, err
+		}
+	} else if bindsTokens(ctx, client, base) {
+		// A key that can't be made leaves the session with bearer tokens.
+		if key, err = devicekey.Create(); err == nil {
+			created = true
+		}
+	}
+	if key != nil {
+		defer key.Close()
+	}
+	token, err := exchange(ctx, client, session.TokenEndpoint, url.Values{"grant_type": {"refresh_token"}, "client_id": {session.ClientID}, "refresh_token": {session.RefreshToken}, "resource": {base + "/api"}}, key)
 	if err != nil {
-		return "", err
+		if created {
+			_ = devicekey.Delete(key.Saved())
+		}
+		return Credentials{}, err
+	}
+	switch {
+	case key != nil && token.bound():
+		saved := key.Saved()
+		session.DeviceKey = &saved
+	case key != nil:
+		_ = devicekey.Delete(key.Saved())
+		session.DeviceKey = nil
 	}
 	session.AccessToken = token.AccessToken
 	session.ExpiresAt = time.Now().Add(time.Duration(token.ExpiresIn) * time.Second)
@@ -388,9 +505,19 @@ func Token(ctx context.Context, store credential.Store, profile, base string, cl
 		session.Scope = token.Scope
 	}
 	if _, err := store.Save(profile, session); err != nil {
-		return "", fmt.Errorf("save refreshed credentials: %w", err)
+		return Credentials{}, fmt.Errorf("save refreshed credentials: %w", err)
 	}
-	return session.AccessToken, nil
+	return Credentials{AccessToken: session.AccessToken, DeviceKey: session.DeviceKey}, nil
+}
+
+// bindsTokens asks the API whether it binds tokens to a device key.
+func bindsTokens(ctx context.Context, client *http.Client, base string) bool {
+	response, err := (&api.Client{BaseURL: base, HTTP: client}).Do(ctx, "GET", "/api/cli/config", nil, nil)
+	if err != nil {
+		return false
+	}
+	var server ServerConfig
+	return json.Unmarshal(response.Body, &server) == nil && server.BindsTokens()
 }
 func Revoke(ctx context.Context, client *http.Client, session *credential.Session) error {
 	if session.RefreshToken == "" || session.RevocationEndpoint == "" {

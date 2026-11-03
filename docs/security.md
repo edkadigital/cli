@@ -35,6 +35,19 @@ rename. Windows uses the operating system's user-directory ACLs; use keyring mod
 when strict credential-store policy is required. Configuration never contains
 credentials, and `.edka.json` contains only profile/origin/resource IDs.
 
+Each login binds its tokens to a key of the computer it ran on (DPoP,
+[RFC 9449](https://www.rfc-editor.org/rfc/rfc9449)). The CLI makes the key in the
+Secure Enclave on a Mac, and in the TPM on Windows, through the Microsoft
+Platform Crypto Provider, and on Linux, through `/dev/tpmrm0`. The key signs a
+proof for every request and every token refresh, and Edka refuses a bound token
+that comes without a proof from its key. The chip never releases the private key,
+so saved credentials copied to another computer authenticate nothing there. A Mac
+without a Secure Enclave, a computer without a TPM, or a Linux user outside the
+group that owns `/dev/tpmrm0` (usually `tss`) gets a software key saved with the
+credentials, and `edka login` says which key it made. Even then, a token that
+leaks on its own, from a log or a proxy, authenticates nothing. A login from an
+earlier CLI gets a key at its next refresh. `edka logout` deletes the key.
+
 Access tokens expire after 15 minutes, and refresh tokens rotate. `edka logout`
 revokes the refresh token, then deletes the saved credentials; `logout --local`
 deletes them without asking Edka. An access token issued before a revocation works

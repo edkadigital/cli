@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/edkadigital/cli/internal/config"
+	"github.com/edkadigital/cli/internal/devicekey"
 	"github.com/zalando/go-keyring"
 )
 
@@ -25,6 +26,9 @@ type Session struct {
 	RefreshToken       string    `json:"refresh_token,omitempty"`
 	ExpiresAt          time.Time `json:"expires_at"`
 	Scope              string    `json:"scope"`
+	// DeviceKey opens the key the tokens are bound to (RFC 9449 DPoP). A
+	// session without one carries bearer tokens.
+	DeviceKey *devicekey.Saved `json:"device_key,omitempty"`
 }
 type Store struct {
 	Dir  string
