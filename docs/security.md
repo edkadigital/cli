@@ -45,8 +45,9 @@ so saved credentials copied to another computer authenticate nothing there. A Ma
 without a Secure Enclave, a computer without a TPM, or a Linux user outside the
 group that owns `/dev/tpmrm0` (usually `tss`) gets a software key saved with the
 credentials, and `edka login` says which key it made. Even then, a token that
-leaks on its own, from a log or a proxy, authenticates nothing. A login from an
-earlier CLI gets a key at its next refresh. `edka logout` deletes the key.
+leaks on its own, from a log or a proxy, authenticates nothing. Edka issues no
+token without a proof of a key, so a sign-in made before v0.10.0 needs
+`edka login` again. `edka logout` deletes the key.
 
 Access tokens expire after 15 minutes, and refresh tokens rotate. `edka logout`
 revokes the refresh token, then deletes the saved credentials; `logout --local`
@@ -55,9 +56,8 @@ until it expires, but a user who is disabled or leaves the organization fails th
 next request. A token is bound to one organization, and a request can't switch it to
 another.
 
-`EDKA_TOKEN` supports short-lived automation and is never saved. Keep access tokens
-out of shell arguments, repository files and logs. Edka issues no long-lived
-machine-to-machine CLI tokens. The CLI collects no telemetry and runs no shell
+Edka issues no long-lived machine-to-machine CLI tokens, and no token works
+without the key it is bound to. The CLI collects no telemetry and runs no shell
 scripts.
 
 A GitHub Actions job signs in with a trust instead of a stored secret. With
@@ -71,8 +71,7 @@ and saves nothing. Edka accepts each GitHub token once and checks its signature,
 issuer, audience, expiry, repository ID, owner ID, ref, environment and workflow
 against the trust. A trust's token reaches only the routes of `edka apps publish`
 and `edka apps update`, for the one app the trust names, and never passes a
-passkey check. `EDKA_TOKEN` and `EDKA_TRUST` together are refused, and so is
-`edka login` while `EDKA_TRUST` is set.
+passkey check. `edka login` is refused while `EDKA_TRUST` is set.
 
 The CLI replaces its binary only when `edka upgrade` runs. The upgrade reads the
 latest release of github.com/edkadigital/cli over HTTPS, without a token. It follows a
