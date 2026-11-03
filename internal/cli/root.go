@@ -808,8 +808,16 @@ func (a *App) addAuth(root *cobra.Command) {
 			return err
 		}
 		client := api.Client{BaseURL: a.current.APIURL, Token: session.AccessToken, Version: a.Version, HTTP: a.HTTP}
+		saved := false
 		if key != nil {
-			defer key.Close()
+			// A login that fails before its credentials are saved leaves no
+			// key behind; the Windows TPM provider keeps keys until deleted.
+			defer func() {
+				key.Close()
+				if !saved {
+					_ = devicekey.Delete(key.Saved())
+				}
+			}()
 			client.Prover = key
 		}
 		identity, err := client.Do(ctx, "GET", "/api/cli/whoami", nil, nil)
@@ -838,6 +846,7 @@ func (a *App) addAuth(root *cobra.Command) {
 		if err != nil {
 			return err
 		}
+		saved = true
 		// The key of the login this one replaces is no longer used.
 		if previous != nil && previous.DeviceKey != nil {
 			_ = devicekey.Delete(*previous.DeviceKey)

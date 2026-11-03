@@ -12,6 +12,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -284,5 +287,30 @@ func TestRefreshRefusesAKeyThatDoesNotOpen(t *testing.T) {
 	}
 	if len(refresh.keys) != 0 {
 		t.Fatal("refreshed without the session's key")
+	}
+}
+
+func TestRefreshDeletesAKeyItCouldNotSave(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a read-only directory doesn't stop the owner on Windows")
+	}
+	refresh := newRefreshServer(t, true)
+	defer refresh.server.Close()
+	store := credential.Store{Dir: t.TempDir(), Mode: "file"}
+	refresh.save(store, nil)
+	credentials := filepath.Join(store.Dir, "credentials")
+	if err := os.Chmod(credentials, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chmod(credentials, 0o700) }()
+	var deleted []devicekey.Saved
+	defer func(previous func(devicekey.Saved) error) { deleteDeviceKey = previous }(deleteDeviceKey)
+	deleteDeviceKey = func(saved devicekey.Saved) error { deleted = append(deleted, saved); return nil }
+
+	if _, err := Token(context.Background(), store, "default", refresh.server.URL, api.HTTPClient(5*time.Second)); err == nil || !strings.Contains(err.Error(), "save refreshed credentials") {
+		t.Fatalf("err = %v", err)
+	}
+	if len(refresh.keys) != 1 || len(deleted) != 1 {
+		t.Fatalf("refreshes %d, deleted keys %d", len(refresh.keys), len(deleted))
 	}
 }

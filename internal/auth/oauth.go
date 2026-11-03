@@ -421,8 +421,11 @@ func discardKey(key *devicekey.Key) {
 		return
 	}
 	key.Close()
-	_ = devicekey.Delete(key.Saved())
+	_ = deleteDeviceKey(key.Saved())
 }
+
+// deleteDeviceKey deletes a key the CLI no longer uses; tests watch it.
+var deleteDeviceKey = devicekey.Delete
 
 // Credentials are what a request needs: the access token and, when the token
 // is bound to a device key, what opens that key.
@@ -484,7 +487,7 @@ func Token(ctx context.Context, store credential.Store, profile, base string, cl
 	token, err := exchange(ctx, client, session.TokenEndpoint, url.Values{"grant_type": {"refresh_token"}, "client_id": {session.ClientID}, "refresh_token": {session.RefreshToken}, "resource": {base + "/api"}}, key)
 	if err != nil {
 		if created {
-			_ = devicekey.Delete(key.Saved())
+			_ = deleteDeviceKey(key.Saved())
 		}
 		return Credentials{}, err
 	}
@@ -493,7 +496,7 @@ func Token(ctx context.Context, store credential.Store, profile, base string, cl
 		saved := key.Saved()
 		session.DeviceKey = &saved
 	case key != nil:
-		_ = devicekey.Delete(key.Saved())
+		_ = deleteDeviceKey(key.Saved())
 		session.DeviceKey = nil
 	}
 	session.AccessToken = token.AccessToken
@@ -505,6 +508,10 @@ func Token(ctx context.Context, store credential.Store, profile, base string, cl
 		session.Scope = token.Scope
 	}
 	if _, err := store.Save(profile, session); err != nil {
+		// A key made for this refresh serves no saved session.
+		if created {
+			_ = deleteDeviceKey(key.Saved())
+		}
 		return Credentials{}, fmt.Errorf("save refreshed credentials: %w", err)
 	}
 	return Credentials{AccessToken: session.AccessToken, DeviceKey: session.DeviceKey}, nil
